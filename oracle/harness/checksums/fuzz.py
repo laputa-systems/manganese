@@ -1,3 +1,4 @@
+#!/usr/bin/env -S python3 -B
 import os
 import pathlib
 import random
