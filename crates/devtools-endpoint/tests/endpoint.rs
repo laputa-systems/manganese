@@ -69,11 +69,11 @@ fn masked_text(payload: &[u8]) -> Vec<u8> {
 
 #[test]
 fn a_hundred_protocol_requests_each_return_the_protocol_and_the_endpoint_keeps_serving() {
-    let endpoint = endpoint();
+    let endpoint = Endpoint::start(SocketAddr::from(([127, 0, 0, 1], 0)), launch::config(), launch::registry(Box::new(SequenceIds::new()))).expect("the endpoint starts");
     for round in 0..100 {
         let response = get(&endpoint, "/json/protocol");
         assert!(response.starts_with(b"HTTP/1.1 200 OK\r\n"), "round {round}");
-        assert_eq!(body(&response), FIXTURE, "round {round}");
+        assert_eq!(body(&response), include_bytes!("../protocol.json"), "round {round}");
     }
     let version = get(&endpoint, "/json/version");
     assert!(version.starts_with(b"HTTP/1.1 200 OK\r\n"));
@@ -115,4 +115,43 @@ fn a_websocket_session_answers_browser_get_version() {
     let text = String::from_utf8_lossy(&reply);
     assert!(text.starts_with("HTTP/1.1 101 WebSocket Protocol Handshake\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: s3pPLMBiTxaQ9kYGzzhZRbK+xOo=\r\n\r\n"));
     assert!(text.contains(r#"{"id":1,"result":{"protocolVersion":"1.3","product":"Chrome/156.0.8078.79""#));
+}
+
+#[test]
+fn client_disconnect_mid_request_does_not_interrupt_other_connections() {
+    let endpoint = endpoint();
+    let mut abandoned = connect(&endpoint);
+    abandoned.write_all(b"GET /json/version HTTP/1.1\r\nHost:").expect("partial request");
+    drop(abandoned);
+    assert!(get(&endpoint, "/json/version").starts_with(b"HTTP/1.1 200 OK\r\n"));
+}
+
+#[test]
+fn upgraded_connection_closes_after_a_close_frame() {
+    let endpoint = endpoint();
+    let mut stream = connect(&endpoint);
+    write!(stream, "GET /devtools/browser/{} HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n", launch::BROWSER_ID).expect("handshake");
+    let mut handshake = Vec::new();
+    while !handshake.ends_with(b"\r\n\r\n") {
+        let mut byte = [0u8; 1];
+        stream.read_exact(&mut byte).expect("handshake response");
+        handshake.push(byte[0]);
+    }
+    assert!(handshake.starts_with(b"HTTP/1.1 101"));
+    stream.write_all(&[0x88, 0x80, 1, 2, 3, 4]).expect("close frame");
+    let mut reply = Vec::new();
+    stream.read_to_end(&mut reply).expect("server closes the connection");
+    assert_eq!(reply, [0x88, 0x02, 0x03, 0xe8]);
+    assert!(get(&endpoint, "/json/version").starts_with(b"HTTP/1.1 200 OK\r\n"));
+}
+
+#[test]
+fn dropping_endpoint_closes_an_idle_keep_alive_connection() {
+    let endpoint = endpoint();
+    let mut stream = connect(&endpoint);
+    stream.write_all(b"GET /json/version HTTP/1.1\r\nHost: localhost\r\n\r\n").expect("request");
+    assert!(read_all(&mut stream).starts_with(b"HTTP/1.1 200 OK\r\n"));
+    drop(endpoint);
+    let mut byte = [0u8; 1];
+    assert_eq!(stream.read(&mut byte).expect("connection closes"), 0);
 }

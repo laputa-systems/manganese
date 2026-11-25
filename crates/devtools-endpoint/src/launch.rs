@@ -27,10 +27,10 @@ pub fn identity() -> Identity {
     }
 }
 
-/// The protocol description is read from the file named by `MANGANESE_PROTOCOL_JSON` when a client asks for it.
+/// The protocol description may be overridden by the file named by `MANGANESE_PROTOCOL_JSON`.
 pub fn config() -> Config {
     let protocol = std::env::var_os(PROTOCOL_ENV).map_or_else(
-        || ProtocolSource::Bytes(format!("{PROTOCOL_ENV} names the file with Chromium's protocol.json, and it is not set\n").into_bytes()),
+        || ProtocolSource::Bytes(include_bytes!("../protocol.json").to_vec()),
         |path| ProtocolSource::File(path.into()),
     );
     Config {
