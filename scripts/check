@@ -25,7 +25,7 @@ step() {
 frozen_tree() {
     sha256sum -c -s oracle/build.sha256 || return 1
     listed=$(awk '{ print $2 }' oracle/build.sha256 | LC_ALL=C sort)
-    actual=$(find oracle/build -type f | LC_ALL=C sort)
+    actual=$(find oracle/build -type d -name __pycache__ -prune -o -type f -print | LC_ALL=C sort)
     [ "$listed" = "$actual" ] || { echo "oracle/build has files outside oracle/build.sha256"; return 1; }
 }
 
@@ -57,7 +57,7 @@ LINKS
 
 frozen_verifier() {
     command -v llvm-readelf >/dev/null || { echo "llvm-readelf is not on PATH"; return 1; }
-    python3 oracle/build/scripts/install-runtime.py --help >/dev/null
+    python3 -B oracle/build/scripts/install-runtime.py --help >/dev/null
 }
 
 builder_base() {
