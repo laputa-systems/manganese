@@ -33,7 +33,7 @@ fn decode(enc: &'static Encoding, mode: u8, fatal: bool, chunks: &[&[u8]]) -> Re
             let (result, _, written) = decoder.decode_to_utf16_without_replacement(chunk, &mut units, last);
             match result {
                 DecoderResult::InputEmpty => (written, false),
-                DecoderResult::Malformed(_, _) => (written, true),
+                DecoderResult::Malformed(_, _) => (0, true),
                 DecoderResult::OutputFull => return Err("decode buffer too small"),
             }
         } else {
@@ -58,12 +58,10 @@ fn encode(enc: &'static Encoding, input: &[u8]) -> Result<Vec<u8>, &'static str>
     let mut encoder = enc.new_encoder();
     let capacity = input.len().checked_mul(16).and_then(|n| n.checked_add(64)).ok_or("input too large")?;
     let mut output = vec![0; capacity];
-    let (result, _, written, error) = encoder.encode_from_utf16(&input, &mut output, true);
+    let (result, _, written, _) = encoder.encode_from_utf16(&input, &mut output, true);
     if result != CoderResult::InputEmpty { return Err("encode buffer too small"); }
     output.truncate(written);
-    let mut response = vec![u8::from(error)];
-    response.extend(output);
-    Ok(response)
+    Ok(output)
 }
 
 fn record(input: &[u8]) -> Result<Vec<u8>, &'static str> {
@@ -73,7 +71,7 @@ fn record(input: &[u8]) -> Result<Vec<u8>, &'static str> {
     let enc = Encoding::for_label(label);
     if op == 0 {
         if reader.offset != input.len() { return Err("trailing request"); }
-        return Ok(enc.map_or_else(Vec::new, |encoding| encoding.name().as_bytes().to_vec()));
+        return Ok(enc.map_or_else(Vec::new, |encoding| encoding.name().to_ascii_lowercase().into_bytes()));
     }
     let enc = enc.ok_or("unknown label")?;
     let response = match op {
@@ -123,11 +121,16 @@ mod tests {
     fn streaming_utf8_and_fatal_error() {
         let enc = Encoding::for_label(b"utf-8").unwrap();
         assert_eq!(decode(enc, 1, false, &[b"\xef", b"\xbb\xbf\xe2", b"\x82\xac"]).unwrap(), [0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,1,0x20,0xac,0]);
-        assert_eq!(decode(enc, 0, true, &[b"a\xff"]).unwrap(), [1, 0,0,0,1,0,97,1]);
+        assert_eq!(decode(enc, 0, true, &[b"a\xff"]).unwrap(), [1, 0,0,0,0,1]);
     }
     #[test]
     fn ncr_for_unencodable_input() {
         let enc = Encoding::for_label(b"windows-1252").unwrap();
-        assert_eq!(encode(enc, &[0x20, 0xac, 0x4e, 0x2d]).unwrap(), b"\x01\x80&#20013;");
+        assert_eq!(encode(enc, &[0x20, 0xac, 0x4e, 0x2d]).unwrap(), b"\x80&#20013;");
+    }
+    #[test]
+    fn label_lookup_canonicalizes_and_rejects_unknown_names() {
+        assert_eq!(record(b"\x00\x00\x00\x00\x05UtF-8").unwrap(), b"utf-8");
+        assert!(record(b"\x00\x00\x00\x00\x03bad").unwrap().is_empty());
     }
 }
