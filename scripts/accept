@@ -56,7 +56,11 @@ esac
 digest() { if [ -f "$1" ]; then sha256sum "$1" | cut -d' ' -f1; else echo missing; fi; }
 oracle=$(fact oracle)
 candidate=$(fact candidate)
-cargo tree --locked --offline -p "$box" -e normal --prefix none > "$work/dependencies" 2>/dev/null || echo unavailable > "$work/dependencies"
+if ! cargo tree --locked --offline --manifest-path "crates/$box/Cargo.toml" -e normal --prefix none > "$work/dependencies" 2> "$work/dependencies.err"; then
+    echo "accept: cannot record the dependency tree of crates/$box:" >&2
+    cat "$work/dependencies.err" >&2
+    exit 1
+fi
 {
     echo "version 1"
     echo "box $box"

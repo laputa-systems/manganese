@@ -1,0 +1,16 @@
+version 1
+box encoding
+revision 5bc6ad428855b47870f7022fc8a552d26526cf12
+arch x86_64
+spec sha256:b54ce70ecd49a9c313ca762a736d142f4846352f51688d51b0538e6ddc755221
+corpus sha256:6dee88b6f62106f385746460cd407074f230a828e24ef332d62b7245ffdd6613 seen 224 holdout 224
+oracle .work/tmp/encoding/oracle sha256:b102753ad21dfee2b1d45c22dc54ddc484e7c941041b7b757c0201b5d4a524b6
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/encoding sha256:85692551e817db9ac92538f987a05fe0b34fa5a91986e1ef053753b894637c08
+dependencies cargo-lock sha256:6dccb29a545fb55bc69229b34dff3bf62a8360a1ae94223ec600e70a5c0644db tree sha256:4105d173fcbc4acf9238932d8aebf1243afd7e115ef98ff2c33c4c9fe0e721b5
+run seen exit 0 items 224 224
+run holdout exit 0 items 224 224
+run fuzz exit 0 seed 1795636574301594733 requested 20000 completed 20000
+level source-harness met
+level frozen-browser pending: frozen-browser TextDecoder and form submission comparison has not been built
+level integration pending: arm64 evidence (public_api: TextDecoder and form submission in the frozen arm64 browser) and make closure have not run

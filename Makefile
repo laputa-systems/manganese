@@ -78,6 +78,12 @@ zlib-harness:
 	mkdir -p .work/tmp/zlib
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zlib $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/zlib/build.py
 
+.PHONY: numerics-harness
+numerics-harness:
+	mkdir -p .work/tmp/numerics
+	set -e; image=$$(sh oracle/source-oracle image-tag); docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/numerics "$$image" python3 -B /lane/oracle/harness/numerics/build_json.py
+	set -e; image=$$(sh oracle/source-oracle image-tag); docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/numerics "$$image" python3 -B /lane/oracle/harness/numerics/build.py
+
 .PHONY: checksums-harness
 checksums-harness:
 	mkdir -p .work/tmp/checksums
@@ -91,6 +97,10 @@ zstd-harness:
 png-harness:
 	mkdir -p .work/tmp/png
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/png $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/png/build.py
+
+.PHONY: png-anchor
+png-anchor:
+	python3 -B oracle/harness/png/anchor.py
 
 .PHONY: zlib-anchor
 zlib-anchor:
@@ -120,3 +130,12 @@ brotli-harness:
 .PHONY: brotli-anchor
 brotli-anchor:
 	PYTHONPATH=oracle/harness/brotli python3 -B oracle/harness/brotli/anchor.py
+
+.PHONY: encoding-harness
+encoding-harness:
+	mkdir -p .work/tmp/encoding
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/encoding "$$tag" python3 -B /lane/oracle/harness/encoding/build.py
+
+.PHONY: zstd-anchor
+zstd-anchor:
+	PYTHONPATH=oracle/harness/zstd python3 -B oracle/harness/zstd/anchor.py

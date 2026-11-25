@@ -156,7 +156,10 @@ Run `make box BOX=<id>` for L0 or `make box BOX=<id> LANE=holdout` for L1.
 L0 loads seen blobs only, then applies Linux Landlock before invoking either
 adapter. The sandbox permits read and execution of the adapter binaries and
 runtime libraries but denies access to the blob store. L0 fails closed when
-Landlock is unavailable. L1 loads holdout blobs and runs the same oracle and
+Landlock is unavailable. Every adapter run, in every lane and in fuzzing, gets an empty private
+directory named by `GOLDENS_SCRATCH` under `.work/tmp/goldens-scratch/` for working files it writes
+and reads back, such as a database it reopens; L0 permits reading that tree, which never overlaps
+the store, and the runner removes it. L1 loads holdout blobs and runs the same oracle and
 candidate comparisons. Run `make box-fuzz BOX=<id>` for L1 differential
 fuzzing against the prebuilt oracle named by the spec. Build the harness beforehand. The lane starts one
 oracle and one candidate and sends each a stream of requests. `SEED` selects a
@@ -166,6 +169,15 @@ starts any generator or driver. On divergence the runner minimizes byte removals
 zero-based case index, input and outputs, and saves the input as
 `.work/tmp/fuzz-<box>-<seed>.bin`. `INJECT=1` selects the selftest injected
 candidate as a negative control.
+
+When the oracle disagrees with itself on an input, the runner asks it six more times. In the seen
+and holdout lanes, a spec whose `varying_relationships` is `none: ...` fails with an oracle
+self-disagreement as before; a spec that declares a varying relationship passes the item only when
+the recorded golden is among the oracle's answers. In fuzzing, a difference on which the oracle is
+stable is a divergence and is minimized as above; when the oracle varies, the case passes only if the
+spec declares a varying relationship and the candidate gave one of the oracle's own answers, the
+input is saved as `.work/tmp/fuzz-<box>-<seed>-variation<index>.bin`, and the run fails once such
+cases exceed 1% of `CASES`. A varying oracle never excuses an answer the oracle itself did not give.
 
 Every adapter response, in the seen and holdout lanes and in fuzzing, must arrive within
 `PEER_TIMEOUT_SECS` (default 300) and announce at most `PEER_MAX_OUTPUT` bytes (default 1 GiB). An

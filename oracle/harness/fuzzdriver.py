@@ -1,7 +1,8 @@
 """The loop every structured fuzz driver runs under `box-fuzz`.
 
 The runner validates SEED and CASES and passes them with FUZZ_ORACLE, FUZZ_CANDIDATE and FUZZ_RESULT.
-Each peer response is bounded by PEER_TIMEOUT_SECS and PEER_MAX_OUTPUT. Whatever stops the run, the
+Each peer response is bounded by PEER_TIMEOUT_SECS and PEER_MAX_OUTPUT, and each peer gets an empty
+GOLDENS_SCRATCH directory for its working files. Whatever stops the run, the
 request in flight is saved under .work/tmp with the peers' identities, and FUZZ_RESULT records the
 seed, the requested cases and the cases completed; the runner rejects a run without it.
 """
@@ -10,9 +11,11 @@ import hashlib
 import os
 import pathlib
 import select
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 
 DEFAULT_TIMEOUT_SECS = 300
@@ -42,7 +45,10 @@ def budget():
 class Peer:
     def __init__(self, role, path, timeout, max_output):
         self.role, self.timeout, self.max_output = role, timeout, max_output
-        self.process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True)
+        pathlib.Path('.work/tmp').mkdir(parents=True, exist_ok=True)
+        self.scratch = tempfile.mkdtemp(prefix=f'fuzz-scratch-{role}-', dir='.work/tmp')
+        environment = dict(os.environ, GOLDENS_SCRATCH=os.path.abspath(self.scratch))
+        self.process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True, env=environment)
 
     def handshake(self):
         self.send(b'MGB1')
@@ -92,6 +98,7 @@ class Peer:
         except ProcessLookupError:
             pass
         self.process.wait()
+        shutil.rmtree(self.scratch, ignore_errors=True)
 
 
 def identity(role, path):

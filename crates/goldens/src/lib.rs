@@ -80,8 +80,35 @@ fn scoreboard(text: &str) -> Result<BTreeSet<String>, String> {
     Ok(result)
 }
 
-fn invoke(program: &Path, args: &[String], record: &[u8], limits: process::Limits) -> Result<Vec<u8>, String> {
-    process::Peer::start(program, args, &program.display().to_string(), limits)?.exchange(record)
+fn invoke(program: &Path, args: &[String], record: &[u8], limits: process::Limits, scratch: &mut process::Scratch) -> Result<Vec<u8>, String> {
+    let dir = scratch.fresh()?;
+    let result = process::Peer::start(program, args, &program.display().to_string(), limits, &dir).and_then(|peer| peer.exchange(record));
+    // The adapter has exited; its scratch held only that run's working files.
+    let _ = fs::remove_dir_all(&dir);
+    result
+}
+
+/// Further oracle runs taken when the oracle disagrees with itself on one input.
+pub(crate) const ORACLE_RESAMPLES: usize = 6;
+
+/// How one input's oracle answers bear on a candidate answer.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum OracleAgreement {
+    /// The oracle answered identically every time.
+    Stable,
+    /// The oracle varied, the spec declares a varying relationship, and the candidate gave one of
+    /// the oracle's own answers.
+    DeclaredVariation,
+    /// The oracle varied and the spec declares no varying relationship.
+    UndeclaredVariation,
+    /// The oracle varied and the candidate gave none of its answers.
+    UnmatchedVariation,
+}
+
+pub(crate) fn oracle_agreement(answers: &[Vec<u8>], candidate: &[u8], declared: bool, comparator: &Comparator) -> OracleAgreement {
+    if answers.windows(2).all(|pair| pair[0] == pair[1]) { return OracleAgreement::Stable; }
+    if !declared { return OracleAgreement::UndeclaredVariation; }
+    if answers.iter().any(|answer| compare(comparator, candidate, answer)) { OracleAgreement::DeclaredVariation } else { OracleAgreement::UnmatchedVariation }
 }
 
 fn compare(comparator: &Comparator, got: &[u8], expected: &[u8]) -> bool {
@@ -121,27 +148,31 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
     let oracle = options.oracle_override.clone().unwrap_or_else(|| PathBuf::from(&spec.oracle)).canonicalize().map_err(|e| format!("oracle path: {e}"))?;
     let candidate = options.candidate_override.clone().unwrap_or_else(|| PathBuf::from(&spec.candidate)).canonicalize().map_err(|e| format!("candidate path: {e}"))?;
     let limits = process::Limits::from_env()?;
+    let mut scratch = process::Scratch::create(&options.box_id)?;
     let score_dir = if options.ratchet { Some(fs::File::open(&boxdir).map_err(|e| format!("open scoreboard directory: {e}"))?) } else { None };
     let mut corpus = Vec::new();
     for item in items.iter().filter(|item| item.lane == options.lane) {
         corpus.push((item, load_blob(&options.store, &item.input_digest, item.input_size)?, load_blob(&options.store, &item.output_digest, item.output_size)?));
     }
     if options.lane == Lane::Seen {
-        sandbox::restrict(&[&oracle, &candidate], &options.store).map_err(|e| format!("L0 isolation unavailable: {e}"))?;
+        sandbox::restrict(&[&oracle, &candidate], &options.store, scratch.root()).map_err(|e| format!("L0 isolation unavailable: {e}"))?;
         if let Some(path) = &options.probe_holdout {
             return match fs::read(path) { Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => Ok(()), Err(e) => Err(format!("holdout probe failed for another reason: {e}")), Ok(_) => Err("L0 read a holdout blob".into()) };
         }
     }
     for (item, input, golden) in &corpus {
-        let first = invoke(&oracle, &options.oracle_args, input, limits).map_err(|e| format!("oracle {}: {e}", item.id))?;
-        let second = invoke(&oracle, &options.oracle_args, input, limits).map_err(|e| format!("oracle {}: {e}", item.id))?;
-        if first != second { return Err(format!("oracle self-disagreement: {}", item.id)); }
-        if first != *golden { return Err(format!("oracle differs from recorded golden: {}", item.id)); }
+        let mut answers = Vec::new();
+        for _ in 0..2 { answers.push(invoke(&oracle, &options.oracle_args, input, limits, &mut scratch).map_err(|e| format!("oracle {}: {e}", item.id))?); }
+        if answers[0] != answers[1] {
+            if !matches!(spec.varying, Declaration::Present(_)) { return Err(format!("oracle self-disagreement: {}", item.id)); }
+            for _ in 0..ORACLE_RESAMPLES { answers.push(invoke(&oracle, &options.oracle_args, input, limits, &mut scratch).map_err(|e| format!("oracle {}: {e}", item.id))?); }
+        }
+        if !answers.contains(golden) { return Err(format!("oracle differs from recorded golden: {}", item.id)); }
     }
     let mut passing = BTreeSet::new();
     let mut failing = Vec::new();
     for (item, input, golden) in &corpus {
-        let got = invoke(&candidate, &[], input, limits).map_err(|e| format!("candidate {}: {e}", item.id))?;
+        let got = invoke(&candidate, &[], input, limits, &mut scratch).map_err(|e| format!("candidate {}: {e}", item.id))?;
         if compare(&spec.comparator, &got, golden) { passing.insert(item.id.clone()); } else { failing.push(item.id.clone()); }
     }
     let regressions: Vec<_> = old.difference(&passing).cloned().collect();
@@ -163,6 +194,23 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
     if !failing.is_empty() { return Err(format!("golden mismatch: {}", failing.join(", "))); }
     println!("lane={} items={} passed={}", if options.lane == Lane::Seen { "seen" } else { "holdout" }, corpus.len(), passing.len());
     Ok(())
+}
+
+#[cfg(test)]
+mod agreement_tests {
+    use super::*;
+
+    #[test]
+    fn a_varying_oracle_excuses_only_declared_variation_the_candidate_matches() {
+        let exact = Comparator::Exact { surface: String::new() };
+        let stable = vec![b"a".to_vec(), b"a".to_vec(), b"a".to_vec()];
+        let varied = vec![b"a".to_vec(), b"closed".to_vec(), b"a".to_vec()];
+        assert_eq!(oracle_agreement(&stable, b"b", true, &exact), OracleAgreement::Stable);
+        assert_eq!(oracle_agreement(&varied, b"a", true, &exact), OracleAgreement::DeclaredVariation);
+        assert_eq!(oracle_agreement(&varied, b"closed", true, &exact), OracleAgreement::DeclaredVariation);
+        assert_eq!(oracle_agreement(&varied, b"a", false, &exact), OracleAgreement::UndeclaredVariation);
+        assert_eq!(oracle_agreement(&varied, b"b", true, &exact), OracleAgreement::UnmatchedVariation);
+    }
 }
 
 #[cfg(test)]
