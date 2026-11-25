@@ -7,3 +7,14 @@ publish = false
 [[bin]]
 name = "devtools-endpoint-oracle"
 path = "src/bin/oracle.rs"
+
+[[bin]]
+name = "devtools-endpoint"
+path = "src/bin/candidate.rs"
+
+[dependencies]
+smol = { package = "laputa-smol", git = "https://github.com/laputa-systems/smolith", rev = "a88c05675dc305602181429330d162cffafef1b5" }
+fastwebsockets = { package = "laputa-fastwebsockets-futures-lite", git = "https://github.com/laputa-systems/smolith", rev = "a88c05675dc305602181429330d162cffafef1b5" }
+sha1 = "0.11"
+base64 = "0.23"
+getrandom = { version = "0.4", features = ["std"] }

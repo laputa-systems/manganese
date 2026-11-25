@@ -2,7 +2,8 @@
 
 Reads one JSON object per line: segments (base64 bytes and the pause after them in milliseconds) and the
 idle time that ends the read. Writes one JSON object per line: the raw bytes received and whether the
-server closed the connection.
+server closed the connection. A server that closes while segments remain unsent is not an error: the replay
+stops sending and reads what the server left.
 """
 
 import base64
@@ -20,7 +21,10 @@ def replay(segments: list[list[object]], idle_ms: int) -> dict[str, object]:
     closed = False
     try:
         for data, pause in segments:
-            connection.sendall(base64.b64decode(str(data)))
+            try:
+                connection.sendall(base64.b64decode(str(data)))
+            except (BrokenPipeError, ConnectionResetError):
+                break
             if int(pause):
                 time.sleep(int(pause) / 1000)
         connection.settimeout(idle_ms / 1000)

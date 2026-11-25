@@ -19,4 +19,4 @@ oracle = ".work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint-ora
 candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint"
 fuzz = "corpus"
 fuzz_max_len = 65536
-fuzz_seeds = "version-host-ip-port list-host-localhost-port path-1 method-new-PUT ws-browser-get-version ws-browser-two-messages pipelined-two split-two malformed-0"
+fuzz_seeds = "version-host-ip-port list-host-localhost path-1 method-new-put ws-browser-get-version ws-browser-fragmented pipelined-two split-two malformed-0"

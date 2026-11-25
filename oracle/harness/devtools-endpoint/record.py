@@ -84,9 +84,10 @@ def corpus() -> list[tuple[str, str, bytes]]:
     methods = ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "get"]
     for index, method in enumerate(methods):
         lane = "holdout" if index % 3 == 1 else "seen"
-        add(lane, f"method-version-{method}", [(get("/json/version", method=method), 0)])
-        add(lane, f"method-list-{method}", [(get("/json/list", method=method), 0)])
-        add(lane, f"method-new-{method}", [(get("/json/new?about:blank", method=method), 0)], 1500)
+        label = method.lower() if method.isupper() else f"lowercase-{method}"
+        add(lane, f"method-version-{label}", [(get("/json/version", method=method), 0)])
+        add(lane, f"method-list-{label}", [(get("/json/list", method=method), 0)])
+        add(lane, f"method-new-{label}", [(get("/json/new?about:blank", method=method), 0)], 1500)
 
     for index, url in enumerate(["about:blank", "data:text/html,hi", "", "chrome://version/", "http://example.test/",
                                  "about:blank#x", "about%3Ablank"]):
