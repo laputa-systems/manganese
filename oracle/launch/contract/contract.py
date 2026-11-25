@@ -1,4 +1,5 @@
 import argparse
+import concurrent.futures
 import json
 import os
 import platform
@@ -10,10 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import launch
 import durability
 import checks
+import clients
+import profile
 
 HERE = Path(__file__).resolve().parent
 ALL = ('5.1', '5.2', '5.4', '6.1', '6.2', '6.3', '6.4', '7.1', '7.2', '7.3', '7.4', '7.5', '7.6', '7.7', '8.1', '8.2', '8.3', '8.4')
-PENDING = {'5.4', '7.5', '7.6'}
+PENDING = set()
 EXCLUDED = {'8.2', '8.3'}
 
 
@@ -77,10 +80,17 @@ def main():
     results = {clause: {'status': 'pending' if clause in PENDING else 'excluded' if clause in EXCLUDED else 'FAIL',
                         'ok': None if clause in PENDING | EXCLUDED else False} for clause in ALL if clause in selected}
     report = {'run_dir': str(run_dir), 'archive': args.archive, 'clauses': results}
+    executor = None
+    client_results = None
     try:
         path = Path(args.archive)
         archive = launch.resolve_archive(run_dir, platform.machine(), path if path.exists() else None,
                                          None if path.exists() else args.archive)
+        if selected & {'7.5', '7.6'}:
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            client_results = executor.submit(clients.run, run_dir, archive, preferences, selected)
+        if '5.4' in selected:
+            results['5.4'] = profile.run(run_dir, archive, preferences)
         if selected & {'5.1', '5.2', '6.1', '6.2', '6.3', '6.4'}:
             observed = egress(run_dir, archive)
             for clause in ('5.1','5.2','6.1','6.2','6.3','6.4'):
@@ -165,8 +175,18 @@ def main():
                         results['7.3']['status'] = 'expected-defect'
             finally:
                 session.close()
+        if executor is not None:
+            results.update(client_results.result())
     except Exception as error:
         report['error'] = repr(error)
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True)
+            if 'error' in report and client_results is not None:
+                try:
+                    client_results.result()
+                except Exception as error:
+                    report['client_error'] = repr(error)
     report['ok'] = all(value['ok'] is not False for value in results.values()) and 'error' not in report
     (run_dir / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
     for clause, value in results.items():
@@ -174,6 +194,18 @@ def main():
         if status == 'expected-defect':
             status = 'defect'
         print(f'{status} {clause}')
+        if clause == '7.5' and 'clients' in value:
+            for client, workloads in sorted(value['clients'].items()):
+                for workload, entry in sorted(workloads.items()):
+                    detail = entry.get('reason', '') if entry['status'] == 'n/a' else ''
+                    print(f'  {client:22} {workload:14} {entry["status"]} {detail}')
+                    if entry['status'] == 'oracle-differs':
+                        print(f'    ORACLE-DIFFERS {json.dumps(entry["evidence"], sort_keys=True)}')
+        if clause == '7.6' and 'features' in value:
+            for feature, entry in sorted(value['features'].items()):
+                print(f'  {feature:28} {entry["status"]}')
+                if entry['status'] == 'oracle-differs':
+                    print(f'    ORACLE-DIFFERS {json.dumps(entry["evidence"], sort_keys=True)}')
     if 'error' in report:
         print(report['error'], file=sys.stderr)
     print(f'report {run_dir / "report.json"}')
