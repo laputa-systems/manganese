@@ -1,16 +1,18 @@
 version 1
 box png
-revision 206f90c2a7ec53b75591a8cf9739af70cd2f3185
+revision b994f77f2056a708cab1dbd36c36fe359b81300d
 arch x86_64
-spec sha256:91f68b19d72e4efa9d3207863cea53d95151350fbec9b2db6fb3ff37ba8aea78
+spec sha256:5f3b8b8415c83697a91c47a5f7cd3b8b70aa030030fde0bf8373153013b57449
 corpus sha256:e057dc9b5dd1cbf7ea79de6567bd428244c1f553ab99514619f8f7b0193bb79d seen 501 holdout 413
 oracle .work/tmp/png/oracle sha256:1ec6f6a104b6a2b07c5d95bc0d31510d3319a07d83447037aed1565f529a7387
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
 candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/png sha256:f879b45c79bf0a96dbd553449ad66ddbdb83c159ef2b28ae57ac9f51fcc72b6e
-dependencies cargo-lock sha256:f5934e1b95ca35298f871f3540f8e1c1bf70d6980d09b2c3b53be171731efd2d tree sha256:05a8087c5e42d4f63b7fb36de8ad93ec31a17722092b5eb6c12319f41b2ab759
+dependencies cargo-lock sha256:7198a0ca10f36f0bcff3ce46f85edf51c30b6a4b6caac9e0a0e7a035d5e11f62 tree sha256:954806eb6dcf9692eee18bc3f3ae90d2f4d72a6bf193bd3531dd865b6fbb1dd1
+snapshot vendor/img tree f021b082dc136d3a163b964763c5ae26e6d67dd0
 run seen exit 0 items 501 501
 run holdout exit 0 items 413 413
-run fuzz exit 0 seed 1795631830785743814 requested 20000 completed 20000
+run fuzz exit 0 seed 1795637239332901763 requested 20000 completed 20000
+run anchor make png-anchor exit 0
 level source-harness met
-level frozen-browser pending: the frozen archive's decode readback and canvas and screenshot export comparisons have not been established for the PNG harness
+level frozen-browser met: make png-anchor
 level integration pending: arm64 evidence (public_api: canvas toDataURL and getImageData in the frozen arm64 browser) and make closure have not run
