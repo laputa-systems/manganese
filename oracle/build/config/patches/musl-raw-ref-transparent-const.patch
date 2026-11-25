@@ -1,0 +1,21 @@
+--- a/base/allocator/partition_allocator/src/partition_alloc/pointers/raw_ref.h
++++ b/base/allocator/partition_allocator/src/partition_alloc/pointers/raw_ref.h
+@@ -348,6 +348,18 @@
+     Impl::IncrementLessCountForTest();
+     return lhs < rhs;
+   }
++
++  bool operator()(const T& lhs, const raw_ref<T, Traits>& rhs) const
++      requires (!std::is_const_v<T>) {
++    Impl::IncrementLessCountForTest();
++    return lhs < rhs;
++  }
++
++  bool operator()(const raw_ref<T, Traits>& lhs, const T& rhs) const
++      requires (!std::is_const_v<T>) {
++    Impl::IncrementLessCountForTest();
++    return lhs < rhs;
++  }
+ };
+ 
+ // Specialize std::pointer_traits. The latter is required to obtain the

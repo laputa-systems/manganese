@@ -1,0 +1,16 @@
+--- a/chrome/browser/about_flags.cc
++++ b/chrome/browser/about_flags.cc
+@@ -11136,11 +11136,13 @@
+      FEATURE_VALUE_TYPE(client_certificates::features::
+                             kEnableClientCertificateProvisioningOnAndroid)},
+ #endif  // BUILDFLAG(IS_ANDROID)
++#if BUILDFLAG(ENABLE_PRINTING)
+ 
+     {"autofill-enable-save-and-fill",
+      flag_descriptions::kAutofillEnableSaveAndFillName,
+      flag_descriptions::kAutofillEnableSaveAndFillDescription, kOsDesktop,
+      FEATURE_VALUE_TYPE(autofill::features::kAutofillEnableSaveAndFill)},
++#endif  // BUILDFLAG(ENABLE_PRINTING)
+ 
+ #if BUILDFLAG(IS_ANDROID)
+     {"default-browser-promo-entry-point",

@@ -1,0 +1,339 @@
+# Roadmap
+
+This is the single plan for this repository: all current and future work, and the handoff for resuming it. Campaigns are sections below, and their items interleave in **Sequence**. "Resume the roadmap" means continue from **Status**.
+
+## Status
+
+- **State:** ready. No slice has started.
+- **Campaign:** [Manganese](#campaign-manganese).
+- **Last accepted revision:** the preflight commit on `main`; `make check lint` is green on a pristine Alpine x86_64 capsule (see Baseline).
+- **Red or parked:** none.
+- **Next:** `p0-ground` on the campaign host.
+- **First command:** `sh scripts/setup-dev && make check lint`, then "resume the roadmap".
+- **Owner, before `p0-launch`:** publish the two frozen archives (Needs environment N1 and N2). Slices that need them park until then; the others proceed.
+
+## Charter
+
+- Decide and keep going. Record a decision only when a later slice depends on it.
+- Within the owner's execution grant (Execution boundary), proceed without waiting for approval. A plan does not provide missing permission. Park an item that needs authority outside the grant.
+- Hard stops are few, and each one parks the item: an irreversible or outside-the-repo action the grant does not name, a boundary this roadmap forbids, or a loop that cannot check anything. Pushing is always forbidden.
+- Fix egregious problems met on the way, in their own commit, to these thresholds: a warm L0 command over 120 s for one crate; a warm `make check` over 10 min; a test that fails once in 20 reruns; a kache hit rate under 90% on an unchanged rebuild. Record anything else and leave it.
+- Parity before optimization.
+- Parallel lanes for the disjoint sets named in **Sequence**, serial otherwise, each in a worktree at `.work/wt/<lane>`, never `/tmp`, following the orchestrate worktree lifecycle.
+- Every commit is a Conventional Commit with the workstream as its scope (`ground`, `oracle`, `lanes`, `box`, `assembly`, `contract`, `release`). The item ID belongs in the body. Code comments never cite the roadmap.
+- Run the parent steering checkpoint after each accepted slice, on resume, and whenever a slice fails twice.
+- A failing slice gets its cause before any retry (root-cause). After 3 failed attempts, park it on its branch with the cause and a retry condition, and take the next ready slice.
+
+## Sequence
+
+Every item belongs to the Manganese campaign. Acceptance commands are run on the integrated tree, together with `make check lint`. Items marked *box* own `crates/<id>/` and `boxes/<id>/` and accept with `make box BOX=<id>`. Items marked *asm* own `crates/asm-<id>/` and accept with `make assembly A=<id>`. Both targets come from `m1-workspace`.
+
+**Disjoint sets.** Box and assembly items within one milestone own disjoint directories and run in parallel. These files are shared and coordinator-owned; lanes propose changes to them and the parent merges serially: `Cargo.toml` (workspace members), `Cargo.lock`, `goldens.lock`, `oracle/capture/series`, `Makefile`, and this roadmap's **Status**. Items in P0, M0 and M1 touch shared harness code and run serially unless the table says otherwise.
+
+### P0 — ground
+
+| ID | Owns | Prerequisites | Acceptance |
+|---|---|---|---|
+| `p0-ground` | Baseline section of this roadmap | none | `sh scripts/setup-dev && make check lint` on the campaign host; record the timings |
+| `p0-artifacts` | `scripts/artifact`, `scripts/artifact-selftest` | `p0-ground` | `make artifact-selftest`: fetch from a `file://` blob base verifies digest and size, a corrupted blob fails, and a name missing from the lock fails |
+| `p0-launch` | `oracle/launch/` | `p0-artifacts`; N2 published, or `m1-source-oracle` accepted | `make oracle-launch ARCH=x86_64 MODE=headless`: appliance contract 2 to 4 hold for the frozen x86_64 archive (readiness, sandbox witness, `Browser.close` exit within 8 s), and the run writes a JSON report |
+
+### M0 — freeze the remaining evidence
+
+M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/frozen/SHA256SUMS`; nothing else in the frozen tree changes. They run in parallel once `p0-launch` is accepted (disjoint `oracle/frozen/<inventory>/` directories and `oracle/probes/<inventory>/` harnesses).
+
+| ID | Owns | Prerequisites | Acceptance |
+|---|---|---|---|
+| `m0-workloads` | `oracle/workloads/clients/`, `oracle/launch/contract` | `p0-launch` | `make contract ARCHIVE=hydrogen-r2-amd64` passes appliance contract 5 to 8 against the oracle itself (excluding 8.2, which is headed, and 8.3, which runs at M8) |
+| `m0-cdp-trace` | `oracle/probes/cdp/`, `oracle/frozen/cdp/` | `m0-workloads` | `make cdp-trace`: the union of methods, events and parameter shapes from every frozen client workload is written to `oracle/frozen/cdp/` and identical across two runs |
+| `m0-abi` | `oracle/probes/abi/`, `oracle/frozen/abi/` | `m0-workloads` | `make abi-census`: the syscall, flag, ioctl, socket-family, `/proc`, `/sys` and `madvise` census of the oracle under every workload is written to `oracle/frozen/abi/x86_64.txt` and identical across two runs |
+| `m0-persona` | `oracle/probes/persona/`, `oracle/frozen/persona/` | `m0-workloads` | `make persona-inventory`: every F16 surface recorded with its comparator class (exact or tolerance with bound); two runs give identical exact surfaces |
+| `m0-probes` | `oracle/probes/capability/`, `oracle/frozen/capability/` | `p0-launch` | `make capability-probes`: WebGL availability and strings per mode, codec answers (`canPlayType`, MSE, WebCodecs, MediaRecorder), XSLT, `chrome.notifications`, Privacy Sandbox interfaces and the global interface and property inventory are recorded, and the proposed-cuts table rows are marked compatible or not from them |
+| `m0-census` | `oracle/probes/census/`, `oracle/frozen/census/` | `m1-source-oracle` | `make census`: GN target, generated-source, link and staged-file graph for `chromium-wayland-release` on x86_64 (A03 to A05), with every node classified per A05 |
+
+### M1 — oracle, golden store and lanes
+
+| ID | Owns | Prerequisites | Acceptance |
+|---|---|---|---|
+| `m1-kache-oracle` | `oracle/capture/kache.patch` | `p0-ground` | `make oracle-gate-a`: the frozen Gate A cache-reuse check passes with kache as `cc_wrapper` and as the rustc wrapper |
+| `m1-source-oracle` | `oracle/Makefile` targets | `m1-kache-oracle` | `make source-oracle`: `oracle/build` produces an x86_64 package revision 2 archive that passes the frozen `test-fast` and `qualify-package.py`; a second run with no input change is an incremental no-op |
+| `m1-workspace` | `crates/goldens/`, `boxes/selftest/`, `make box`, `make assembly` | `p0-artifacts` | `make box BOX=selftest`: a synthetic box passes with exact goldens; its negative control (a deliberately wrong crate) fails; a scoreboard regression fails; and the holdout set is unreadable from the L0 lane |
+| `m1-fuzz-lane` | `crates/goldens/` fuzz runner | `m1-workspace`, `m1-source-oracle` | `make box-fuzz BOX=selftest`: 10 000 differential cases against a prebuilt harness with no divergence, and an injected divergence is reported with a minimized input |
+| `m1-zlib` | box `zlib` | `m1-fuzz-lane` | `make box BOX=zlib` (Q01): zlib-rs output matches the oracle's zlib inflate and deflate on the corpus, the holdout set and 10 000 fuzz cases |
+
+### M2 — leaf boxes (*box*, parallel)
+
+| ID | TODOs | Registry start |
+|---|---|---|
+| `brotli` | Q02 | Laputa rust-brotli |
+| `zstd` | Q03 | ruzstd |
+| `compression-misc` | Q04 | snap, lz4_flex as the census requires |
+| `structured-data` | Q05 | serde_json, quick-xml |
+| `regex` | Q06 | regex |
+| `numerics` | Q07 | double-conversion port |
+| `checksums` | Q08 | crc32fast, crc32c |
+| `zip` | Q10 | Laputa rawzip |
+| `png` | M03 | img (png 0.18.1) |
+| `jpeg-decode`, `jpeg-encode` | M02 | img, exact with the oracle's libjpeg-turbo |
+| `webp` | M04 | img (image-webp, webpkit) |
+| `gif` | M05 | img |
+| `avif` | M06 | img's AVIF container reader with K08 |
+| `jxl` | M07 (conditional on `m0-probes`) | jxl-oxide |
+| `bmp-ico` | M08 | img |
+| `color` | M10, M11 | skcms port |
+| `font-sanitize` | H05 | OTS and WOFF2 port |
+| `shaping` | H01, H02 | Laputa HarfRust, Fontations |
+| `glyph-raster` | H03 | Skrifa with Skia's mask path |
+| `font-match` | H04, H08 | rust-fontconfig against the frozen configuration |
+| `font-subset` | H06 | write-fonts, skera |
+| `text-qualification` | H09 | needs `shaping`, `glyph-raster`, `font-match` |
+| `url` | F12 | url, idna |
+| `encoding` | F13 | encoding_rs |
+| `protobuf` | P09 | prost |
+| `cert-verify` | O04, O05 | Laputa webpki |
+| `media-demux` | K02, K03 | play's Symphonia |
+| `video-h264` | K05 | OxideAV H.264 |
+| `video-hevc` | K06 (conditional on `m0-probes`) | removal expected |
+| `video-vpx` | K07 | OxideAV VP8/VP9 |
+| `video-av1` | K08 | rav1d-safe |
+| `audio-decode` | K09, K10 | play's Symphonia, `ruopus`, `rusty-aac` |
+| `audio-dsp` | K11 | Chromium Web Audio DSP port |
+| `yuv` | K12 | libyuv port |
+| `codec-licensing` | K19, K20 | records only |
+| `common-codecs` | B09 | std, existing crates |
+
+### M3 — services on Smolith (*box* unless marked)
+
+| ID | TODOs | Note |
+|---|---|---|
+| `devtools-endpoint` | S01, S09 | First Smolith slice; survives 100 `/json/protocol` requests (contract 7.3) |
+| `runtime` | B02 | Smolith task runtime with named sequences |
+| `http1` | N04 | Wire-exact with the oracle (F16) |
+| `http2` | N05 | Wire-exact; browser wire profile in Smolith |
+| `tls-handshake` | O01, O02, O03 | ClientHello exact; browser handshake profile in the Laputa rustls fork |
+| `websocket` | N07 | |
+| `socks-egress` | N02, N03 | Contract 6 |
+| `cookies` | N11 | |
+| `http-cache` | N10 | |
+| `net-policy` | N12, N13, N14 | |
+| `fetch` | N09, N15, N16 | |
+| `net-foundation` | N01, N17 | |
+| `sqlite` | P01 | Opens Hydrogen profile databases unchanged (contract 5.3) |
+| `leveldb` | P02 | Same |
+| `storage-service` | P03, P04, P07, P10 | |
+| `profile-format` | P05, P08 | Hydrogen and Manganese reopen each other's profiles |
+| `downloads` | P06 | |
+| `web-crypto` | O06, O08, O09 | |
+| `adblock` | R03, R04 | `adblock.enabled` from Preferences (contract 5.1) |
+| `relay-compat` | S11 | |
+| `services` | D03 | GPU and network stay out of process |
+| `diagnostics` | B10 | |
+| `headless-fetch` (*asm*) | M3 exit | Serves CDP and fetches through a SOCKS5 relay; matches the oracle's CDP, NetLog and wire captures for the same workloads |
+
+### M4 — platform, sandbox and IPC (*box* unless marked)
+
+| ID | TODOs | Note |
+|---|---|---|
+| `mojo` | D01, D02, D07 | Mojo wire format and validation against recorded messages |
+| `sandbox` | D04, D06, D08, D09 | Seccomp-BPF programs per process type exact; broker and zygote behavior |
+| `linux-abi` | B04, B08 | Inside the frozen ABI census (contract 10) |
+| `process-model` | B05, B06, B07, C01, C05 | |
+| `ozone-wayland` | J01, J02, J03, J09, J10 | Against Tinyland at the frozen revision |
+| `input` | J04, J07 | kbvm |
+| `process-host` (*asm*) | U04 | Launches sandboxed browser, renderer, GPU, network and utility roles; contract 4.2 witness and negative controls |
+
+### M5 — graphics and compositing (*box* unless marked)
+
+| ID | TODOs | Note |
+|---|---|---|
+| `raster-2d` | I01, I02 | `PaintOpBuffer` to pixels, Skia-exact |
+| `compositor` | I03, I04, I05, I14 | |
+| `webgl` | I06 to I13, I15 to I17 | GPU command buffer to pixels, exact with the oracle's software path |
+| `replay` (*asm*) | M5 exit | Captured paint and compositor streams from real pages match Hydrogen's screenshots exactly |
+
+### M6 — Blink and content (*box* unless marked)
+
+| ID | TODOs | Note |
+|---|---|---|
+| `blink-foundation` | F01, C03 | Oilpan in Rust |
+| `html-parser` | F02 | html5lib-tests plus the oracle's own dumps |
+| `dom` | F03, F05, F06, F14 | |
+| `bindings` | F04, E09 | Against native V8 through the test-only bridge |
+| `css` | G01, G02 | |
+| `layout` | G03, G04, G05, G06 | Layout dumps |
+| `paint` | G07, G08, G09 | |
+| `navigation` | F07, F08, F09, F10, F11, F15, D05 | |
+| `media-pipeline` | K04, K13 to K18 | |
+| `shell` | R01, R02, R06, R07, R08, R09, B03 | |
+| `extensions` | R05 | Extension suite tests (contract 7.6) |
+| `cdp-domains` | S02 to S08, S10, S12 to S14 | |
+| `static-renderer` (*asm*) | M6 | JS-off pages match Hydrogen's screenshots and layout dumps |
+| `blink-bridged` (*asm*) | M6 exit | Rust Blink with the V8 bridge passes the WPT subset, the extension suite and CDP DOM and Runtime transcripts |
+
+### M7 — V8, last (*box* unless marked)
+
+| ID | TODOs | Note |
+|---|---|---|
+| `v8` | E01 to E08, E10 to E14, C04 | The `d8` box: Test262, mjsunit and captured scripts; inspector transcripts |
+| `intl` | H07 | Intl output exact with ICU4C |
+| `rust-v8` (*asm*) | M7 exit | Rust V8 replaces the bridge in every M6 assembly; the bridge is deleted |
+
+### M8 — integration and release
+
+| ID | Owns | Prerequisites | Acceptance |
+|---|---|---|---|
+| `m8-browser` | `crates/manganese/` | M7 | `make assembly A=browser`: the full browser passes the M6 and M7 assembly goldens |
+| `m8-archive` | `release/` | `m8-browser` | `make archive`: Cargo-only offline build (`cargo build --release --locked --offline --target x86_64-unknown-linux-musl`) produces an archive that the frozen verifier accepts, with the ELF rules of contract 1.4 and 1.8 |
+| `m8-contract` | none | `m8-archive` | `make contract ARCHIVE=<manganese archive>` gives the same results as on the oracle archive, including 8.3 (60-minute soak) |
+| `m8-persona` | none | `m8-archive` | `make persona ARCHIVE=<manganese archive>`: the U16 report shows no unapproved difference from the oracle |
+| `m8-closure` | none | `m8-archive` | `make closure`: T02 to T10, T13, T14 and the remaining U items; two clean builds give identical digests |
+
+### M9 — conditional transport
+
+| ID | TODOs | Acceptance |
+|---|---|---|
+| `m9-transport` | N06, N08, O07, L02 to L07 | Default outcome: honest unsupported behavior, proved by the capability probes. Implementation only after an owner decision approves a host datagram relay |
+
+### Optimization and polish (after M8)
+
+| ID | Acceptance |
+|---|---|
+| `opt-loop` | L0, L1 and oracle-lane timings recorded against the P0 baseline; any loop more than 2× its baseline is fixed |
+| `opt-browser-log` | Browser timings (startup, workload wall time, footprint) measured against the oracle and logged in the receipts; not gating |
+
+### Close
+
+| ID | Acceptance |
+|---|---|
+| `close-dead` | No stage-era adapter, bridge or unused crate remains; `cargo machete`-style dependency audit and graph absence proof |
+| `close-review` | `ultrareview` over the tree; P1 and P2 findings fixed |
+| `close-report` | Final report: closure fields from the requirements for every TODO ID |
+
+## Campaign: Manganese
+
+### Goal
+
+Build the browser that [the requirements](requirements.md) define, prove it against the frozen oracle box by box as [the oracle](oracle.md) describes, and deliver an archive that satisfies [the appliance contract](appliance-contract.md) on both architectures. State: **ready**.
+
+### Decisions
+
+**Owner, 2026-11-24.**
+
+1. Requirements are frozen at manifest version 1; the oracle is the production package revision 2 archive per architecture (A01).
+2. The project is self-contained: Chromium is only the oracle, and nothing depends on the repositories it was frozen from.
+3. Method: golden boxes and hill-climbing first, bottom-up Rust-only integration last.
+4. Order: tooling and oracle, then leaf libraries, services, platform, graphics, Blink, and V8 last. The V8 inspector and debugger are retained.
+5. Nothing reaches the appliance until the assembled browser passes the appliance contract.
+6. Persona parity is required (F16).
+7. GPU and network services stay out of process in both modes.
+8. Hydrogen profiles open unchanged, so SQLite and LevelDB file formats stay.
+9. Crash reporting is excluded.
+10. A narrow MV3 extension runtime is retained (contract 7.6). WebMCP is excluded.
+11. QUIC, HTTP/3, WebTransport and WebRTC transport stay deferred (M9).
+12. `chrome` is a musl-dynamic PIE (contract 1.4, 1.8).
+13. Drop-in scope is the production appliance images only.
+14. Artifacts live in the owner's OCI registry through `stuff`.
+15. The campaign runs on an isolated x86_64 Alpine Linux host; the source oracle is x86_64-only.
+16. Dogfood and improve owned projects: kache, Smolith, img (in place of zune and other image crates), play's vendored Symphonia, `ruopus` and `rusty-aac` (in place of upstream Symphonia), stuff, and the Laputa forks.
+
+**Prescribed** (reason; what would reverse it).
+
+- The appliance supervisor and its compositor are environment, not Manganese roles; J05, J06 and J08 are removed. A drop-in replacement cannot fold in the consumer's own processes. Reversed only by an owner decision to change the appliance.
+- Manganese archive revisions start at 100, so they never collide with Hydrogen's in names or receipts.
+- `oracle/build/` is a verbatim snapshot of the tooling that built the oracle. Pruning it risks a build that no longer matches the oracle.
+- The Rust toolchain is `nightly-2026-11-09`, the pin the owned Rust projects share. Executables link with mold.
+- An owned-project fix is committed in that project's own clone. Because pushing is forbidden, Manganese consumes the fix as a snapshot under `vendor/<project>/` with `UPSTREAM.md` (repository, base revision, local commit, patch). The owner pushes the branch later (N7). Reversed when the owner grants pushes to owned repositories.
+- `/json/protocol` survives repeated requests although the oracle crashed (contract 7.3). It is an expected difference, because a crashing endpoint is not a persona surface.
+- A profile Manganese writes must reopen in Hydrogen, so rollback stays safe (contract 5.3).
+- If the frozen x86_64 archive is unavailable, the archive `m1-source-oracle` builds and qualifies is the x86_64 binary oracle, and receipts record which one was used.
+- Capture hooks are batched: one oracle rebuild per milestone carries every hook that milestone needs.
+- A box that stays inexact after 3 attempts is parked with its evidence. The comparator is never relaxed; only an owner decision can change a surface's class.
+- Browser performance is measured and logged, never gating, before the optimization phase.
+
+**Delegated** (the executor decides inside the bound and logs only decisions a later slice depends on).
+
+- Order of boxes inside a milestone, and lane width up to the host's headroom.
+- A crate's internal design, provided it stays behind its box's protocol and passes the per-crate Cargo purity check (requirements, build policy).
+- Corpus composition per box, with at least 30% of items in the holdout set and every conformance suite the box names included.
+- New dependencies: pure Rust, permissive license, no `-sys` or `cc` build, and no native transitive dependency (T02). No performance gate applies to the browser; a dependency must not push a warm L0 run past the 120 s threshold.
+- Whether a fix belongs in an owned project or in Manganese, following the co-development table in the requirements.
+
+### Baseline
+
+- **Known red:** none.
+- **Proven at preflight, 2026-11-24, on an Apple Silicon Mac with OrbStack:**
+  - The frozen arm64 archive runs to readiness with a sandboxed renderer (`NoNewPrivs 1`, `Seccomp 2`, own PID namespace) in a pristine Alpine container under the appliance's launch switches: 8.4 s for the whole container run.
+  - The frozen verifier accepts the frozen arm64 archive on Alpine with `python3` and `llvm`: 12.9 s including package installation.
+  - A static-PIE musl binary segfaults under `ld-musl-aarch64.so.1`, which is the evidence behind decision 12.
+- **Loop timings:** filled in by `p0-ground` on the campaign host: cold `setup-dev`, cold and warm `make check`. The preflight capsule figures (emulated x86_64) are in the preflight commit message.
+
+### Acceptance
+
+| Deliverable | Command | Passes when | Fails when |
+|---|---|---|---|
+| Frozen requirements intact | `make check` | Every frozen byte matches its manifest and every step prints `ok` | Any manifest mismatch, broken link, or host-capability failure |
+| Oracle runnable | `make oracle-launch ARCH=x86_64 MODE=headless` | Contract 2 to 4 hold for the oracle | Readiness, sandbox or shutdown fails |
+| Each box at parity | `make box BOX=<id>` | Corpus and holdout exact (or within approved tolerance) and fuzz clean | Any golden mismatch, scoreboard regression or fuzz divergence |
+| Each assembly | `make assembly A=<id>` | Its goldens match | Any mismatch |
+| Drop-in archive | `make contract ARCHIVE=<archive>` | Same results as the oracle archive under the same harness | Any contract clause differs outside the expected differences |
+| Persona | `make persona ARCHIVE=<archive>` | No unapproved difference | Any unapproved difference |
+| Closure | `make closure` | Requirements definition-of-done table holds; reproducible digests | Any native implementation object, extra `DT_NEEDED`, hidden subprocess or digest drift |
+
+### Needs environment
+
+| ID | Proof | Command the owner runs |
+|---|---|---|
+| N1 | Publish the frozen arm64 archive and sidecars | On the host holding them: `scripts/artifact publish manganese/oracle-inputs:hydrogen-r2-arm64 <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.sha256 <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.acceptance.json` |
+| N2 | Publish the frozen x86_64 archive and sidecars | The same with the `x86_64` names and tag `hydrogen-r2-amd64`; then add the archive size and the sidecar digests to `oracle/frozen/artifacts.lock` |
+| N3 | arm64 parity | On an arm64 Alpine host: `make oracle-launch ARCH=aarch64`, the arm64 goldens for architecture-sensitive boxes, and `make contract ARCHIVE=<arm64 manganese archive>` |
+| N4 | Appliance acceptance | Build both production appliance images from the Manganese archive, then run the appliance's interop, profile-mode, audio-worklet, render-pass, egress, adblock and soak suites |
+| N5 | Shadowdriver workloads | Provide `GH_TOKEN` with read access to `joshuarli/shadowdriver` on the campaign host, or run `make contract CLIENTS=shadowdriver` on a host that has it |
+| N6 | Publish corpora and goldens | On a host with `stuff` credentials: `scripts/artifact publish manganese/goldens:<tag> <files>` for the store entries the executor lists |
+| N7 | Push owned-project branches | Push the branches listed in each `vendor/<project>/UPSTREAM.md`, then replace the vendored snapshot with a pinned revision |
+
+### Execution boundary and non-goals
+
+**Authorized.**
+
+- Edit this repository and commit.
+- Create worktrees under `.work/wt/` and scratch under `.work/tmp/`.
+- Fetch pinned inputs by digest or revision: the oracle's source inputs from `oracle/build` locks, crates through `Cargo.lock`, the pinned clients (contract 7.5), the owned projects, and frozen artifacts.
+- Run Docker builds and privileged containers on the campaign host.
+- Run `scripts/artifact publish` to the `manganese/*` OCI repositories when credentials exist.
+- Commit in local clones of the owned projects, following each project's `AGENTS.md`.
+
+**Forbidden.**
+
+- Pushing any git branch.
+- Publishing anywhere other than `manganese/*`.
+- Signing in to real accounts or contacting live services beyond fetching pinned inputs.
+- Changing `docs/requirements.md` or `docs/appliance-contract.md`, apart from Status lines the owner asks for.
+- Editing `oracle/build/`, `oracle/frozen/` or `oracle/workloads/` except where an M0 item says so.
+- Patching Chromium to call Manganese code.
+
+**Non-goals.** Browser performance parity, size, startup or energy targets; a general-purpose browser; desktop, PDF or printing; Servo, Boa or interpreter-only substitutes; the appliance's diagnostic image; arm64 builds of the source oracle.
+
+**Contract changes for the owner.**
+
+- `chrome` is a musl-dynamic PIE.
+- No `chrome_crashpad_handler`.
+- GPU and network run out of process in headless mode too.
+- `/json/protocol` survives repeated requests.
+- Archive revisions start at 100.
+- The diagnostic image needs its own change (contract, Consumer changes outside scope).
+
+### Reference
+
+| Path | Purpose |
+|---|---|
+| `scripts/setup-dev` | Alpine bootstrap: packages, Docker, pinned Rust, pinned kache |
+| `scripts/check` | `make check` steps |
+| `scripts/artifact` | Fetch, verify and publish artifacts by digest |
+| `oracle/build/` | Frozen build tooling; `chromium-build` is its driver and `scripts/install-runtime.py` the appliance's verifier |
+| `oracle/frozen/` | Frozen evidence and `artifacts.lock` |
+| `oracle/workloads/cdp/appliance-native.txt` | The appliance's native CDP methods and events |
+| `.cargo/config.toml` | musl-dynamic PIE link flags |
+
+## Later
+
+- Move the persona and requirements forward to a newer Chromium: a new manifest version, a new oracle freeze and regenerated goldens.

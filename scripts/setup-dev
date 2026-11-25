@@ -1,0 +1,83 @@
+#!/bin/sh
+# Bootstrap a Manganese campaign host. Supported: Alpine Linux on x86_64 or
+# aarch64. Idempotent; rerun after pulling a change to this script.
+set -eu
+
+fail() { printf 'setup-dev: %s\n' "$*" >&2; exit 1; }
+
+[ -r /etc/os-release ] || fail "cannot read /etc/os-release"
+# shellcheck source=/dev/null
+. /etc/os-release
+[ "${ID:-}" = alpine ] || fail "unsupported distribution '${ID:-unknown}'; this bootstrap supports Alpine Linux only"
+arch=$(uname -m)
+case $arch in
+    x86_64) kache_sha=c4f0101461a84642ffb0512b91056782be6f415458b48e59ea2550fdfb0faa40 engine_sha=e85bf20cc4d3b10af86a672cb9678d4508869f73abeb2c298d985dce034cf1a9 ;;
+    aarch64) kache_sha=2a71f6a80550d0bdfafc5eb71e6c71369d21dffa7f0958d92613b0af641c094a engine_sha=9e6e44ed36a7a5720ac862d0a309a48d9c303c5be6ecf2ffaded9a8328664b3e ;;
+    *) fail "unsupported architecture $arch" ;;
+esac
+
+if [ "$(id -u)" = 0 ]; then
+    as_root() { "$@"; }
+elif command -v doas >/dev/null 2>&1; then
+    as_root() { doas "$@"; }
+elif command -v sudo >/dev/null 2>&1; then
+    as_root() { sudo "$@"; }
+else
+    fail "run as root, or install doas or sudo"
+fi
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+
+# Consumers of each package are listed in docs/development.md.
+as_root apk add --no-cache \
+    bash build-base ca-certificates curl docker docker-cli-buildx git llvm make mold \
+    python3 rustup shellcheck tar xz
+
+docker_ready() { docker info >/dev/null 2>&1; }
+if ! docker_ready; then
+    if command -v rc-service >/dev/null 2>&1 && [ -d /run/openrc ]; then
+        as_root rc-update add docker default >/dev/null 2>&1 || true
+        as_root rc-service docker start
+    else
+        as_root sh -c 'dockerd >/var/log/dockerd.log 2>&1 &'
+    fi
+    tries=0
+    until docker_ready; do
+        tries=$((tries + 1))
+        [ "$tries" -le 60 ] || fail "dockerd did not become ready; see /var/log/dockerd.log or the docker service log"
+        sleep 1
+    done
+fi
+docker_ready || fail "docker is not usable by $(id -un); add the user to the docker group or run as root"
+
+cargo_bin=${CARGO_HOME:-$HOME/.cargo}/bin
+if [ ! -x "$cargo_bin/rustup" ]; then
+    rustup-init -y --no-modify-path --profile minimal --default-toolchain none
+fi
+PATH=$cargo_bin:$PATH
+export PATH
+(cd "$root" && rustup toolchain install)
+
+kache_release=release-8d78da5c10cf741966733d5cf494b982e9f41d31
+kache_want=$(printf '%s\n' "$kache_release" | sed 's/^release-//')
+installed_release=$(cat "$cargo_bin/.kache-release" 2>/dev/null || true)
+if [ "$installed_release" != "$kache_want" ] || [ ! -x "$cargo_bin/kache" ] || [ ! -x "$cargo_bin/kache-engine" ]; then
+    work=$(mktemp -d)
+    trap 'rm -rf "$work"' EXIT
+    base=https://github.com/joshuarli/kache/releases/download/$kache_release
+    for pair in "kache:$kache_sha" "kache-engine:$engine_sha"; do
+        name=${pair%%:*}
+        sha=${pair#*:}
+        asset=$name-$arch-unknown-linux-musl-static.tar.xz
+        curl -fsSL --retry 3 -o "$work/$asset" "$base/$asset"
+        printf '%s  %s\n' "$sha" "$work/$asset" | sha256sum -c -s || fail "$asset does not match its pinned SHA-256"
+        tar -xJf "$work/$asset" -C "$work"
+        install -m 0755 "$work/$name-$arch-unknown-linux-musl-static" "$cargo_bin/$name"
+    done
+    printf '%s\n' "$kache_want" > "$cargo_bin/.kache-release"
+    rm -rf "$work"
+    trap - EXIT
+fi
+"$cargo_bin/kache" init --yes --no-service --no-shell >/dev/null
+
+printf 'setup-dev: ready on Alpine %s %s; add %s to PATH\n' "${VERSION_ID:-?}" "$arch" "$cargo_bin"

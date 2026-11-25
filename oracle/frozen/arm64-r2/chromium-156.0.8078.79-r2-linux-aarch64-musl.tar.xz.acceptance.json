@@ -1,0 +1,28 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "product": "chromium",
+  "product_version": "156.0.8078.79",
+  "architecture": "arm64",
+  "archive": "chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz",
+  "archive_root": "chromium-156.0.8078.79-r2-linux-aarch64-musl",
+  "archive_sha256": "04f262a2851abde56d0c38a3abb526f68de0fcab4f8e9481051d7b40d178dfc6",
+  "report_sha256": "82007d3df2da918133025268a8989fcb7028103f1bbc9a538cbb2767a86ac784",
+  "checks": {
+    "product-identity": true,
+    "wayland-window": true,
+    "page-rendering": true,
+    "sandbox-renderer": true,
+    "clean-shutdown": true,
+    "headless-devtools": true,
+    "headless-page": true,
+    "headless-sandbox-renderer": true,
+    "headless-clean-exit": true,
+    "headless-identity": true,
+    "headless-user-agent": true
+  },
+  "identities": {
+    "executable_version": "Chromium 156.0.8078.79",
+    "devtools_browser": "Chrome/156.0.8078.79"
+  }
+}

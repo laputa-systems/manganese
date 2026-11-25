@@ -1,0 +1,7 @@
+Frozen build tooling for the Manganese oracle.
+
+Source: https://github.com/laputa-systems/chromium-build at
+10b7bec505eea27394aa50cb987436d538f64043, the recipe that produced package
+revision 2 of ungoogled Chromium 156.0.8078.79 for linux/arm64 and
+linux/amd64. Snapshotted on 2026-11-24 with `git archive`. Never edit files
+here; oracle/build.sha256 pins every one.

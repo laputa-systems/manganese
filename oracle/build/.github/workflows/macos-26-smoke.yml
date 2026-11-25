@@ -1,0 +1,171 @@
+name: macOS 26 native smoke build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.head_ref || github.run_id }}"
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+jobs:
+  build:
+    runs-on: xcode-27
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    env:
+      CHROMIUM_WORK_ROOT: /Volumes/dev/d/chromium-build/.work/macos-arm64
+      MACOS_COMPILER_CACHE: off
+      MACOS_MIN_FREE_GB: "80"
+      MACOS_POST_FETCH_MIN_FREE_GB: "40"
+      MACOS_REQUIRE_FULL_BUILD: "1"
+      MACOS_REQUIRE_RUST_TOOLCHAIN: "1"
+      MACOS_SKIP_ACCEPTANCE: "1"
+      MACOS_INPUT_DOWNLOAD_WORKERS: "16"
+      MACOS_INPUT_ENTRY_WORKERS: "4"
+      RUSTUP_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/tools/rustup
+      CARGO_HOME: /Volumes/dev/d/chromium-build/.work/macos-arm64/cache/cargo
+
+    steps:
+      - name: Clone the exact dispatched commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /Volumes/dev/d
+          sudo chown "$(id -u):$(id -g)" /Volumes/dev /Volumes/dev/d
+          git clone --no-checkout --depth=1 --no-tags --filter=blob:none \
+            "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" \
+            /Volumes/dev/d/chromium-build
+          git -C /Volumes/dev/d/chromium-build fetch --depth=1 origin "$GITHUB_SHA"
+          git -C /Volumes/dev/d/chromium-build checkout "$GITHUB_SHA"
+          test "$(git -C /Volumes/dev/d/chromium-build rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Claim the policy work root
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_macos_ci.py claim-work-root \
+            --repo-root /Volumes/dev/d/chromium-build \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
+
+      - name: Resolve locked input cache key
+        id: input_cache_key
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          key="$(python3 scripts/verify_macos_ci.py cache-key --lock config/macos.inputs.lock)"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore locked Chromium inputs
+        id: restore_inputs
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
+          key: ${{ steps.input_cache_key.outputs.key }}
+
+      - name: Fetch locked Chromium inputs
+        id: fetch_inputs
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          ./chromium-build --platform macos --arch arm64 --profile macos-release fetch
+
+      - name: Run full-build host preflight
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          ./chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
+          python3 scripts/verify_macos_ci.py verify-preflight \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64 \
+            --minimum-free-gb 80
+
+      - name: Cache locked Chromium inputs
+        if: steps.fetch_inputs.outcome == 'success' && steps.restore_inputs.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: /Volumes/dev/d/chromium-build/.work/macos-arm64/inputs
+          key: ${{ steps.input_cache_key.outputs.key }}
+
+      - name: Apply locked source preparation
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release prepare
+
+      - name: Configure the native release graph
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release configure
+          python3 scripts/verify_macos_ci.py verify-configure \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
+
+      - name: Confirm compiler caching is disabled
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release cache-stats
+          python3 scripts/verify_macos_ci.py verify-cache-disabled \
+            --work-root /Volumes/dev/d/chromium-build/.work/macos-arm64
+
+      - name: Build Chromium for arm64
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          unset CCACHE_DIR SCCACHE_DIR RBE_service GOMA_service RECLIENT_service SISO_service || true
+          jobs="$(sysctl -n hw.ncpu)"
+          if [ "$jobs" -gt 8 ]; then jobs=8; fi
+          ./chromium-build --platform macos --arch arm64 --profile macos-release --jobs "$jobs" build
+
+      - name: Sign and audit the finished app bundle
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
+
+      - name: Package the audited app bundle
+        working-directory: /Volumes/dev/d/chromium-build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./chromium-build --platform macos --arch arm64 --profile macos-release package
+          python3 scripts/verify_macos_ci.py verify-package \
+            --work-root "$CHROMIUM_WORK_ROOT"
+          version="$(python3 scripts/verify_macos_ci.py chromium-version --lock config/macos.inputs.lock)"
+          release_root="$CHROMIUM_WORK_ROOT/release"
+          archive="$release_root/Chromium-${version}-macos-arm64-experimental.zip"
+          test -s "$archive"
+          test -s "$archive.sha256"
+          test -s "$release_root/release-manifest.json"
+          test -s "$release_root/SHA256SUMS"
+          ls -lh "$archive" "$archive.sha256"
+
+      - name: Upload the experimental build artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: chromium-macos-arm64-experimental
+          path: |
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/Chromium-*-macos-arm64-experimental.zip
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/Chromium-*-macos-arm64-experimental.zip.sha256
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/release-manifest.json
+            /Volumes/dev/d/chromium-build/.work/macos-arm64/release/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7

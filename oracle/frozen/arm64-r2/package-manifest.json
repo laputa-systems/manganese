@@ -1,0 +1,1400 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "product": "chromium",
+  "product_version": "156.0.8078.79",
+  "architecture": "arm64",
+  "launcher": "chromium",
+  "executable": "chrome",
+  "stage": "/work/stage/chromium-wayland-release",
+  "host_requirements": [
+    "libc.musl-aarch64.so.1"
+  ],
+  "bundled_libraries": [
+    "libexpat.so.1",
+    "libfreebl3.so",
+    "libfreeblpriv3.so",
+    "libnspr4.so",
+    "libnss3.so",
+    "libnssckbi.so",
+    "libnssutil3.so",
+    "libplc4.so",
+    "libplds4.so",
+    "libsmime3.so",
+    "libsoftokn3.so",
+    "libsqlite3.so.0",
+    "libxkbcommon.so.0"
+  ],
+  "audit": {
+    "status": "complete",
+    "architecture": "arm64",
+    "root": "/work/package/.chromium-wayland-release.i5yfr1u0",
+    "files": [
+      {
+        "path": "chrome",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-aarch64.so.1",
+        "needed": [
+          "libminigbm.so",
+          "libnspr4.so",
+          "libnss3.so",
+          "libnssutil3.so",
+          "libsmime3.so",
+          "libexpat.so.1",
+          "libxkbcommon.so.0",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": null,
+        "rpath": [
+          "$ORIGIN"
+        ],
+        "runpath": []
+      },
+      {
+        "path": "chrome_crashpad_handler",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-aarch64.so.1",
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": null,
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "chrome_sandbox",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-aarch64.so.1",
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": null,
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libexpat.so.1",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libexpat.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libfreebl3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libfreebl3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libfreeblpriv3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libfreeblpriv3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnspr4.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libnspr4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnss3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnssutil3.so",
+          "libplc4.so",
+          "libplds4.so",
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libnss3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnssckbi.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libplc4.so",
+          "libplds4.so",
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libnssckbi.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnssutil3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libplc4.so",
+          "libplds4.so",
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libnssutil3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libplc4.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libplc4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libplds4.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libplds4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsmime3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnss3.so",
+          "libnssutil3.so",
+          "libplc4.so",
+          "libplds4.so",
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libsmime3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsoftokn3.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libsqlite3.so.0",
+          "libnssutil3.so",
+          "libplc4.so",
+          "libplds4.so",
+          "libnspr4.so",
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libsoftokn3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsqlite3.so.0",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libsqlite3.so.0",
+        "rpath": [],
+        "runpath": [
+          "/opt/pure-runtime/lib"
+        ]
+      },
+      {
+        "path": "lib/libxkbcommon.so.0",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libxkbcommon.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libEGL.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libEGL.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libGLESv2.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libGLESv2.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libVkICD_mock_icd.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libVkICD_mock_icd.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libVkLayer_khronos_validation.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libVkLayer_khronos_validation.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libminigbm.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libminigbm.so",
+        "rpath": [],
+        "runpath": [
+          "$ORIGIN"
+        ]
+      },
+      {
+        "path": "libvk_swiftshader.so",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libvk_swiftshader.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libvulkan.so.1",
+        "class": "ELF64",
+        "machine": "AArch64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-aarch64.so.1"
+        ],
+        "soname": "libvulkan.so.1",
+        "rpath": [],
+        "runpath": []
+      }
+    ],
+    "gnu_runtime_edges": [],
+    "ffmpeg_gnu_closure": [],
+    "failures": []
+  },
+  "files": [
+    {
+      "path": "IwaKeyDistribution/iwa-key-distribution.pb",
+      "size": 3793,
+      "sha256": "db1b46bcb253793ecc2cb734e2eb7c04ee6a69acfe3548abe27c4ea62a3b402a",
+      "mode": "0o644"
+    },
+    {
+      "path": "IwaKeyDistribution/manifest.json",
+      "size": 114,
+      "sha256": "2de00b641c03834a89f9c9c06327cb72a948dc59a18a5c2d28ddd617eb64ff9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "angledata/VkICD_mock_icd.json",
+      "size": 142,
+      "sha256": "7b3298c69e33b8da0dbac552fbdb82cf3af438850acf3f6824c1e439d6777c2e",
+      "mode": "0o644"
+    },
+    {
+      "path": "angledata/VkLayer_khronos_validation.json",
+      "size": 130593,
+      "sha256": "be7449fd772ae17a3da0e5ce4b3400e110a39cf168e95d6033c04c8d812f7a50",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome",
+      "size": 476504880,
+      "sha256": "287990e51f264761921e6d21351730e51c2f75ceca4a89103a64d078292b1a43",
+      "mode": "0o755"
+    },
+    {
+      "path": "chrome_100_percent.pak",
+      "size": 586560,
+      "sha256": "0f28428f462f26d4c7df56b54671e1cd40a091e27820e01e035ac3f28cdb6da0",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome_200_percent.pak",
+      "size": 949265,
+      "sha256": "e0786bf96e5110b9a1afd93e7b5e6b405b7a1a801a12d7da7e2d4f3625218fa4",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome_crashpad_handler",
+      "size": 2289744,
+      "sha256": "41872f4511d9323b1f21ab36e90ce7f9cc4241b92a77ad310d5542cc73bddc1a",
+      "mode": "0o755"
+    },
+    {
+      "path": "chrome_sandbox",
+      "size": 97232,
+      "sha256": "96f26e33383ab6b4979e5c66b3e5a38bad2eeb1f9e871fba1591e44ca69fd037",
+      "mode": "0o4755"
+    },
+    {
+      "path": "chromium",
+      "size": 288,
+      "sha256": "aca83b75f2ab3e842c05cd6cf002a37aec838d7a285801b15c4c5fbbcd526561",
+      "mode": "0o755"
+    },
+    {
+      "path": "chromium.desktop",
+      "size": 280,
+      "sha256": "fbfb0ac02b411c33460799c567791c27154a91414948fbbae9c7eb0069cd831b",
+      "mode": "0o644"
+    },
+    {
+      "path": "chromium.png",
+      "size": 4393,
+      "sha256": "190dc5dbd72d856627acdc86acec90ec2fcc27781a3a2654fd3aa49d570cd474",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-hinting-slight.conf",
+      "size": 620,
+      "sha256": "d138eca2bac3f78d45ff7cfb649ad792caa4a6e61f73cea7cf0ea54b091f1ef4",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-scale-bitmap-fonts.conf",
+      "size": 2068,
+      "sha256": "df8e99abb6f82384c61978906a45a95794940545da95790d87f01d9391e0894b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-sub-pixel-none.conf",
+      "size": 647,
+      "sha256": "0f00b5cf0ce07062ec65b9b340aa888f6c5fbc215aafebd26781be2d5a13ff6a",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-yes-antialias.conf",
+      "size": 258,
+      "sha256": "e6d82a642d1b37f7d24dc37f938b999f00ff7aa4303b2602d04164d53f221005",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/11-lcdfilter-default.conf",
+      "size": 695,
+      "sha256": "76aec9d8dac48faabe1bbde9e887cfb09fa45f30be5f8826e945a394a0097e48",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/20-unhint-small-vera.conf",
+      "size": 1377,
+      "sha256": "278732c68c16177f2aa3c7e4ea318b9f720aee13a433c32eb15ba626806c609d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/30-metric-aliases.conf",
+      "size": 13610,
+      "sha256": "3baf25c82e1a14c606d45c212296852be06ae9795d60e84aab573226151450a2",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/40-nonlatin.conf",
+      "size": 7775,
+      "sha256": "5c3f7d62a44258d5d9e81a93b1685bee5ab78acb8688b25a43c4c1e749312a84",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-generic.conf",
+      "size": 3490,
+      "sha256": "24de9f68189d544bb4cc084d9bd8f3a59d8b988a9dc44b11e9877d5add5fc948",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-latin.conf",
+      "size": 7258,
+      "sha256": "b46e539c25dfd5531c8fcf4f22c3d156b09272ffbc6f8a83a8eeb7431c09aee5",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto-math.conf",
+      "size": 544,
+      "sha256": "d134e7c4f5e004bcb55eb98a5eb58f946506fbeb885830c02f855d207e4d50a1",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto-symbols.conf",
+      "size": 348,
+      "sha256": "1511c844daed58a05e1be80cbdf208f47f8428a5480c5b3437ae11cfd22264db",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto.conf",
+      "size": 571,
+      "sha256": "7e71006c21395b66272e0467720b7c5d6151d26855729c918c60eac116037c62",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/48-spacing.conf",
+      "size": 441,
+      "sha256": "99d839cd8aa28854e8f54f26e7200b6e57951f39f56791a0ed473662488bcef6",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/49-sansserif.conf",
+      "size": 639,
+      "sha256": "7849a11ce5243e8bb3d06bcad558737a8682e5122e73c8e427f4c011a2054818",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/50-user.conf",
+      "size": 542,
+      "sha256": "bc6e31684e4f5e0176200e558a250ff63e9ab0773300f47071223edc320c4c5e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/51-local.conf",
+      "size": 263,
+      "sha256": "dca9d917e1f66f73bfa495943b4d1eaab2d93810a51bc8e600cf4d4e9df03e67",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/58-noto-math.conf",
+      "size": 782,
+      "sha256": "00934fd7484a288bd1ae8e97d800e5bd03c07edd1946aeaac85af4f2168bd2b7",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/58-noto.conf",
+      "size": 10666,
+      "sha256": "262badb0c713ff0d620263ede3eac4b3ac918fd0cc4e884c819feb526047f7af",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/60-generic.conf",
+      "size": 1911,
+      "sha256": "195bc8605dd23289d42c10d79cc13a5ce4a4b3cf965df5b30ecc0b7149bb951f",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/60-latin.conf",
+      "size": 2169,
+      "sha256": "5c2c410bc584ba16a5e2ca5830311b0efaba9bdba3261d3247e880f6ea9d5220",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/65-fonts-persian.conf",
+      "size": 10132,
+      "sha256": "c675fab143a3638346874798be45f51f6878ebec591b4362d83cfffb828ec4ca",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/65-nonlatin.conf",
+      "size": 10011,
+      "sha256": "77ad64b2838b880377e54fd1a634adbfa67a73d2cb49b46c10117ec6c64b2b19",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/69-unifont.conf",
+      "size": 687,
+      "sha256": "fa97c0cf5f79d70e2dc3dc48155d4c9220cd7c6a8bc95b89c4ebcc517f97479e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/70-no-bitmaps-except-emoji.conf",
+      "size": 429,
+      "sha256": "bb5df65896bf3011b2f2935b63ab12db1ecf078674ff73a533123445f122a92b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/80-delicious.conf",
+      "size": 437,
+      "sha256": "34f27b7fe9cd83b2b6d46f16ef9c477412f2d7ef63634f86b9b38b79bc4f81ad",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/90-synthetic.conf",
+      "size": 1757,
+      "sha256": "cdd0aac7840c664a7127b64db66bdfe8dc22be3774d10bc22f4a41c98de5d85e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/fonts.conf",
+      "size": 241,
+      "sha256": "6ecde5d296a3864dbf4c0becf16a7df83b346a6bb208a60905c9a96376a2e7fa",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Bold.ttf",
+      "size": 631484,
+      "sha256": "1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-BoldItalic.ttf",
+      "size": 646092,
+      "sha256": "1b602a9d6353be42c91df097a4857b69fa2696f26703d7a33b54a15d87c2622c",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Italic.ttf",
+      "size": 639124,
+      "sha256": "467e3f89eeca4108bb8710a2b9e0cf2281ac56d5b0609211a83776d0505eecb5",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Regular.ttf",
+      "size": 621572,
+      "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMath-Regular.ttf",
+      "size": 990564,
+      "sha256": "d51afd5739c7ba6c44fcab35a88160e25dfb69a2d4ad0bd99533f8d894af1f96",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMono-Bold.ttf",
+      "size": 610908,
+      "sha256": "a21ea0ba6ea49fda7b34ca39a504b487f1130885d36e1a4f9f4255b3ba6994bc",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMono-Regular.ttf",
+      "size": 596428,
+      "sha256": "65b5e2b2c4a1fba9ae8be1f026cb35b03dcb8886d9b2a4147054fde12f7e767d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Black.ttf",
+      "size": 235968,
+      "sha256": "637e3857aa729ec67aae4bfc6838cd298cad2b4a54de953916f0b1c5e10b2121",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Bold.ttf",
+      "size": 228028,
+      "sha256": "af83250e7c5bdd37d542187a724ac6b33453a6550e741cebcacf7a771891f75e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-ExtraBold.ttf",
+      "size": 229908,
+      "sha256": "3b603fecbbd9ad1b45223c6b7871cf9d54b653653fade3c1da0bdec98cef8740",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-ExtraLight.ttf",
+      "size": 232496,
+      "sha256": "a14c578c4b8ad2142a7830225a5d215ed15c7e2295cebd7e211614336e2288fc",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Light.ttf",
+      "size": 228800,
+      "sha256": "659843a49ef43ff42f9c315285a9e8b828853c46496f8bed426800b68b10b697",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Medium.ttf",
+      "size": 227616,
+      "sha256": "f2422696752b46d12ff32c4abfe5201b34c9b83404fc5da6ccab05fceaff6bd3",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Regular.ttf",
+      "size": 226980,
+      "sha256": "d0e98e9a2c046594c5021437273943be7e79e0fd980fde125279e22302212595",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-SemiBold.ttf",
+      "size": 228356,
+      "sha256": "9ab8ee074de01e611ee9085c4721eeaa02efe815dea7b32f682bba7dd6fb6afe",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Thin.ttf",
+      "size": 231428,
+      "sha256": "b3f87bf5316769f72382ac64cbefc08030350028d4dacb5622a1c5cefc6ec6e9",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols2-Regular.ttf",
+      "size": 671568,
+      "sha256": "c4a0a80f0041ce4be81e2478faad22776d23edb98ae3f0d19bd37044820ecf9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Bold.ttf",
+      "size": 747144,
+      "sha256": "96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-BoldItalic.ttf",
+      "size": 779236,
+      "sha256": "c710c5b9cf354ae46e7a10472a08019b28220fafeb5887a482a76856f8f6fc0b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Italic.ttf",
+      "size": 756796,
+      "sha256": "749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Regular.ttf",
+      "size": 712444,
+      "sha256": "19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Bold.ttf",
+      "size": 682480,
+      "sha256": "bca7070ed1e6a8f5b2b08ad04dad4bed677c8044060ace0f78b2e01d425e841b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-BoldItalic.ttf",
+      "size": 682972,
+      "sha256": "b6521b09ecedf447a43f1eb202566ccf14d3ad7fb4f2008823762f71781405e8",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Italic.ttf",
+      "size": 676588,
+      "sha256": "60c8e4d1b55d3346fd7113bb12ec9ff9cc684129c32aadfa37eec4d76223dc37",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Regular.ttf",
+      "size": 670076,
+      "sha256": "8b45c367c7c6a4a1d82f132464b7f1aa8ff092df06602522b981daf1da64d927",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js",
+      "size": 8057,
+      "sha256": "84af11661013a9495c51b0ddff598f5ffb83597729456d9affbc18dc32cc6a86",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js.map",
+      "size": 18574,
+      "sha256": "d7f4fcc2c4d10b0c0adf72f3aa949f17d39d72739a2f9a60dc950dd96c0ffa3c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js",
+      "size": 5315,
+      "sha256": "c6a8622d3820c2407c92ab95420c5ecae26d02d7cbcf9a5538b726744809ea2c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js.map",
+      "size": 11934,
+      "sha256": "3fcde8318bb2c2d4dc0f7faab8565f0e5896c40577995de6d98f3d6603d47366",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js",
+      "size": 40218,
+      "sha256": "8ac2b6789d365201a2feaec4aede8604c49113f95dc4d9e274d5fa10e32326d8",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js.map",
+      "size": 67961,
+      "sha256": "8bd8f3222a46a143bd5561b22c3b16d8ca00a83f7feb2f515de15d9660550aea",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js",
+      "size": 4162,
+      "sha256": "19066ebfad118db49d60eb5902b31005fdc8f808ede97ae7eb6ec47cc553821d",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js.map",
+      "size": 8259,
+      "sha256": "4a9d844d1ae45544e3ef8e71ce277ce3a58b37e76527b39f043cff75fbae25b0",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js",
+      "size": 6075,
+      "sha256": "9f5bc6c420ff07fc19ff0e434c5b6ec309852bd022d4037aa63183bb439853c9",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js.map",
+      "size": 12218,
+      "sha256": "a36144026a6a6d90d319ebb9156180a0a08f6e27f21fc86057167d4e9f875f30",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js",
+      "size": 8563,
+      "sha256": "a669c9bdef4ed166fd36ce95c3c53d6d04d5064266383732b5b7994dcb28706d",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js.map",
+      "size": 18956,
+      "sha256": "8960a7a7affe8da3390b240a2291ada12fdaa3c403206eb3ef8f616919971dfc",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js",
+      "size": 1058,
+      "sha256": "c1490c62bc96275629897fe11513ecdc3c5bbe6f38a110e407a18879512b1ab3",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js.map",
+      "size": 2462,
+      "sha256": "74b830f93bfafc89e598263f20225687075370aca8fa20daff80e2d88d09d922",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js",
+      "size": 31190,
+      "sha256": "5ff68770ef35e630c795ccd03191ef6e40be4dbea148f3d401b41e45a33182c1",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js.map",
+      "size": 64560,
+      "sha256": "a53aec5185eba651da2b9ca34019d47c6a9f400afd2848834087b241e48a6570",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js",
+      "size": 13038,
+      "sha256": "b1a01e81169c11b7a13e760fb6af9259fc27d6a7a29295b5d8c1dd941975a354",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js.map",
+      "size": 23361,
+      "sha256": "eac52528b62887f39e950ed84f7b9057ff322f2b39ee250caaa5b82484f75344",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js",
+      "size": 1878,
+      "sha256": "87e6c9e90e7ee7f68abfc6d577a3caed076a9699cd36e29544eaf91685506cbd",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js.map",
+      "size": 4196,
+      "sha256": "166cdfecc44fd851b11aecb358a8e81a9608ea326855bfd27314669e8a6e517c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js",
+      "size": 4962,
+      "sha256": "da8becb88b66bf9c36ecc77f93454e0500fc1a2db2ef1c67fcc81f5492c03100",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js.map",
+      "size": 10972,
+      "sha256": "d8368c77b8cc62c133ca83925261d382968df8a20af6c8cf95b96b6eb1a29186",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js",
+      "size": 3926,
+      "sha256": "edc9fabad304e152632887d0ddeeccaabd8ba90078dde263f61f775736780a82",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js.map",
+      "size": 7764,
+      "sha256": "c30f170105c560c2007f1018177b7f074760ce893a5b94c887707961eb81f042",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js",
+      "size": 5031,
+      "sha256": "717d0f798b400b76cbb3ff0a5a21cd6b4dfeda16931d61363b4ae63eeef9e476",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js.map",
+      "size": 10046,
+      "sha256": "15aca0b550a1252d4e15fe6d25d3988ee6268679898e38908ee2cf667e8a1092",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js",
+      "size": 24797,
+      "sha256": "ce6b7a1faa5da26d3aebb53819cd202b8f8ae7e78c8d67946da7c34623ea188b",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js.map",
+      "size": 49447,
+      "sha256": "ce41aef55b56153ddb7cc36e3af80fd8049f6eea1ca02c6afe0db48190705f72",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js",
+      "size": 2686,
+      "sha256": "30c954b21505c442b726bd36297e70976fcc2837424d76ecb744aead46d5a1ad",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js.map",
+      "size": 5525,
+      "sha256": "52355d5c87a8fec68f1b8c9b06531ac66f990c2c4cf510278f4df80b74bf8f89",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js",
+      "size": 5804,
+      "sha256": "f48ea61e272918d3fd22eeb7028fd9fc591e25f0fba78e8bfacd0bccc1df64c3",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js.map",
+      "size": 11516,
+      "sha256": "cf6dbcecf3bf38812f2ac843195a21613b8b17b1f42f709e5a3426a15c68f532",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js",
+      "size": 3532,
+      "sha256": "20cd0470ad1fb9002e272aa0b2ccff1b5f555b02d5da12b5b20e469cf60d1028",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js.map",
+      "size": 7678,
+      "sha256": "627bdb43b4cc3d456e278e71d3f3e33bf23c22e369d1c10775f3ce0144b941bb",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js",
+      "size": 9025,
+      "sha256": "635a6d658d393ae45ad6d4d5049356dfbb71ba5b14acf5867b5ef0a8f8c0e1e0",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js.map",
+      "size": 15851,
+      "sha256": "b49b03669a70c060cf5780de7bb396f82019ca8f610777d5a88b0493c59c5ca2",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js",
+      "size": 1642,
+      "sha256": "b57aff80263c3d95a0791aeec2a572883efeddc8a05a8ffc545e1f596e366306",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js.map",
+      "size": 3499,
+      "sha256": "bb4886cc8837da47e0d1837dabeaf9c795c60e8fefcdebaacc06ab6af547bfea",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js",
+      "size": 3252,
+      "sha256": "6662d559f17daffcdc4a2795d99d846c7e6870ba6dd98f1f89eeaac29d930ed2",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js.map",
+      "size": 6625,
+      "sha256": "0dda56d9b313fc28094ff0b73980ee0a9235282e5a769d55cd3d903e2ad35898",
+      "mode": "0o644"
+    },
+    {
+      "path": "icudtl.dat",
+      "size": 10824576,
+      "sha256": "e1ed8f674bb8449731b79cae956042da59f9ecbd37c8d3f86586a22b4836e5b2",
+      "mode": "0o644"
+    },
+    {
+      "path": "lib/libexpat.so.1",
+      "size": 195632,
+      "sha256": "e57a2d32b601dca488198bedb484f3147eafce80eb9c5395c43dff83228399a8",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libfreebl3.so",
+      "size": 12408,
+      "sha256": "733b799b687bf51b462a6bce460b69732853139e313e849eecd4ce4e5f9e3165",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libfreeblpriv3.so",
+      "size": 1092056,
+      "sha256": "3331edde31e32dd8a41de7f93e76ab9737088597deea0f060e0a036e47d829cf",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnspr4.so",
+      "size": 302008,
+      "sha256": "af773dd10997c6728fdd0889ae0ea06fe0c19915b5a7f89879b85cb104f34d65",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnss3.so",
+      "size": 1439520,
+      "sha256": "20c223ef7bb3426fe08acae9b38a42be4126275d7eb216d61032639e7e6136b0",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnssckbi.so",
+      "size": 665128,
+      "sha256": "e0c97d3c4fc31fceb4f77e2466557c3a42eba89610e8a560f51d82b1b03c7167",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnssutil3.so",
+      "size": 261608,
+      "sha256": "c650079ba5ab247210f31193b19418c89d219f365d4202925b965fc641d5e344",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libplc4.so",
+      "size": 22752,
+      "sha256": "83ee66a45acde45581a6fd40ece1591fb4af7b2f33a1e4d340f57095e0fd0623",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libplds4.so",
+      "size": 16184,
+      "sha256": "933387e0478cdb861a952635e8ea0fbeb4de42e45abddaf4916d965801ecd755",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsmime3.so",
+      "size": 224712,
+      "sha256": "37057e76a23950f7e982663c4c68fac453d9de3d881adca83b6c580b51a16acc",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsoftokn3.so",
+      "size": 454088,
+      "sha256": "456ed6efa495436203023f5e63f85f2b4066e1151704b4eb3f115172ec524925",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsqlite3.so.0",
+      "size": 1866520,
+      "sha256": "2a10d6a55eee513fc0f6809e2f289832454d29d2f09bcdf0b55594c4ffa0149d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxkbcommon.so.0",
+      "size": 973032,
+      "sha256": "31d4892722036c4f0daaa72c0c0a8d4b7f7d7c4ffc98f857ed4859d11037d536",
+      "mode": "0o755"
+    },
+    {
+      "path": "libEGL.so",
+      "size": 411768,
+      "sha256": "073dacc829272d466df533992f9e0ee6c59fedae574b713749a47c9dc940dfc0",
+      "mode": "0o755"
+    },
+    {
+      "path": "libGLESv2.so",
+      "size": 411768,
+      "sha256": "b29833da4ad9f334fa53b95331ffffac31677ab179994afc045b18b5153e2ee7",
+      "mode": "0o755"
+    },
+    {
+      "path": "libVkICD_mock_icd.so",
+      "size": 729800,
+      "sha256": "1f81cc0d114a946d08e7dbddb11a9c155c318fa72348e54721e8900b03c6c333",
+      "mode": "0o755"
+    },
+    {
+      "path": "libVkLayer_khronos_validation.so",
+      "size": 27574400,
+      "sha256": "560a1c56176e55b8236bee450f6000d088b88432a2a2e26e93e353741a2322ca",
+      "mode": "0o755"
+    },
+    {
+      "path": "libminigbm.so",
+      "size": 468744,
+      "sha256": "86d6eda71c605853ba2ba40e1fa8bc8b2ccdd9421bd8bc8b3f4601e0acb7f0ef",
+      "mode": "0o755"
+    },
+    {
+      "path": "libvk_swiftshader.so",
+      "size": 24192176,
+      "sha256": "add27ed26964124b47f575831df616f0415926b2e4d5b02c3464ffa26499909b",
+      "mode": "0o755"
+    },
+    {
+      "path": "libvulkan.so.1",
+      "size": 967160,
+      "sha256": "57c68edec9913c49cf93c3235acceea13498bda26c8b6c0bb71533158c1b91e0",
+      "mode": "0o755"
+    },
+    {
+      "path": "locales/en-US.pak",
+      "size": 583147,
+      "sha256": "1702c3e405e1952d2b051ed5dc1326d53c752c02373f2c417ebca62ccaaaa1a3",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/__init__.py",
+      "size": 349,
+      "sha256": "5b3af98ae1b57e1de43e10adf3714503364f9d3ca3dfb596524c0a997d8f265b",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/any.py",
+      "size": 1324,
+      "sha256": "c90e0a770b8c79be8661dd7524d665cad940e77d129a3b071cc218910899ea9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor.py",
+      "size": 53321,
+      "sha256": "c82e91904557558e317ed4bbc12ed94e7a3b2fd6285a00cb42526c3e5a9eaf3d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_database.py",
+      "size": 6345,
+      "sha256": "51bc95aac632c881e7fd7dc12e33ae8ef6e093e66f7978ab4018f4fb5cf5969d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_pb2.py",
+      "size": 369823,
+      "sha256": "1fc7fde70dd922b96fc2a8d006e6a79ecd47ac2b4f9b281c9572e9f4991e31ae",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_pool.py",
+      "size": 49027,
+      "sha256": "8d49f57de01248141361719819f37f994c41c057e6a8834d1663bf3b790ea4f6",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/duration.py",
+      "size": 2675,
+      "sha256": "760726b00e13605759b9400abe3114fdae3d8174bf3d0a66dd510f2883733cdc",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/__init__.py",
+      "size": 274,
+      "sha256": "d84335c9e7fae8099f595f9407809ea95ae181d9fb685ba568a4c51461a9b9c2",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/api_implementation.py",
+      "size": 4621,
+      "sha256": "732183edda12c8b742bd8ccda33111cc4b3d8f5f3dcd105867c3e48c428dedf5",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/builder.py",
+      "size": 4163,
+      "sha256": "f081a4b9a6ffd5860a6b3863cc0dcc8a9b713c5145da2925aa2c7b2b764b8bb4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/containers.py",
+      "size": 25620,
+      "sha256": "3750ddc124176fd39705396eeeae9e20759365b9ffbe15ed6bc0d19983466b32",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/decoder.py",
+      "size": 37855,
+      "sha256": "33bbf78329f112000926202ca770cfb7b638ae217bea3889d8ad91c340045fe7",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/encoder.py",
+      "size": 27019,
+      "sha256": "6f31e1e91eb911e3e38cc3839164254a2d9532b12c542ae6b463a36995b0234a",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/enum_type_wrapper.py",
+      "size": 3902,
+      "sha256": "07db8d61f7cfa55345a6326f6074c0de9879a076a928efe041398af25c46cde5",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/extension_dict.py",
+      "size": 7265,
+      "sha256": "9086ad78f13d1192d1b7cc84339d990d159df383f203e722d7a119c1e954d422",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/field_mask.py",
+      "size": 11320,
+      "sha256": "6e08f6fc34790820abefcec2faa4cb9e1d6669f772ae5b1dc345447bf9680b35",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/message_listener.py",
+      "size": 2008,
+      "sha256": "7e20253b0cc19aa9945f0703d831262583ffee4a2c49b07decf47ee981b236c7",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/python_edition_defaults.py",
+      "size": 645,
+      "sha256": "7fb7071b6bc4845347c1f3312dcb8de0451949a476cbff94af7a793fa3097118",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/python_message.py",
+      "size": 59722,
+      "sha256": "e96cfd4bc319f648f1e1bfba84dfb14325f42a12e24dc7a7f0f34f52c8bac9e0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/type_checkers.py",
+      "size": 16832,
+      "sha256": "7bce7c3965d6b8effc59cc5a2d3535cace9d59685185237e30a49328adc03227",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/well_known_types.py",
+      "size": 23345,
+      "sha256": "c9d564c17d883ab4ed3f235328432f9ae6b103cf165a39a29f597da01fdfb8b4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/wire_format.py",
+      "size": 7115,
+      "sha256": "d2dd0306027223dba59383ddeb99dcac8c8f4ea008a30a279647724dab65a375",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/json_format.py",
+      "size": 39427,
+      "sha256": "ff24132f8bd6c012fc7627ef25617dc03773289467e5ee15870ac8a523cdb7a0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/message.py",
+      "size": 15608,
+      "sha256": "81e225d8338b1070cc58540cc499b037e1cc68b9aa0797ca8c7da46c49c961a1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/message_factory.py",
+      "size": 6611,
+      "sha256": "7b746231c1a91b890f98ee377a6a794bf1df35db1a5cdcf042257b9f5a4474ba",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto.py",
+      "size": 4403,
+      "sha256": "83c112c806258488d7724a53a91d73177797f8510e14941c0372e0cbc6c768c1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_builder.py",
+      "size": 4249,
+      "sha256": "a21c42d6118c0340baa97485d99f251a518726a4afc03852429ddac49c16e4d4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_json.py",
+      "size": 2966,
+      "sha256": "ec414a61a96faf4332a3a4479473a3f1ca701616b7dd6b4a5e3228523b363ff1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_text.py",
+      "size": 4649,
+      "sha256": "17f51bd35b9587c67f028aacf82062c3ad132f8f69640026f8758c805ee8d9b0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/reflection.py",
+      "size": 1247,
+      "sha256": "feb2235110b1b989d9deabf1766d0c5c70db234bb08b277df409dfb598281809",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/runtime_version.py",
+      "size": 3040,
+      "sha256": "e58327f339aeaf7633b08cf3e713be7ea476cf396c16488273c8d19b92140864",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/service_reflection.py",
+      "size": 10108,
+      "sha256": "a14e400454a40c30d0fc60b9a5acb86d69a197664b20629aaf6daebf8f565db0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/symbol_database.py",
+      "size": 5752,
+      "sha256": "dea860011d12860b9b3e45d400d2809585af1528b881659454bcb132a81d1bac",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/text_encoding.py",
+      "size": 3628,
+      "sha256": "3f04747bdb078d0b9e3349fff54c70a415cab1f6e136d49178a0fdd39ff16429",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/text_format.py",
+      "size": 66522,
+      "sha256": "947d7a49770c5f107ffb7de2a672683a60c3179aebbe6f0c5468c7a19ddbd98d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/timestamp.py",
+      "size": 3136,
+      "sha256": "025ff58a4cb080d1eb2879f626fab6376fbab4d5eecefd65205abb85f3be52d9",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/unknown_fields.py",
+      "size": 3050,
+      "sha256": "88acc92aaaf091e59597cde441a3189fc45dc994a93e1755d2185d42a1dbf465",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/accessibility/reading_mode_gdocs_helper_manifest.json",
+      "size": 2387,
+      "sha256": "b0a8ac7c5f45a71ae311356f31ca85545c65bc70ead958b016c4f39e8c2beb88",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/helium_adblock/assets/assets.json",
+      "size": 32105,
+      "sha256": "e1faa0710c49c50a694a59636f2c49d77a879a11caae3c9b632b506eae63cf9b",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/helium_adblock/resources.json",
+      "size": 414558,
+      "sha256": "3a2cdd9c50baa201a8fc78748662cfd4de9735cd82119c843045a98b8e0e6b52",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources.pak",
+      "size": 23577699,
+      "sha256": "4ebe42809659b444794cf1c8437c9e76f1258687743ed8867cfa79e920fa6ad6",
+      "mode": "0o644"
+    },
+    {
+      "path": "snapshot_blob.bin",
+      "size": 391248,
+      "sha256": "efb2d32109e154abe96d12022283b9851237a118bc7f62c55bfcdffc4ea75c4e",
+      "mode": "0o644"
+    },
+    {
+      "path": "v8_context_snapshot.bin",
+      "size": 769824,
+      "sha256": "67fa642c37cb2db3b06099fb529446fedc527b7cfb743cf809ced3dbee706968",
+      "mode": "0o644"
+    },
+    {
+      "path": "vk_swiftshader_icd.json",
+      "size": 107,
+      "sha256": "c9eef28b6b984fec220ef0abfecc40b502d46946706e47bfe97707027cb818bd",
+      "mode": "0o644"
+    }
+  ]
+}

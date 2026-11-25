@@ -1,0 +1,98 @@
+#!/bin/sh
+# Repository gate. Each step prints ok or FAIL; the script exits nonzero if any
+# step failed, after running all of them.
+# The step functions are called through step "$@", which shellcheck cannot follow.
+# shellcheck disable=SC2329
+set -u
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root" || exit 1
+PATH=${CARGO_HOME:-$HOME/.cargo}/bin:$PATH
+export PATH
+failed=0
+
+step() {
+    name=$1
+    shift
+    if out=$("$@" 2>&1); then
+        printf 'ok   %s\n' "$name"
+    else
+        printf 'FAIL %s\n%s\n' "$name" "$out" >&2
+        failed=1
+    fi
+}
+
+frozen_tree() {
+    sha256sum -c -s oracle/build.sha256 || return 1
+    listed=$(awk '{ print $2 }' oracle/build.sha256 | LC_ALL=C sort)
+    actual=$(find oracle/build -type f | LC_ALL=C sort)
+    [ "$listed" = "$actual" ] || { echo "oracle/build has files outside oracle/build.sha256"; return 1; }
+}
+
+frozen_evidence() {
+    (cd oracle/frozen && sha256sum -c -s SHA256SUMS) && (cd oracle/workloads && sha256sum -c -s SHA256SUMS)
+}
+
+artifacts_lock() {
+    awk '$0 ~ /^#/ { next }
+        NF != 4 || $1 !~ /^[0-9a-f]+$/ || length($1) != 64 || $2 !~ /^([0-9]+|-)$/ || $4 !~ /^manganese\/[a-z0-9-]+:[A-Za-z0-9._-]+$/ {
+            print "bad line " NR ": " $0; bad = 1 }
+        END { exit bad }' oracle/frozen/artifacts.lock
+}
+
+doc_links() {
+    bad=0
+    for doc in README.md AGENTS.md docs/*.md; do
+        dir=$(dirname "$doc")
+        links=$(grep -o '](\([^)]*\))' "$doc" | sed 's/^](//; s/)$//; s/#.*//')
+        while IFS= read -r target; do
+            case $target in ''|http://*|https://*|mailto:*) continue ;; esac
+            [ -e "$dir/$target" ] || { echo "$doc links to missing $target"; bad=1; }
+        done <<LINKS
+$links
+LINKS
+    done
+    return "$bad"
+}
+
+frozen_verifier() {
+    command -v llvm-readelf >/dev/null || { echo "llvm-readelf is not on PATH"; return 1; }
+    python3 oracle/build/scripts/install-runtime.py --help >/dev/null
+}
+
+builder_base() {
+    image=$(sed -n 's/^ARG BASE_IMAGE=//p' oracle/build/Dockerfile)
+    [ -n "$image" ] || { echo "no BASE_IMAGE in oracle/build/Dockerfile"; return 1; }
+    docker pull -q "$image" >/dev/null && docker run --rm --network=none "$image" /bin/true
+}
+
+musl_link_mode() {
+    case $(uname -m) in
+        x86_64) triple=x86_64-unknown-linux-musl ;;
+        aarch64) triple=aarch64-unknown-linux-musl ;;
+        *) echo "unsupported architecture"; return 1 ;;
+    esac
+    loader=/lib/ld-musl-$(uname -m).so.1
+    probe=$root/.work/tmp/link-probe
+    rm -rf "$probe"
+    mkdir -p "$probe/src"
+    printf '[package]\nname = "link-probe"\nversion = "0.0.0"\nedition = "2024"\n\n[workspace]\n' > "$probe/Cargo.toml"
+    printf 'fn main() { println!("Chromium 156.0.8078.79"); }\n' > "$probe/src/main.rs"
+    RUSTC_WRAPPER=kache cargo build -q --release --manifest-path "$probe/Cargo.toml" --target "$triple" || return 1
+    bin=$probe/target/$triple/release/link-probe
+    interp=$(llvm-readelf -l "$bin" | sed -n 's/.*Requesting program interpreter: \(.*\)\]/\1/p')
+    needed=$(llvm-readelf -d "$bin" | sed -n 's/.*(NEEDED).*\[\(.*\)\]/\1/p' | tr '\n' ' ')
+    [ "$interp" = "$loader" ] || { echo "interpreter is '$interp', want $loader"; return 1; }
+    [ "$needed" = "libc.musl-$(uname -m).so.1 " ] || { echo "DT_NEEDED is '$needed', want only musl libc"; return 1; }
+    [ "$("$bin")" = "Chromium 156.0.8078.79" ] || { echo "direct run failed"; return 1; }
+    [ "$("$loader" "$bin")" = "Chromium 156.0.8078.79" ] || { echo "run through $loader failed"; return 1; }
+}
+
+step frozen-tree frozen_tree
+step frozen-evidence frozen_evidence
+step artifacts-lock artifacts_lock
+step doc-links doc_links
+step frozen-verifier frozen_verifier
+step builder-base builder_base
+step musl-link-mode musl_link_mode
+exit $failed

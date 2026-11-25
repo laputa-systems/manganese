@@ -1,0 +1,5 @@
+[toolchain]
+channel = "nightly-2026-11-09"
+profile = "minimal"
+components = ["clippy"]
+targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]

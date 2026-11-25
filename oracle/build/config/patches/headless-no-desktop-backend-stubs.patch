@@ -1,0 +1,54 @@
+--- a/chrome/browser/notifications/BUILD.gn
++++ b/chrome/browser/notifications/BUILD.gn
+@@ -335,6 +335,8 @@
+         "//chrome/app/theme:chrome_unscaled_resources_grit",
+         "//chrome/browser/themes",
+       ]
++    } else {
++      sources += [ "notification_platform_bridge_no_dbus.cc" ]
+     }
+   }
+ 
+--- a/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
++++ b/chrome/browser/notifications/notification_platform_bridge_no_dbus.cc
+@@ -0,0 +1,16 @@
++// Copyright 2026 The Chromium Authors
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++#include "chrome/browser/notifications/notification_platform_bridge.h"
++
++std::unique_ptr<NotificationPlatformBridge>
++NotificationPlatformBridge::Create() {
++  return nullptr;
++}
++
++// static
++bool NotificationPlatformBridge::CanHandleType(
++    NotificationHandler::Type) {
++  return false;
++}
+--- a/chrome/browser/metrics/chrome_metrics_service_client.cc
++++ b/chrome/browser/metrics/chrome_metrics_service_client.cc
+@@ -880,7 +880,7 @@
+       metrics::MetricsLogUploader::MetricServiceType::UMA));
+ 
+ 
+-#if BUILDFLAG(IS_LINUX) || BUILDFLAG(IS_CHROMEOS)
++#if BUILDFLAG(IS_CHROMEOS)
+   metrics_service_->RegisterMetricsProvider(
+       std::make_unique<metrics::BluetoothMetricsProvider>());
+ #endif
+--- a/extensions/browser/api/networking_private/BUILD.gn
++++ b/extensions/browser/api/networking_private/BUILD.gn
+@@ -76,6 +76,9 @@
+     ]
+   } else {
+     not_needed([ "default_sources" ])
+-    sources = [ "networking_private_stubs.cc" ]
++    sources = [
++      "networking_private_delegate_factory_no_dbus.cc",
++      "networking_private_stubs.cc",
++    ]
+   }
+ }

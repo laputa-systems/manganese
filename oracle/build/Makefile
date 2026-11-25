@@ -1,0 +1,222 @@
+ifdef TARGET
+ifeq ($(TARGET),aarch64-apple-darwin)
+PLATFORM ?= macos
+ARCH ?= arm64
+else ifeq ($(TARGET),x86_64-unknown-linux-musl)
+PLATFORM ?= linux
+ARCH ?= amd64
+else ifeq ($(TARGET),aarch64-unknown-linux-musl)
+PLATFORM ?= linux
+ARCH ?= arm64
+else
+$(error unsupported TARGET $(TARGET); use aarch64-apple-darwin, x86_64-unknown-linux-musl, or aarch64-unknown-linux-musl)
+endif
+endif
+PLATFORM ?= linux
+PRODUCT ?= chromium
+ifeq ($(PLATFORM),macos)
+ARCH ?= arm64
+PROFILE ?= macos-release
+IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
+WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
+CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
+else ifeq ($(PRODUCT),helium)
+ARCH ?= amd64
+PROFILE ?= helium-wayland-release
+# Helium image, work, and cache defaults come from config/helium.inputs.lock
+# through scripts/linux_product.py; leave them unset unless explicitly chosen.
+IMAGE ?=
+WORK_VOLUME ?=
+CACHE_VOLUME ?=
+else
+ARCH ?= amd64
+PROFILE ?= headless-debug
+IMAGE ?= ungoogled-chromium-builder:153.0.8010.52-$(ARCH)
+WORK_VOLUME ?= ungoogled-chromium-153-work-$(ARCH)
+CACHE_VOLUME ?= ungoogled-chromium-153-ccache-$(ARCH)
+endif
+# Ninja parallelism for build steps; empty keeps build.py's default of min(CPUs, 8).
+JOBS ?=
+
+CHROMIUM_BUILD = CHROMIUM_BUILDER_IMAGE=$(IMAGE) \
+    CHROMIUM_WORK_VOLUME=$(WORK_VOLUME) \
+    CHROMIUM_CACHE_VOLUME=$(CACHE_VOLUME) \
+    ./chromium-build --product $(PRODUCT) --platform $(PLATFORM) --arch $(ARCH) --profile $(PROFILE) $(if $(JOBS),--jobs $(JOBS))
+DOCKER ?= docker
+
+.NOTPARALLEL:
+.PHONY: image fetch prepare gate-a gate-b gate-c gate-d gate-e gate-f gates
+.PHONY: release-linux package install
+.PHONY: bootstrap full-build resume-build build-target stage-runtime test-fast test-functional test-staged cache-stats resume-check graph-breakdown check-py lint test test-ci coverage build verify clean
+.PHONY: macos-doctor macos-smoke-preflight macos-update-lock macos-fetch macos-prepare macos-configure macos-cache-stats macos-build macos-stage-runtime macos-test-staged
+
+check-py: lint
+
+lint:
+	PYTHONPATH=scripts:tests uv run ruff check scripts tests
+	PYTHONPATH=scripts:tests uv run ty check scripts tests
+	uv run python scripts/sources_lock.py check
+
+test:
+	mkdir -p .work/tmp
+	TMPDIR="$(CURDIR)/.work/tmp" PYTHONPATH=scripts:tests uv run python tests/run_controller_tests.py $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+
+coverage:
+	mkdir -p .work/tmp
+	rm -f .work/tmp/.coverage*
+	TMPDIR="$(CURDIR)/.work/tmp" PYTHONPATH=scripts:tests uv run --with coverage coverage run tests/run_controller_tests.py $(if $(filter Darwin,$(shell uname -s)),macos,linux)
+	uv run --with coverage coverage report --skip-empty
+
+test-ci:
+	mkdir -p .work/tmp
+	$(DOCKER) run --rm --network=none --entrypoint /bin/sh \
+		--mount type=bind,source="$(CURDIR)",target=/repo,readonly \
+		--tmpfs /repo/.work/tmp:exec -e TMPDIR=/repo/.work/tmp \
+		-e PYTHONPATH=/repo/scripts:/repo/tests "$(IMAGE)" \
+		-c 'cd /repo && python3 tests/run_controller_tests.py linux-builder'
+
+build:
+ifeq ($(PLATFORM),macos)
+	$(CHROMIUM_BUILD) fetch
+	$(CHROMIUM_BUILD) prepare
+	$(CHROMIUM_BUILD) configure
+	$(CHROMIUM_BUILD) build
+	$(CHROMIUM_BUILD) stage-runtime
+	@case "$$(printf %s "$${MACOS_SKIP_ACCEPTANCE:-0}" | tr A-Z a-z)" in 1|true|yes) ;; *) $(CHROMIUM_BUILD) test-staged ;; esac
+	$(CHROMIUM_BUILD) package
+else ifeq ($(PRODUCT),chromium)
+	$(MAKE) release-linux
+else
+	@echo 'make build supports PRODUCT=chromium; build helium with the steps in docs/linux.md' >&2; exit 2
+endif
+
+verify:
+ifeq ($(PLATFORM),macos)
+	$(CHROMIUM_BUILD) verify-release
+else
+	$(CHROMIUM_BUILD) test-staged
+endif
+
+clean:
+	rm -rf .venv .ruff_cache
+	find . -path './.git' -prune -o -path './.work' -prune -o -name __pycache__ -type d -prune -exec rm -rf {} +
+	rm -rf .work/macos-arm64/out .work/macos-arm64/stage .work/macos-arm64/release .work/macos-arm64/verify
+
+image:
+	$(CHROMIUM_BUILD) image
+
+fetch:
+	$(CHROMIUM_BUILD) fetch
+
+prepare:
+	$(CHROMIUM_BUILD) prepare
+
+gate-a:
+	$(CHROMIUM_BUILD) gate-a
+
+gate-b:
+	$(CHROMIUM_BUILD) gate-b
+
+gate-c:
+	$(CHROMIUM_BUILD) gate-c
+
+gate-d:
+	$(CHROMIUM_BUILD) gate-d
+
+gate-e:
+	$(CHROMIUM_BUILD) gate-e
+
+gate-f:
+	$(CHROMIUM_BUILD) gate-f
+
+bootstrap: image fetch prepare
+
+gates: gate-a gate-b gate-c gate-d gate-e gate-f
+
+full-build: bootstrap gates
+	$(CHROMIUM_BUILD) build
+
+resume-build: gate-e gate-f
+	$(CHROMIUM_BUILD) build
+
+build-target:
+	@test -n "$(NINJA_TARGET)" || (echo 'usage: make build-target NINJA_TARGET=obj/path.o' >&2; exit 2)
+	$(CHROMIUM_BUILD) build-target "$(NINJA_TARGET)"
+
+stage-runtime:
+	$(CHROMIUM_BUILD) stage-runtime
+
+test-fast:
+	$(CHROMIUM_BUILD) test-fast
+
+test-functional:
+	$(CHROMIUM_BUILD) test
+
+test-staged:
+	$(CHROMIUM_BUILD) test-staged
+
+package:
+	$(CHROMIUM_BUILD) package
+
+install:
+	$(CHROMIUM_BUILD) install
+
+# Build, accept, package, and install the self-contained headless release
+# bundle. Resumable: completed fetch/prepare are skipped and Ninja only
+# rebuilds what changed. `image` always runs so the image carries the
+# current scripts; with a warm build cache that is a no-op.
+release-linux: PLATFORM = linux
+release-linux: PROFILE = headless-release
+release-linux:
+	$(CHROMIUM_BUILD) image
+	$(CHROMIUM_BUILD) ensure-source
+	$(CHROMIUM_BUILD) poc
+	$(CHROMIUM_BUILD) build
+	$(CHROMIUM_BUILD) test
+	$(CHROMIUM_BUILD) stage-runtime
+	$(CHROMIUM_BUILD) test-staged
+	$(CHROMIUM_BUILD) package
+	$(CHROMIUM_BUILD) install
+
+cache-stats:
+	$(DOCKER) run --rm --network=none -v $(CACHE_VOLUME):/ccache $(IMAGE) \
+		sh -c 'CCACHE_DIR=/ccache ccache -s'
+
+resume-check:
+	$(DOCKER) run --rm --network=none -v $(WORK_VOLUME):/work $(IMAGE) \
+		sh -c 'cd /work/out/$(PROFILE) && ninja -n chrome 2>/dev/null | tail -1'
+
+graph-breakdown:
+	$(DOCKER) run --rm --network=none -v "$(CURDIR):/repo:ro" -v $(WORK_VOLUME):/work $(IMAGE) \
+		python3 /repo/scripts/build-task-breakdown.py \
+		--out /work/out/$(PROFILE) --target chrome
+
+macos-doctor:
+	./chromium-build --platform macos --arch arm64 --profile macos-release doctor
+
+macos-smoke-preflight:
+	MACOS_COMPILER_CACHE=off ./chromium-build --platform macos --arch arm64 --profile macos-release smoke-preflight
+
+macos-update-lock:
+	./chromium-build --platform macos --arch arm64 --profile macos-release update-lock --latest
+
+macos-fetch:
+	./chromium-build --platform macos --arch arm64 --profile macos-release fetch
+
+macos-prepare:
+	./chromium-build --platform macos --arch arm64 --profile macos-release prepare
+
+macos-configure:
+	./chromium-build --platform macos --arch arm64 --profile macos-release configure
+
+macos-cache-stats:
+	./chromium-build --platform macos --arch arm64 --profile macos-release cache-stats
+
+macos-build:
+	./chromium-build --platform macos --arch arm64 --profile macos-release build
+
+macos-stage-runtime:
+	./chromium-build --platform macos --arch arm64 --profile macos-release stage-runtime
+
+macos-test-staged:
+	./chromium-build --platform macos --arch arm64 --profile macos-release test-staged

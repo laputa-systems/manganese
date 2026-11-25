@@ -1,0 +1,360 @@
+# Linux musl builds
+
+The Linux backend builds headless Chromium and the Helium desktop browser in
+an Alpine container on the native host architecture (amd64, or arm64 for
+Helium). Headless Chromium remains amd64-only; Helium also builds for
+linux/arm64. Chromium source and Ninja output use Docker named volumes.
+The `image` and `fetch` phases acquire inputs. Later browser build phases run
+offline.
+
+`image --jobs N` limits parallel compilation of Helium's pure arm64 runtime
+libraries. Without `--jobs`, that image stage uses the container's CPU count.
+
+## Inputs and profiles
+
+The pinned Chromium revision, tool archives, and digests are in
+[`config/inputs.lock`](../config/inputs.lock) and
+[`config/packages.amd64.lock`](../config/packages.amd64.lock). The
+`headless-debug` and `headless-release` profiles differ in debug checks.
+Chromium's compiler runs against a pinned glibc runtime in the image and targets
+`x86_64-unknown-linux-musl`. Staged Chrome must use the musl loader and must not
+directly require glibc, libstdc++, or libgcc. Chromium's in-tree libc++ provides
+the C++ runtime. The audited FFmpeg runtime closure is the only bundled GNU
+runtime exception.
+
+### Builder packages
+
+The AMD64 Chromium lock and the ARM64 and AMD64 Helium locks record
+the dependency closures for their digest-pinned Alpine 3.24.2 images.
+Each lock includes the URL, byte count, and hashes for the exact APKs
+needed beyond its base image.
+
+`chromium-build image` verifies those archives in its worktree
+cache and passes them to the Docker build. The installation
+runs with networking disabled and an empty APK repository list.
+The installed package manifest must match the owning lock. Alpine keeps
+only the newest revision of a package, so every locked APK is also an asset
+of this repository's `alpine-apks-v<series>` release, named
+`<arch>-<package>.apk`. A fetch tries the locked URL, then that release,
+then the dl-4 and dl-5 mirrors, and accepts only the locked size and
+SHA-512. After refreshing a lock, upload its new archives while upstream
+still serves them: `scripts/mirror-builder-apks.py .work/tmp/apks`.
+
+To refresh the closure, resolve the supported stable branch in
+a disposable container from the same base digest. Capture the
+installed manifest and keep the exact archive set for its
+difference from the base inventory. Verify an isolated offline
+install with `python3 scripts/lockcheck.py packages`, then regenerate
+`sources.lock.json` from the committed archive metadata.
+
+## Build and acceptance
+
+Run phases in order. `build` requires Gate D to have passed for the same
+profile.
+
+```sh
+./chromium-build --arch amd64 --profile headless-debug image
+./chromium-build --arch amd64 --profile headless-debug fetch
+./chromium-build --arch amd64 --profile headless-debug prepare
+./chromium-build --arch amd64 --profile headless-debug poc
+./chromium-build --arch amd64 --profile headless-debug build
+./chromium-build --arch amd64 --profile headless-debug test-fast
+./chromium-build --arch amd64 --profile headless-debug test
+./chromium-build --arch amd64 --profile headless-debug stage-runtime
+./chromium-build --arch amd64 --profile headless-debug test-staged
+```
+
+Gate A checks direct cache reuse for C and C++ objects. Gate F checks the
+target-scoped compiler and link commands; its separate oracle is described in
+[Gate F oracle](gate-f-oracle.md). Linux GN uses `/usr/bin/ccache` for compile
+commands and does not wrap link commands.
+
+### Helium Rust toolchain
+
+Helium uses Chromium's pinned Rust 1.100 toolchain and Crubit instead of the
+Alpine Rust packages. The target standard library and Crubit bindings are
+compiled in-tree for the musl target. Alpine Rust, Cargo, rust-src, and
+rustfmt are not part of the Helium package world. The toolchain must sit at
+`third_party/rust-toolchain`: Chromium disables Crubit, which Blink's fonts
+need, when `rust_sysroot_absolute` points elsewhere.
+
+On linux/arm64 the toolchain is native aarch64 musl, and the builder carries no
+glibc, libgcc, or libstdc++ for it. Chromium publishes its Rust toolchain only
+for x86_64 glibc hosts, so `scripts/build-rust-toolchain.sh` rebuilds the same
+pinned Rust, Crubit, and bindgen revisions on an aarch64 musl host against
+llvm-prebuilt-musl's GCC-free LLVM and its `-dev` package. Its `profiler_builtins`
+links LLVM 23.1.5's compiler-rt profile runtime, built by the same clang, because
+Chromium's host standard library copy expects that crate. The archive also
+carries a native `clang-format` from the same LLVM release, which Crubit runs on
+the headers it generates. rustc, clang, and
+lld then share LLVM 23.1.5. The resulting archive is the `rust_toolchain` entry
+under `architecture_inputs.arm64` in `config/helium.inputs.lock`. `fetch`
+verifies its size and SHA-512 like any other input. `prepare` checks that
+`tools/rust/update_rust.py` pins the same Rust revision and that the archive's
+`VERSION` matches the toolchain Chromium pins. It then replaces
+`third_party/rust-toolchain` with the archive and requires the installed
+`rustc -vV` to report the locked commit, the `aarch64-unknown-linux-musl` host,
+and the locked LLVM version. Host build tools, proc macros, and the browser
+all link with the same musl clang.
+
+The Linux overlay is an x86_64 tree, so `prepare` on arm64 also deletes every
+ELF file built for another architecture and the unused Debian glibc sysroots.
+Anything that would have needed emulation then fails as a missing file. The
+host tools the arm64 build does run are native: Alpine's `node` at Chromium's
+`node-linux-x64` path, the toolchain archive's `clang-format` at
+`buildtools/linux64-format/clang-format`, and two npm arm64 binaries pinned in
+the lock: `@typescript/typescript-linux-arm64` as `typescript_native` and
+`@esbuild/linux-arm64` (the DevTools inspector overlay bundler) as
+`esbuild_native`. `prepare` installs each over Chromium's x86_64 path only if
+Chromium pins the same version and the binary is aarch64 and reports it. Gate A fails if an arm64 builder has a glibc
+loader, a `*-linux-gnu` library directory, `/opt/chromium-glibc`, or a
+`RUST_HOST_LINKER`.
+
+To produce a new archive after a Chromium Rust roll, run
+`scripts/build-rust-toolchain.sh <prepared-src> <llvm-prefix> <out-dir>` in an
+arm64 Alpine container with network access. `<llvm-prefix>` is the compiler
+package with its `-dev` package extracted over it. Publish the archive and pin
+its URL, size, SHA-512, and Rust revision in the lock.
+
+On amd64 the toolchain is still Chromium's downloaded x86_64 glibc build.
+Its host tools, build scripts, and procedural macros are glibc host binaries.
+They link against the Debian runtime copied into the amd64 image through
+`/opt/chromium-glibc` and `scripts/rust-host-linker`. The browser and every
+shipped shared object target musl on both architectures.
+
+The Helium Wayland fixture owns a headless Sway session with the pixman
+renderer. On amd64 the browser renders with Mesa llvmpipe; on arm64 it uses
+Chromium's in-tree ANGLE/SwiftShader, so the reported WebGL vendor and renderer
+are SwiftShader's. `scripts/helium_wayland.py --check-fixture` proves output,
+clipboard, and screenshot ownership without a GPU device, XWayland, or the host
+session.
+
+`stage-runtime` audits Chrome's ELF interpreter and direct dependencies.
+`package` collects Chrome, its runtime libraries, font configuration, and
+fonts under `/work/package/<profile>`. `install` verifies that package and
+copies it to the host prefix. `make release-linux` runs the resumable
+headless-release path through installation.
+`make build TARGET=x86_64-unknown-linux-musl` is `make release-linux`, and
+`make verify TARGET=x86_64-unknown-linux-musl` runs `test-staged`. Pass
+`NINJA_TARGET` to `make build-target`.
+
+## Chromium desktop package
+
+The `chromium-wayland-release` desktop profile produces a
+`chromium-<version>-r<revision>-linux-<arch>-musl.tar.xz` archive. Qualify it
+with `scripts/qualify-package.py` using its Chromium browser report; a host
+headless report can be supplied with `--host-headless-report` after running
+`helium_test_fast.py --product chromium --headless-only`. Archive installation
+verifies the acceptance and manifest identities, installs under
+`~/.local/opt/chromium-wayland-release`, and links `~/.local/bin/chromium`.
+Use `./chromium-build --product chromium --profile chromium-wayland-release install`
+to install the qualified builder archive or pass `--archive` for a local one.
+
+## Helium desktop package
+
+The Helium product is a Linux musl desktop build (amd64 and arm64). The image, source
+inputs, package world, patch inventory, and executable name come from
+`config/helium.inputs.lock`; the only supported profile is
+`helium-wayland-release`. Browser acceptance uses the Linux CDP and Sway
+harness; Shadowdriver remains macOS-only. The package ships no glibc, gcompat,
+static browser, or sandbox bypass, and needs no X server, session bus, or
+hardware GPU; VA-API is optional at runtime.
+
+On arm64 the staged `lib/` directory contains only Chromium's own libraries
+plus pure-musl builds of SQLite 3.53.4, expat 2.10.0, xkbcommon 1.13.1, zlib
+1.4, libffi 3.5.2 (static PIC), NSS 3.133, and NSPR 4.38.2. The pinned sources and their sizes and SHA-512 digests
+are `runtime_sources.arm64` in the lock; the image builds them in a separate
+builder stage with the image's llvm-prebuilt-musl clang and installs the shared
+objects in `/usr/lib`, where `stage-runtime` reads them. FFmpeg, ANGLE, and
+SwiftShader are Chromium's in-tree builds. Mesa, the GCC-built Alpine
+libraries, libstdc++, and libgcc_s are not staged. The arm64 profile disables
+glib, gio, atk, udev, system libffi, system minigbm, and VA-API, and enables
+ANGLE/SwiftShader. udev-based device hotplug and media capture are therefore
+not compiled in on arm64.
+
+The profile compiles in the Wayland and headless Ozone backends. Wayland stays
+the default; `--headless=new` or `--ozone-platform=headless` runs the browser
+with no display server and the normal Linux sandbox. `test-fast` and
+`test-staged` run that headless path first, with no `WAYLAND_DISPLAY` or
+`DISPLAY`, and then the Wayland path. The headless run needs unprivileged user
+namespaces and proves the `DevTools listening on ws://` line, the same
+`/json/version` product as the headed browser (`Helium/<Helium version>`;
+`helium-devtools-product.patch` sets it for `/json/version` and
+`Browser.getVersion`, while the web User-Agent stays Chrome's), a CDP evaluation on a page served over loopback
+HTTP, renderers with `NoNewPrivs: 1`, `Seccomp: 2`, and their own PID namespace,
+and a `Browser.close` that exits 0 with no processes left.
+`qualify-package.py` requires all of those checks.
+
+The build ships no Helium onboarding component and no first-run setup. The
+input lock carries no onboarding payload, `prepare` unpacks only the search
+engine data and uBlock components, and `helium-remove-onboarding.patch` drops
+the `chrome://setup` page and its startup redirect.
+
+Autoupdates are fully off: `helium-disable-autoupdates.patch` forces the
+Helium services browser/component update gates off, defaults the browser-updates
+preference off, removes its settings toggle, and stops the component updater
+(`CheckForUpdates` returns early; component and background-downloader switches
+are off, with `UpdateUrl` already empty). Extension updates (uBlock and
+extensions) still run. On Linux, browser updates stay with the distro package
+manager.
+
+The profile uses an official-style optimized build:
+`is_official_build=true`, `dcheck_always_on=false`, `chrome_pgo_phase=2`,
+`use_thin_lto=true`, and `thin_lto_enable_optimizations=true`. Chromium's
+bundled Linux PGO profile is selected from `chrome/build/pgo_profiles` through
+`chrome/build/linux.pgo.txt`, so PGO needs no network fetch. The profile
+enables VA-API video decode, disables D-Bus and GTK, and omits the DevTools
+frontend resources while retaining raw CDP. `helium-no-devtools-frontend.patch`
+and `helium-no-dbus.patch` carry those exclusions. The frontend is omitted
+permanently, in Hydrogen too (`desktop-no-devtools-frontend.patch`); `TODO.md`
+tracks completing the non-D-Bus fallbacks. With `use_dbus=false` and
+`use_gtk=false`, the packaged browser does not require a session bus or GTK:
+native file choosers, GTK theming, and native dialogs are gone, and uploads
+go through the web content or CDP. Native notifications are
+disabled and external URI or file-manager launch falls back to `xdg-open` and
+`xdg-email`. Accessibility is disabled by default; `TODO.md`
+tracks restoring it without requiring a session bus.
+
+The amd64 profile compiles VA-API decode in, but the GPU driver stays
+host-provided: the browser loads the host's musl `libva` and Intel driver at
+runtime. On Intel Broadwell, `libva-intel-driver` provides H.264 and VP8 decode
+through Mesa's iris OpenGL driver. VP9 and HEVC fall back to software, as does
+the whole path when no VA-API device is present. The arm64 profile sets
+`use_vaapi=false`; decode there is software or bundled FFmpeg.
+
+```sh
+./chromium-build --product helium --profile helium-wayland-release image
+./chromium-build --product helium --profile helium-wayland-release fetch
+./chromium-build --product helium --profile helium-wayland-release prepare
+./chromium-build --product helium --profile helium-wayland-release poc
+./chromium-build --product helium --profile helium-wayland-release build
+./chromium-build --product helium --profile helium-wayland-release test-fast
+./chromium-build --product helium --profile helium-wayland-release build-target chrome_sandbox --jobs 32
+./chromium-build --product helium --profile helium-wayland-release stage-runtime
+./chromium-build --product helium --profile helium-wayland-release test-staged
+./chromium-build --product helium --profile helium-wayland-release package
+```
+
+`//chrome:chrome` does not build the `chrome_sandbox` data dependency, so
+`build-target chrome_sandbox` must run before staging. On amd64 `stage-runtime`
+also closes the system FFmpeg libraries; their `libstdc++.so.6` and
+`libgcc_s.so.1` dependencies are allowed only below the FFmpeg roots, matching
+the builder policy's scoped exception. The arm64 stage has no such closure.
+
+`stage-runtime` takes the `//chrome:chrome` runtime dependency list from GN,
+adds the upstream desktop packaging inputs, all generated locale packs and V8
+startup data, and closes the system libraries the browser still needs. On amd64
+it seeds the Mesa, Wayland, and NSS libraries and closes the system FFmpeg
+libraries; their `libstdc++.so.6` and `libgcc_s.so.1` dependencies are allowed
+only below the FFmpeg roots. On arm64 it seeds only the pure NSS modules;
+bundled FFmpeg, ANGLE, and SwiftShader come from the Chromium output. VA-API is
+loaded from the host on amd64 and is not part of the staged closure. The audit
+recursively rejects glibc and absolute build RPATHs, and keeps the graphics/NSS
+closure separate from the browser's direct dependencies. The Helium profile uses Torque's instance-type generation
+because Chromium's prebuilt `llvm-libclang` is a glibc binary in this musl
+builder; `v8_use_metagen_instance_types=false` selects the supported path.
+
+`package` writes the relocatable bundle at `/work/package/<profile>` and the
+candidate archive at `/work/artifacts/helium-0.20.3.1-r3-linux-<arch>-musl.tar.xz`
+with its `.sha256` sidecar. It does not publish or install it. The `r3` is the
+lock's `product.package_revision`; it changes whenever the package changes for the
+same Helium version, so a new archive cannot be mistaken for an accepted one.
+
+After a passing browser report for that archive, bind the report to the
+archive digest before installation:
+
+```sh
+python3 scripts/qualify-package.py --archive "$ARCHIVE" --report "$REPORT"
+```
+
+The resulting `.acceptance.json` sidecar is required by archive installation.
+It names the archive digest, product, version, architecture, and the actual
+browser checks that passed. Its `identities` record both names the build
+answers to: the executable's `--version` (`Helium <version> (Chromium
+<version>)`) and the `/json/version` `Browser` (`Helium/<version>`).
+
+The container harness runs privileged. To record the headless path as an
+ordinary user on a host with no display server, extract the archive and run
+the headless checks there, then pass that report too:
+
+```sh
+python3 scripts/install-runtime.py --archive "$ARCHIVE" --verify-extract "$DIR"
+python3 scripts/helium_test_fast.py --headless-only --load-instances 3 --load-seconds 180 \
+    --helium "$DIR/helium-wrapper" --fixtures tests/fixtures \
+    --inputs-lock config/helium.inputs.lock --output "$HOST_OUT"
+python3 scripts/qualify-package.py --archive "$ARCHIVE" --report "$REPORT" \
+    --host-headless-report "$HOST_OUT/test-fast.json"
+```
+
+The load run keeps three headless browsers opening the loopback fixture page,
+evaluating it, and closing the tab until the time runs out, while each browser
+connection watches `Target.targetCrashed`. A crashed target, or a wait status
+whose signal is `SIGSYS`, fails the run; musl sandbox gaps showed up exactly
+that way, as renderers killed under load. The sidecar's `host_headless`
+section then carries those checks and the load totals.
+
+The offline installer needs only Python's standard library and the package,
+checksum, and acceptance sidecar; it makes no Docker calls:
+
+```sh
+python3 scripts/install-runtime.py --archive "$ARCHIVE" --verify-extract "$DIR"
+./chromium-build --product helium --profile helium-wayland-release install \
+    --archive "$PWD/.../helium-0.20.3.1-linux-x86_64-musl.tar.xz"
+./chromium-build --product helium --profile helium-wayland-release install --rollback
+```
+
+The default installation prefix is `${HOME}/.local/opt/helium-wayland-release`;
+the launcher is `${HOME}/.local/bin/helium`. The installer keeps versioned
+slots and a `<prefix>.previous` symlink for rollback. It refuses unmanaged
+prefixes, launchers, and archive links, and does not write through symlinks.
+
+### Release evidence
+
+The current archive is published as the prerelease
+`https://github.com/laputa-systems/chromium-build/releases/tag/helium-0.20.3.1`
+with its `.sha256` and `.acceptance.json`. The archive is
+`helium-0.20.3.1-linux-x86_64-musl.tar.xz` (223.3 MB, 521 files, 147 bundled
+libraries, SHA-256
+`6853af22b60345c92e0cbe69181aebd8af3fa79842c7f0135d20c9656c5918c6`). It was
+built from builder image
+`sha256:160899ccbfcd29483806ae6a5787b2e29b7ef2aaa8c6f2c10bdc41ba6972a91b`,
+and the acceptance sidecar binds that digest to the product-identity,
+Wayland-window, page-rendering, sandbox-renderer, and clean-shutdown checks
+under the isolated Sway fixture. The `~/usr` desktop provisioner later installed
+the published archive in a disposable `alpine:edge` container: checksum and
+sidecar validation, manifest digests, the setuid `chrome_sandbox`, the
+`--version` probe, and a second idempotent run all passed.
+
+That is automated fixture and container evidence. The owner dropped the Alpine
+dwl desktop target on 2026-11-19, so no live desktop installation or Broadwell
+VA-API qualification follows. [Helium acceptance](helium-acceptance.md) defines
+the remaining observations.
+
+The `release-linux` qualification container disables Docker’s outer seccomp
+filter so the unprivileged browser can create its user namespace. Network
+isolation remains enabled. Chromium still installs its own renderer seccomp
+filter and namespace sandbox, and the qualification report must prove both.
+The native host qualification command above needs no Docker exception.
+
+
+Archive verification and extraction use disk-backed scratch under the mounted
+qualification directory. The 256 MiB `/tmp` tmpfs is too small for the unpacked
+browser. The container temporarily owns that directory for the installer's
+ownership checks and returns all outputs to the runner on exit, including
+failure. The unprivileged headless test uses the same writable scratch.
+
+To regression-test the actual workflow qualification step against a completed
+CI work volume on the runner, set `CHROMIUM_RELEASE_TEST_WORK_VOLUME` to that
+volume and run `PYTHONPATH=scripts:tests python3 -m unittest
+test_workflow.WorkflowTests.test_linux_release_qualifies_a_real_archive_and_returns_runner_ownership`.
+`RUNNER_TEMP` and the checkout must be visible at identical paths to Docker.
+This runs the full three-instance, 180-second headless check and verifies the
+acceptance report and restored ownership. It never rebuilds or publishes.
+
+For the Chromium Wayland desktop, packaging must trim locale packs to en-US.
+
+The `chromium-wayland-release` profile stages the Chromium desktop runtime with
+`chrome`, `chrome_crashpad_handler`, `chrome_sandbox`, and only the en-US locale.
+Its package launcher is `chromium`. Both `test-fast` and `test-staged` run the
+headless checks followed by the owned Sway session, checking `Chrome/<version>`
+against `config/inputs.lock`. FFmpeg is statically linked in the browser.

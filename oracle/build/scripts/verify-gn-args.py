@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Check the effective headless profile GN values and canonical listing."""
+
+import argparse
+import ast
+import json
+from pathlib import Path
+
+
+def parse_args(path):
+    logical = []
+    pending = ""
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        if pending:
+            line = f"{pending} {line}"
+            pending = ""
+        if "=" not in line:
+            continue
+        if not line.split("=", 1)[1].strip():
+            pending = line
+            continue
+        logical.append(line)
+    values = {}
+    for line in logical:
+        name, value = (part.strip() for part in line.split("=", 1))
+        if value == "true":
+            parsed = True
+        elif value == "false":
+            parsed = False
+        else:
+            try:
+                parsed = ast.literal_eval(value)
+            except (SyntaxError, ValueError):
+                parsed = value
+        values[name] = parsed
+    return values
+
+
+def parse_value(value):
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    try:
+        return ast.literal_eval(value)
+    except (SyntaxError, ValueError):
+        return value
+
+
+# The two headless profiles differ only in the debug switch; everything else in
+# `expected` is the shared headless musl contract.
+DEBUG_BY_PROFILE = {"headless-debug": True, "headless-release": False}
+HEADLESS_PROFILES = tuple(sorted(DEBUG_BY_PROFILE))
+HELIUM_PROFILE = "helium-wayland-release"
+CHROMIUM_WAYLAND_PROFILE = "chromium-wayland-release"
+
+
+LEAN_DESKTOP = {
+    "use_alsa": False,
+    "use_vaapi": False,
+    "enable_printing": False,
+    "enable_pdf": False,
+    "enable_screen_ai_service": False,
+    "enable_background_mode": False,
+    "enable_chrome_notifications": False,
+}
+
+
+def helium_expected(args):
+    pure_arm64 = args.target_cpu == "arm64"
+    return {
+        "target_os": "linux",
+        "target_cpu": args.target_cpu,
+        "host_cpu": args.target_cpu,
+        "root_extra_deps": ["//tools/hermetic_smoke"],
+        "is_clang": True,
+        "is_musl": True,
+        "use_sysroot": False,
+        "use_lld": True,
+        "use_mold": False,
+        "clang_base_path": "/opt/chromium-llvm",
+        "clang_version": args.clang_major,
+        "custom_toolchain": "//build/toolchain/linux/unbundle:default",
+        "host_toolchain": "//build/toolchain/linux/unbundle:default",
+        "cc_wrapper": "/usr/bin/ccache",
+        "is_component_build": False,
+        "is_debug": False,
+        "is_official_build": True,
+        "dcheck_always_on": False,
+        "safe_browsing_mode": 0,
+        "symbol_level": 0,
+        "blink_symbol_level": 0,
+        "v8_symbol_level": 0,
+        "chrome_pgo_phase": 2,
+        "is_cfi": False,
+        "use_thin_lto": True,
+        "thin_lto_enable_optimizations": True,
+        "use_custom_libcxx": True,
+        "use_custom_libunwind": True,
+        "use_safe_libstdcxx": False,
+        "use_system_libffi": not pure_arm64,
+        "use_siso": False,
+        "use_remoteexec": False,
+        "use_ozone": True,
+        "ozone_auto_platforms": False,
+        "ozone_platform": "wayland",
+        "ozone_platform_wayland": True,
+        "ozone_platform_headless": True,
+        "ozone_platform_x11": False,
+        "use_xkbcommon": True,
+        "use_gtk": False,
+        "use_glib": not pure_arm64,
+        "use_gio": not pure_arm64,
+        "use_pangocairo": False,
+        "use_qt6": False,
+        "use_dbus": False,
+        "use_udev": not pure_arm64,
+        "use_libpci": False,
+        "use_system_minigbm": not pure_arm64,
+        "use_alsa": args.target_cpu != "arm64",
+        "use_pulseaudio": False,
+        "rtc_use_pipewire": False,
+        "rtc_link_pipewire": False,
+        "use_vaapi": not pure_arm64,
+        "enable_vulkan": False,
+        "enable_swiftshader": pure_arm64,
+        "enable_printing": True,
+        "use_cups": False,
+        "ffmpeg_branding": "Chrome",
+        "proprietary_codecs": True,
+        "enable_widevine": False,
+        "enable_openxr": False,
+        "enable_vr": False,
+        "optimize_webui": False,
+        "v8_use_metagen_instance_types": False,
+    }
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--args", type=Path, required=True)
+    parser.add_argument("--canonical", type=Path, required=True)
+    parser.add_argument("--effective-json", type=Path, required=True)
+    parser.add_argument("--probe", type=Path, required=True)
+    parser.add_argument("--target-cpu", required=True)
+    parser.add_argument("--clang-major", required=True)
+    parser.add_argument("--profile", choices=[*HEADLESS_PROFILES, HELIUM_PROFILE, CHROMIUM_WAYLAND_PROFILE], required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+
+    values = parse_args(args.args)
+    if args.profile == HELIUM_PROFILE:
+        expected = helium_expected(args)
+    elif args.profile == CHROMIUM_WAYLAND_PROFILE:
+        expected = helium_expected(args) | LEAN_DESKTOP
+    else:
+        expected = {
+            "target_os": "linux",
+            "target_cpu": args.target_cpu,
+            "host_cpu": args.target_cpu,
+            "root_extra_deps": ["//tools/hermetic_smoke"],
+            "is_clang": True,
+            "is_musl": True,
+            "use_sysroot": False,
+            "rust_sysroot_absolute": "/usr",
+            "rust_bindgen_root": "/usr",
+            "use_lld": True,
+            "clang_base_path": "/opt/chromium-llvm",
+            "clang_version": args.clang_major,
+            "custom_toolchain": "//build/toolchain/linux/unbundle:default",
+            "host_toolchain": "//build/toolchain/linux/unbundle:default",
+            "cc_wrapper": "/usr/bin/ccache",
+            "is_component_build": False,
+            "is_debug": DEBUG_BY_PROFILE[args.profile],
+            "is_official_build": False,
+            "safe_browsing_mode": 0,
+            "symbol_level": 0,
+            "blink_symbol_level": 0,
+            "v8_symbol_level": 0,
+            "chrome_pgo_phase": 0,
+            "is_cfi": False,
+            "use_thin_lto": False,
+            "use_custom_libcxx": True,
+            "use_custom_libunwind": True,
+            "use_safe_libstdcxx": False,
+            "use_ozone": True,
+            "ozone_platform": "headless",
+            "ozone_platform_headless": True,
+            "use_xkbcommon": False,
+            "ozone_platform_wayland": False,
+            "use_gtk": False,
+            "use_qt6": False,
+            "use_alsa": False,
+            "use_pulseaudio": False,
+            "rtc_use_pipewire": False,
+            "rtc_link_pipewire": False,
+            "use_vaapi": False,
+            "enable_vulkan": False,
+            "enable_swiftshader": False,
+            "enable_printing": True,
+            "use_cups": False,
+            "ffmpeg_branding": "Chrome",
+            "proprietary_codecs": True,
+            "enable_widevine": False,
+            "optimize_webui": False,
+        }
+        if not DEBUG_BY_PROFILE[args.profile]:
+            expected["dcheck_always_on"] = False
+    for name, value in expected.items():
+        if values.get(name) != value:
+            raise SystemExit(f"GN arg {name}: expected {value!r}, got {values.get(name)!r}")
+
+    probe = json.loads(args.probe.read_text(encoding="utf-8"))
+    canonical = args.canonical.read_text(encoding="utf-8")
+    effective = json.loads(args.effective_json.read_text(encoding="utf-8"))
+    effective_values = {
+        item["name"]: parse_value(item["current"]["value"])
+        for item in effective
+        if "name" in item and "current" in item
+    }
+    if "clang_version" not in values:
+        raise SystemExit("GN arg clang_version is missing")
+    for name, value in expected.items():
+        if effective_values.get(name) != value:
+            raise SystemExit(
+                f"effective GN arg {name}: expected {value!r}, "
+                f"got {effective_values.get(name)!r}"
+            )
+    canonical_names = {
+        line.split("=", 1)[0].strip()
+        for line in canonical.splitlines()
+        if "=" in line and not line.lstrip().startswith("#")
+    }
+    for name, result in probe["arguments"].items():
+        if result["supported"]:
+            expected_value = {
+                "devtools_skip_typecheck": False,
+                "devtools_bundle": False,
+            }[name]
+            if values.get(name) != expected_value:
+                raise SystemExit(f"proven optional GN arg {name} has the wrong value")
+            if effective_values.get(name) != expected_value:
+                raise SystemExit(f"effective optional GN arg {name} has the wrong value")
+        elif name in values:
+            raise SystemExit(f"unproven optional GN arg {name} was supplied")
+    for name in expected:
+        if name not in canonical_names:
+            raise SystemExit(f"canonical GN args omit {name}")
+    for name, result in probe["arguments"].items():
+        if result["supported"] and name not in canonical_names:
+            raise SystemExit(f"canonical GN args omit proven optional arg {name}")
+
+    report = {
+        "schema": 1,
+        "status": "complete",
+        "target_cpu": args.target_cpu,
+        "profile": args.profile,
+        "values": values,
+        "optional_arguments": probe["arguments"],
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+if __name__ == "__main__":
+    main()

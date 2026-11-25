@@ -1,0 +1,18 @@
+--- a/content/browser/devtools/features.gni
++++ b/content/browser/devtools/features.gni
+@@ -6,3 +6,4 @@
+ 
+ # iOS and Fuchsia don't support DevTools front-end.
+ enable_devtools_frontend = false
++enable_devtools_browser = true
+--- a/chrome/browser/devtools/BUILD.gn
++++ b/chrome/browser/devtools/BUILD.gn
+@@ -164,7 +164,7 @@
+     "//ui/events:dom_keycode_converter",
+   ]
+ 
+-  if (enable_devtools_frontend) {
++  if (enable_devtools_frontend || enable_devtools_browser) {
+     sources += [
+       "aida_client.cc",
+       "aida_client.h",

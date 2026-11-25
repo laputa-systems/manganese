@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "layers": [
+    {
+      "project": "portablelinux",
+      "revision": "6f0aa178c2394fc0a177edc0fd64e41f402a0418",
+      "patches": [
+        "use-oauth2-client-switches-as-default.patch",
+        "fix-compiling-on-arm64.patch",
+        "chromium-138-drop-nodejs-version-check.patch",
+        "chromium-153-revert-hermetic-python.patch",
+        "chromium-154-use-system-tsc.patch",
+        "chromium-155-use-system-esbuild.patch",
+        "chromium-156-remove-private-verification-tokens.patch",
+        "chromium-156-revert-crubit-changes.patch",
+        "chromium-156-revert-use-typescript-go.patch"
+      ]
+    },
+    {
+      "project": "alpine",
+      "revision": "4a3cc589c1e0ad0f7a26b519014e6322e1d5c419",
+      "patches": [
+        "0001-hotfix-ignore-a-new-warning-in-rust-1.89.patch",
+        "compiler.patch",
+        "disable-dns_config_service.patch",
+        "disable-failing-tests.patch",
+        "fc-cache-version.patch",
+        "fix-ffmpeg-codec-list.patch",
+        "fstatat-32bit.patch",
+        "gdbinit.patch",
+        "generic-sensor-include.patch",
+        "headless-shell-no-license.patch",
+        "musl-reserved-stack-limit.patch",
+        "musl-sandbox.patch",
+        "musl-tid-caching.patch",
+        "net-test-no-vpython.patch",
+        "net-test-pyws3-py3.12.patch",
+        "no-execinfo.patch",
+        "no-mallinfo.patch",
+        "no-res-ninit-nclose.patch",
+        "no-sandbox-settls.patch",
+        "partalloc-no-tagging-arm64.patch",
+        "pvalloc.patch",
+        "rust-cbor.patch",
+        "temp-failure-retry.patch"
+      ]
+    },
+    {
+      "project": "copium",
+      "revision": "153.0",
+      "patches": [
+        "cr133-ffmpeg-no-noh264parse.patch",
+        "cr138-node-version-check.patch",
+        "cr140-musl-prctl.patch",
+        "cr143-libsync-__BEGIN_DECLS.patch",
+        "cr145-iwyu-dev_t.patch",
+        "cr145-musl-unfortify-SkDescriptor.patch",
+        "cr146-swiftshader-unfortify-memset-memcpy.patch",
+        "cr146-unfortify-blink-display_item_list.patch",
+        "cr147-is-musl-libcxx.patch",
+        "cr147-simdutf-8.0-base-char.patch",
+        "cr148-rust-1.95-bytemuck.patch",
+        "cr148-v8-no-san-trap.patch",
+        "cr149-musl-alloc-shim-dispatch.patch",
+        "cr149-rust-toolchain-var.patch",
+        "cr151-dawn-armv7-is-real.patch",
+        "cr151-dawn-cgo_enabled.patch",
+        "cr152-dawn-clang-22.patch",
+        "cr152-ffmpeg-no-agtm.patch",
+        "cr152-unbundle-minizip-undo-unicode.patch",
+        "cr152-unbundle-opus-devtools.patch",
+        "cr153-no-python-vendoring.patch",
+        "cr153-typescript-break-definitions.patch",
+        "cr153-unbundle-opus-iamf.patch",
+        "cr153-uncrubit-blink-opentype.patch"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+#!/bin/sh
+# Fetch and publish frozen artifacts by digest.
+#   artifact fetch NAME     download NAME from oracle/frozen/artifacts.lock into the store and print its path
+#   artifact path NAME      print the store path of NAME if it is already present and verified
+#   artifact publish REPOSITORY:TAG FILE...   publish files as one OCI layout through stuff (needs oras and stuff credentials)
+set -eu
+
+fail() { printf 'artifact: %s\n' "$*" >&2; exit 1; }
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+lock=$root/oracle/frozen/artifacts.lock
+store=${MANGANESE_STORE:-$HOME/.local/share/manganese/store}
+blobs=${MANGANESE_BLOB_BASE:-https://oci-blobs.17166969.xyz/sha256}
+
+entry() {
+    awk -v name="$1" '$0 !~ /^#/ && NF == 4 && $3 == name { print $1, $2; found = 1 } END { exit !found }' "$lock" \
+        || fail "$1 is not in oracle/frozen/artifacts.lock"
+}
+
+verify() {
+    file=$1 sha=$2 size=$3
+    [ -f "$file" ] || return 1
+    if [ "$size" != - ] && [ "$(wc -c < "$file" | tr -d ' ')" != "$size" ]; then
+        return 1
+    fi
+    printf '%s  %s\n' "$sha" "$file" | sha256sum -c -s
+}
+
+cmd=${1:-}
+[ $# -ge 1 ] && shift
+case $cmd in
+    path|fetch)
+        [ $# = 1 ] || fail "usage: artifact $cmd NAME"
+        name=$1
+        fields=$(entry "$name") || exit 1
+        sha=${fields% *}
+        size=${fields#* }
+        file=$store/sha256/$sha
+        if verify "$file" "$sha" "$size"; then
+            printf '%s\n' "$file"
+            exit 0
+        fi
+        [ "$cmd" = fetch ] || fail "$name is not in the store; run: scripts/artifact fetch $name"
+        mkdir -p "$store/sha256"
+        partial=$file.partial
+        curl -fsSL --retry 3 -o "$partial" "$blobs/$sha" || fail "cannot download $name from $blobs/$sha; it may not be published yet"
+        verify "$partial" "$sha" "$size" || { rm -f "$partial"; fail "$name does not match its pinned digest"; }
+        mv "$partial" "$file"
+        printf '%s\n' "$file"
+        ;;
+    publish)
+        [ $# -ge 2 ] || fail "usage: artifact publish REPOSITORY:TAG FILE..."
+        target=$1
+        shift
+        repository=${target%%:*}
+        tag=${target#*:}
+        [ "$repository" != "$target" ] && [ -n "$tag" ] || fail "target must be REPOSITORY:TAG"
+        command -v oras >/dev/null 2>&1 || fail "publishing needs oras on PATH"
+        command -v stuff >/dev/null 2>&1 || fail "publishing needs the stuff CLI and its credentials"
+        mkdir -p "$root/.work/tmp"
+        layout=$(mktemp -d "$root/.work/tmp/layout.XXXXXX")
+        trap 'rm -rf "$layout"' EXIT
+        dir=$(dirname "$1")
+        for file in "$@"; do
+            [ -f "$file" ] || fail "$file is not a file"
+            [ "$(dirname "$file")" = "$dir" ] || fail "publish files from one directory at a time"
+        done
+        (cd "$dir" && for file in "$@"; do basename "$file"; done | xargs oras push --oci-layout "$layout:$tag")
+        stuff publish oci --layout "$layout" --repository "$repository" --tag "$tag"
+        ;;
+    *)
+        fail "usage: artifact fetch NAME | path NAME | publish REPOSITORY:TAG FILE..."
+        ;;
+esac

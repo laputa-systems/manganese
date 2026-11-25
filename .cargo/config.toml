@@ -1,0 +1,7 @@
+# Manganese links its executables as musl-dynamic PIEs (docs/requirements.md T05),
+# with mold on Linux campaign hosts.
+[target.x86_64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold"]
+
+[target.aarch64-unknown-linux-musl]
+rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold"]
