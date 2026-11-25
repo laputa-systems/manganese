@@ -14,7 +14,58 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 FROZEN = ROOT / 'oracle/frozen'
 HERE = Path(__file__).resolve().parent
-INVENTORY_COMPARERS = [('abi-census', None), ('cdp-trace', None)]
+
+
+def lines(path):
+    return {line for line in path.read_text().splitlines() if line and not line.startswith('#')} if path.is_file() else set()
+
+
+def set_differences(name, expected, actual, tolerated, result):
+    """Items present on one side only, except items a side recorded as not seen in every run."""
+    for item in sorted(expected - actual - tolerated):
+        result.append({'field':name, 'expected':item, 'actual':'<missing>'})
+    for item in sorted(actual - expected - tolerated):
+        result.append({'field':name, 'expected':'<missing>', 'actual':item})
+
+
+def key(line):
+    return '\t'.join(line.split('\t')[:2])
+
+
+def compare_abi(rebuild, run_dir, result):
+    output = run_dir / 'abi'
+    completed = run_python(['oracle/probes/abi/census.py', '--archive', str(rebuild), '--output', str(output)], run_dir / 'abi.log')
+    if completed.returncode:
+        raise RuntimeError('abi census failed: ' + str(completed.returncode))
+    frozen, rebuilt = lines(FROZEN / 'abi/x86_64.txt'), lines(output / 'x86_64.txt')
+    tolerated = {key(line) for line in lines(FROZEN / 'abi/x86_64-unstable.txt') | lines(output / 'x86_64-unstable.txt')}
+    set_differences('abi', {key(line) for line in frozen}, {key(line) for line in rebuilt}, tolerated, result)
+
+
+def shape_items(path):
+    data = read(path)
+    return {(kind, name, section, field) for kind in ('methods', 'events') for name, sections in data[kind].items()
+            for section, fields in sections.items() for field in fields}
+
+
+def compare_cdp(rebuild, run_dir, result):
+    output = run_dir / 'cdp'
+    completed = run_python(['oracle/probes/cdp/run.py', '--archive', str(rebuild), '--output', str(output)], run_dir / 'cdp.log')
+    if completed.returncode:
+        raise RuntimeError('cdp trace failed: ' + str(completed.returncode))
+    unstable = {tuple(line.split('\t')) for line in lines(FROZEN / 'cdp/unstable.tsv') | lines(output / 'unstable.tsv')}
+    names = {item[1] for item in unstable if item[0] in ('method', 'event')}
+    for name in ('methods.tsv', 'events.tsv', 'errors.tsv'):
+        expected, actual = lines(FROZEN / 'cdp' / name), lines(output / name)
+        tolerated = {line for line in expected | actual if line.split('\t')[0] in names}
+        set_differences('cdp.' + name, expected, actual, tolerated, result)
+    shapes_tolerated = {repr(item[1:]) for item in unstable if item[0] == 'shape'}
+    expected = {repr(item[1:]) for item in shape_items(FROZEN / 'cdp/shapes.json')}
+    actual = {repr(item[1:]) for item in shape_items(output / 'shapes.json')}
+    set_differences('cdp.shapes.json', expected, actual, shapes_tolerated, result)
+
+
+INVENTORY_COMPARERS = [('abi-census', compare_abi), ('cdp-trace', compare_cdp)]
 
 
 def read(path):
@@ -41,6 +92,13 @@ def differences(expected, actual, path, result):
             differences(a, b, path + '.' + str(index), result)
     elif type(expected) != type(actual) or expected != actual:
         result.append({'field':path, 'expected':expected, 'actual':actual})
+
+
+def run_python(arguments, log):
+    completed = subprocess.run(['python3', '-B', *arguments], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    log.write_text(completed.stdout)
+    print(completed.stdout, end='', flush=True)
+    return completed
 
 
 def run_make(target, variables, log):

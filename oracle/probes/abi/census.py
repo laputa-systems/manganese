@@ -1,3 +1,4 @@
+import argparse
 import collections
 import hashlib
 import shutil
@@ -13,13 +14,20 @@ ROOT = Path(__file__).resolve().parents[3]
 FROZEN = ROOT / 'oracle/frozen'
 OUT = FROZEN / 'abi/x86_64.txt'
 UNSTABLE = FROZEN / 'abi/x86_64-unstable.txt'
-WORKLOADS = (('oracle-launch-headless', ['make', 'oracle-launch', 'ARCH=x86_64', 'MODE=headless']),
-             ('oracle-launch-headed', ['make', 'oracle-launch', 'ARCH=x86_64', 'MODE=headed']),
-             ('contract', ['make', 'contract', 'ARCHIVE=hydrogen-r2-amd64',
-                           'CLAUSES=5.1 5.2 5.4 6.1 6.2 6.3 6.4 7.1 7.2 7.3 7.5 7.6 7.7 8.1 8.4']),
-             ('contract-7.4', ['make', 'contract', 'ARCHIVE=hydrogen-r2-amd64', 'CLAUSES=7.4']),
-             ('capability-probes', ['make', 'capability-probes']),
-             ('persona-inventory', ['make', 'persona-inventory']))
+def workloads(archive, output):
+    """The traced workloads; with an output directory they probe ARCHIVE and leave oracle/frozen alone."""
+    tag = 'hydrogen-r2-amd64' if archive is None else str(archive)
+    launch_source = [] if archive is None else ['--archive', str(archive)]
+    probes = '' if output is None else (f'PROBE_ARGS=--archive {archive} --output {output / "capability"}')
+    persona = '' if output is None else (f'PROBE_ARGS=--archive {archive} --output {output / "persona"} '
+                                         f'--capability {output / "capability"}')
+    return (('oracle-launch-headless', ['python3', '-B', 'oracle/launch/launch.py', '--arch', 'x86_64', '--mode', 'headless', *launch_source]),
+            ('oracle-launch-headed', ['python3', '-B', 'oracle/launch/launch.py', '--arch', 'x86_64', '--mode', 'headed', *launch_source]),
+            ('contract', ['make', 'contract', f'ARCHIVE={tag}',
+                          'CLAUSES=5.1 5.2 5.4 6.1 6.2 6.3 6.4 7.1 7.2 7.3 7.5 7.6 7.7 8.1 8.4']),
+            ('contract-7.4', ['make', 'contract', f'ARCHIVE={tag}', 'CLAUSES=7.4']),
+            ('capability-probes', ['make', 'capability-probes', *([probes] if probes else [])]),
+            ('persona-inventory', ['make', 'persona-inventory', *([persona] if persona else [])]))
 SYSCALL = re.compile(r'^([a-zA-Z_][a-zA-Z_0-9]*)\((.*)\)\s+=\s+(.*)$')
 CLONE = re.compile(r'(?:clone|clone3|fork|vfork)\(.*\)\s+=\s+(\d+)(?: /\* (\d+) in strace.s PID NS \*/)?')
 TYPE = re.compile(r'--type=([a-zA-Z0-9_-]+)')
@@ -252,6 +260,17 @@ def run_contract(command, environment):
 def main():
     if os.uname().machine != 'x86_64':
         raise RuntimeError('native x86_64 required')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archive', type=Path, help='an archive with its sidecars (default: the frozen hydrogen-r2-amd64 tag)')
+    parser.add_argument('--output', type=Path, help='write the census here instead of oracle/frozen/abi')
+    args = parser.parse_args()
+    if (args.archive is None) != (args.output is None):
+        parser.error('--archive and --output go together')
+    output = args.output.resolve() if args.output else None
+    archive = args.archive.resolve() if args.archive else None
+    out = output / 'x86_64.txt' if output else OUT
+    unstable_out = output / 'x86_64-unstable.txt' if output else UNSTABLE
+    WORKLOADS = workloads(archive, output)
     run_dir = ROOT / '.work/tmp/abi' / str(time.time_ns())
     run_dir.mkdir(parents=True)
     capability = {p: hashlib.sha256(p.read_bytes()).digest() for d in ('capability', 'persona') for p in (FROZEN / d).iterdir() if p.is_file()}
@@ -278,9 +297,13 @@ def main():
     after = {p: hashlib.sha256(p.read_bytes()).digest() for d in ('capability', 'persona') for p in (FROZEN / d).iterdir() if p.is_file()}
     if capability != after:
         raise RuntimeError('frozen capability or persona files changed')
-    archive = next(line.split() for line in (FROZEN / 'artifacts.lock').read_text().splitlines()
+    if archive is None:
+        row = next(line.split() for line in (FROZEN / 'artifacts.lock').read_text().splitlines()
                    if line.endswith('manganese/oracle-inputs:hydrogen-r2-amd64') and '.tar.xz ' in line)
-    header = ['# archive: ' + archive[2] + ' sha256:' + archive[0],
+        name, sha = row[2], row[0]
+    else:
+        name, sha = archive.name, hashlib.sha256(archive.read_bytes()).hexdigest()
+    header = ['# archive: ' + name + ' sha256:' + sha,
               '# workloads: ' + ', '.join(label for label, _ in WORKLOADS),
               '# strace symbolic decoding; flags are sets of symbolic arguments per syscall',
               '# numeric path components are placeholders; return values are omitted except ENOSYS',
@@ -292,10 +315,14 @@ def main():
     roles = run_dir.with_name(run_dir.name + '-process-types.txt')
     roles.write_text(''.join(category + '\t' + item + '\t' + ','.join(sorted(types)) + '\n'
                              for (category, item), types in sorted(union.items())))
-    OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text('\n'.join(header + lines) + '\n')
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text('\n'.join(header + lines) + '\n')
     unstable = [category + '\t' + item for (category, item) in sorted(union) if seen[(category, item)] < runs]
-    UNSTABLE.write_text(''.join(line + '\n' for line in unstable))
+    unstable_out.write_text(''.join(line + '\n' for line in unstable))
+    if output is not None:
+        shutil.rmtree(run_dir)
+        print('abi-census: ' + str(out))
+        return
     manifest = FROZEN / 'SHA256SUMS'
     rows = [line for line in manifest.read_text().splitlines() if not line.endswith(('  ./abi/x86_64.txt', '  ./abi/x86_64-unstable.txt'))]
     rows.append(hashlib.sha256(OUT.read_bytes()).hexdigest() + '  ./abi/x86_64.txt')

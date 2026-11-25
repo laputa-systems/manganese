@@ -1,5 +1,5 @@
 # archive: chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz sha256:0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7
-# workloads: oracle-launch-headless, oracle-launch-headed, contract, capability-probes
+# workloads: oracle-launch-headless, oracle-launch-headed, contract, contract-7.4, capability-probes, persona-inventory
 # strace symbolic decoding; flags are sets of symbolic arguments per syscall
 # numeric path components are placeholders; return values are omitted except ENOSYS
 # which process types use an item depends on scheduling, so it is reported per run, not frozen;
@@ -96,6 +96,7 @@ flags	kill:1=SIGKILL
 flags	kill:1=SIGTERM
 flags	landlock_create_ruleset:0=NULL;2=LANDLOCK_CREATE_RULESET_VERSION
 flags	lseek:2=SEEK_CUR
+flags	lseek:2=SEEK_END
 flags	lseek:2=SEEK_SET
 flags	lstat:1=S_IFDIR
 flags	lstat:1=S_IFDIR|S_ISGID
@@ -138,6 +139,7 @@ flags	newfstatat:2=S_IFREG
 flags	newfstatat:2=S_IFREG;3=AT_SYMLINK_NOFOLLOW
 flags	newfstatat:2=S_IFSOCK
 flags	newfstatat:2=S_IFSOCK;3=AT_SYMLINK_NOFOLLOW
+flags	open:1=O_APPEND|O_CREAT|O_LARGEFILE|O_RDWR
 flags	open:1=O_APPEND|O_LARGEFILE|O_WRONLY
 flags	open:1=O_CLOEXEC|O_CREAT|O_EXCL|O_LARGEFILE|O_NOCTTY|O_RDWR
 flags	open:1=O_CLOEXEC|O_CREAT|O_LARGEFILE|O_NOCTTY|O_RDWR
@@ -521,6 +523,7 @@ flags	stat:1=S_IFDIR|S_ISGID
 flags	stat:1=S_IFDIR|S_ISVTX
 flags	stat:1=S_IFREG
 flags	statfs:1=EXT2_SUPER_MAGIC|ST_RELATIME|ST_VALID
+flags	statfs:1=OVERLAYFS_SUPER_MAGIC|ST_RELATIME|ST_VALID
 flags	statfs:1=ST_NODEV|ST_NOEXEC|ST_NOSUID|ST_RELATIME|ST_VALID|TMPFS_MAGIC
 flags	statfs:1=ST_NODEV|ST_NOSUID|ST_RELATIME|ST_VALID|TMPFS_MAGIC
 flags	statfs:1=ST_RELATIME|ST_VALID|TMPFS_MAGIC
@@ -681,6 +684,7 @@ syscall	flock
 syscall	fork
 syscall	fstat
 syscall	fstatfs
+syscall	fsync
 syscall	ftruncate
 syscall	futex
 syscall	getcwd

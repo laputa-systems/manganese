@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 import os
@@ -46,7 +47,7 @@ def paths(value, prefix, output, opaque=False):
             paths(item, prefix + '[]', output)
 
 
-def reduce_logs(directories, identity):
+def reduce_logs(directories, identity, output=OUTPUT, frozen=True):
     """The union over runs; items some run did not see are listed in unstable.tsv."""
     methods = defaultdict(Counter)
     events = defaultdict(set)
@@ -68,7 +69,7 @@ def reduce_logs(directories, identity):
                     shapes[name][section][path] |= types
         for method, values in run[3].items():
             errors[method] |= values
-    write(methods, events, shapes, errors, identity, seen, len(directories))
+    write(methods, events, shapes, errors, identity, seen, len(directories), output, frozen)
 
 
 def keys(methods, events, shapes, errors):
@@ -109,19 +110,19 @@ def record(directory, methods, events, shapes, errors):
                 paths(msg.get('params', {}), '', shapes[event]['event'])
 
 
-def write(methods, events, shapes, errors, identity, seen, runs):
+def write(methods, events, shapes, errors, identity, seen, runs, output=OUTPUT, frozen=True):
     labels = set().union(*(set(counts) for counts in methods.values()))
     expected = {'browser-use-cli', 'browser-use-library', 'agent-browser', 'extension-cli',
                 'shadowdriver-sdk', 'shadowdriver-crawler', 'extension-features', 'native', 'audio'}
     if labels != expected or not events:
         raise RuntimeError(f'CDP capture missing clients: {sorted(expected - labels)}; unexpected: {sorted(labels - expected)}')
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    (OUTPUT / 'methods.tsv').write_text('method\tclients\tcount_class\n' + ''.join(
+    output.mkdir(parents=True, exist_ok=True)
+    (output / 'methods.tsv').write_text('method\tclients\tcount_class\n' + ''.join(
         f"{method}\t{','.join(sorted(counts))}\t{'once' if sum(counts.values()) == 1 else 'multiple'}\n"
         for method, counts in sorted(methods.items())))
-    (OUTPUT / 'events.tsv').write_text('event\tclients\n' + ''.join(
+    (output / 'events.tsv').write_text('event\tclients\n' + ''.join(
         f"{event}\t{','.join(sorted(labels))}\n" for event, labels in sorted(events.items())))
-    (OUTPUT / 'errors.tsv').write_text('method\tcode\tmessage\n' + ''.join(
+    (output / 'errors.tsv').write_text('method\tcode\tmessage\n' + ''.join(
         f'{method}\t{code}\t{message}\n' for method, values in sorted(errors.items()) for code, message in sorted(values)))
     result = {'archive':identity, 'methods':{}, 'events':{}}
     for name, sections in sorted(shapes.items()):
@@ -129,13 +130,14 @@ def write(methods, events, shapes, errors, identity, seen, runs):
                      for section, values in sorted(sections.items())}
         target = result['events'] if 'event' in converted else result['methods']
         target[name] = converted
-    (OUTPUT / 'shapes.json').write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
+    (output / 'shapes.json').write_text(json.dumps(result, indent=2, sort_keys=True) + '\n')
     unstable = sorted(key for key in keys(methods, events, shapes, errors) if seen[key] < runs)
-    (OUTPUT / 'unstable.tsv').write_text(''.join('\t'.join(map(str, key)) + '\n' for key in unstable))
-    manifest = ROOT / 'oracle/frozen/SHA256SUMS'
-    rows = [row for row in manifest.read_text().splitlines() if '  ./cdp/' not in row]
-    rows += [hashlib.sha256(path.read_bytes()).hexdigest() + '  ./cdp/' + path.name for path in sorted(OUTPUT.iterdir())]
-    manifest.write_text('\n'.join(rows) + '\n')
+    (output / 'unstable.tsv').write_text(''.join('\t'.join(map(str, key)) + '\n' for key in unstable))
+    if frozen:
+        manifest = ROOT / 'oracle/frozen/SHA256SUMS'
+        rows = [row for row in manifest.read_text().splitlines() if '  ./cdp/' not in row]
+        rows += [hashlib.sha256(path.read_bytes()).hexdigest() + '  ./cdp/' + path.name for path in sorted(output.iterdir())]
+        manifest.write_text('\n'.join(rows) + '\n')
     print(f'unstable {len(unstable)} of {runs} runs')
     print(f'methods {len(methods)} events {len(events)} clients {len(set().union(*(set(c) for c in methods.values())))}')
 
@@ -143,16 +145,26 @@ def write(methods, events, shapes, errors, identity, seen, runs):
 def main():
     if platform.machine() != 'x86_64':
         raise RuntimeError('native x86_64 required')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archive', type=Path, help='an archive with its sidecars (default: the frozen hydrogen-r2-amd64 tag)')
+    parser.add_argument('--output', type=Path, help='write the inventory here instead of oracle/frozen/cdp')
+    args = parser.parse_args()
+    if (args.archive is None) != (args.output is None):
+        parser.error('--archive and --output go together')
     runs = int(os.environ.get('CDP_RUNS') or 2)
     directories = [launch.new_run_dir('cdp-trace', f'x86_64-{index}') for index in range(runs)]
     try:
         for directory in directories:
             print(f'run {directory}', flush=True)
-            archive = capture(directory)
-        lock = (ROOT / 'oracle/frozen/artifacts.lock').read_text().splitlines()
-        digest = next(line.split()[0] for line in lock if line.split() and line.split()[0] != '#'
-                      and len(line.split()) >= 4 and line.split()[3] == 'manganese/oracle-inputs:hydrogen-r2-amd64')
-        reduce_logs(directories, {'identity':archive.identity, 'sha256':digest})
+            archive = capture(directory, args.archive.resolve() if args.archive else None)
+        if args.archive is None:
+            lock = (ROOT / 'oracle/frozen/artifacts.lock').read_text().splitlines()
+            digest = next(line.split()[0] for line in lock if line.split() and line.split()[0] != '#'
+                          and len(line.split()) >= 4 and line.split()[3] == 'manganese/oracle-inputs:hydrogen-r2-amd64')
+            reduce_logs(directories, {'identity':archive.identity, 'sha256':digest})
+        else:
+            digest = hashlib.sha256(archive.path.read_bytes()).hexdigest()
+            reduce_logs(directories, {'identity':archive.identity, 'sha256':digest}, args.output.resolve(), False)
     finally:
         for directory in directories:
             launch.checked(['docker', 'run', '--rm', '-v', f'{directory}:/cleanup', launch.PROBE_IMAGE,
@@ -160,8 +172,8 @@ def main():
             shutil.rmtree(directory)
 
 
-def capture(directory):
-    archive = launch.resolve_archive(directory, 'x86_64', None, 'hydrogen-r2-amd64')
+def capture(directory, archive_path):
+    archive = launch.resolve_archive(directory, 'x86_64', archive_path, None if archive_path else 'hydrogen-r2-amd64')
     results = clients.run(directory, archive, contract.preferences, {'7.5', '7.6'}, ENDPOINT)
     if not all(result['ok'] for result in results.values()):
         raise RuntimeError('client contract checks failed')
