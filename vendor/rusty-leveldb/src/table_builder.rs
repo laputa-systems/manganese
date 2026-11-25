@@ -222,7 +222,11 @@ impl<Dst: Write> TableBuilder<Dst> {
         Ok(handle)
     }
 
-    pub fn finish(mut self) -> Result<usize> {
+    pub fn finish(self) -> Result<usize> {
+        self.finish_with_writer().map(|(size, _)| size)
+    }
+
+    pub(crate) fn finish_with_writer(mut self) -> Result<(usize, Dst)> {
         assert!(self.data_block.is_some());
 
         let compressor_list = self.opt.compressor_list.clone();
@@ -275,7 +279,7 @@ impl<Dst: Write> TableBuilder<Dst> {
 
         self.offset += self.dst.write(&buf[..])?;
         self.dst.flush()?;
-        Ok(self.offset)
+        Ok((self.offset, self.dst))
     }
 }
 

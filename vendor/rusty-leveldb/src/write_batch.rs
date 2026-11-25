@@ -78,8 +78,12 @@ impl WriteBatch {
         u32::decode_fixed(&self.entries[COUNT_OFFSET..COUNT_OFFSET + 4])
     }
 
-    fn set_sequence(&mut self, s: SequenceNumber) {
+    pub(crate) fn set_sequence(&mut self, s: SequenceNumber) {
         s.encode_fixed(&mut self.entries[SEQNUM_OFFSET..SEQNUM_OFFSET + 8]);
+    }
+
+    pub(crate) fn contents(&self) -> &[u8] {
+        &self.entries
     }
 
     pub fn sequence(&self) -> SequenceNumber {

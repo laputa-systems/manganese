@@ -89,6 +89,9 @@ mod write_batch;
 mod db_impl;
 mod db_iter;
 
+#[cfg(test)]
+mod durability_tests;
+
 pub mod compressor;
 pub mod env;
 

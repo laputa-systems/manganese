@@ -7,8 +7,8 @@ use crate::cache::Cache;
 use crate::db_iter::DBIterator;
 
 use crate::cmp::{Cmp, InternalKeyCmp};
-use crate::env::{Env, FileLock};
-use crate::error::{err, Result, StatusCode};
+use crate::env::{Env, FileLock, WritableFile};
+use crate::error::{err, Result, Status, StatusCode};
 use crate::filter::{BoxedFilterPolicy, InternalFilterPolicy};
 use crate::infolog::Logger;
 use crate::key_types::{parse_internal_key, InternalKey, LookupKey, ValueType};
@@ -53,8 +53,9 @@ pub struct DB {
     mem: MemTable,
     imm: Option<MemTable>,
 
-    log: Option<LogWriter<BufWriter<Box<dyn Write>>>>,
+    log: Option<LogWriter<BufWriter<Box<dyn WritableFile>>>>,
     log_num: Option<FileNum>,
+    write_error: Option<Status>,
     cache: Shared<TableCache>,
     vset: Shared<VersionSet>,
     snaps: SnapshotList,
@@ -98,6 +99,7 @@ impl DB {
 
             log: None,
             log_num: None,
+            write_error: None,
             cache,
             vset: share(vset),
             snaps: SnapshotList::new(),
@@ -156,7 +158,8 @@ impl DB {
             let manifest_file = self.opt.env.open_writable_file(Path::new(&manifest))?;
             let mut lw = LogWriter::new(manifest_file);
             lw.add_record(&ve.encode())?;
-            lw.flush()?;
+            self.opt.env.sync_dir(&self.path)?;
+            lw.sync()?;
         }
         set_current_file(self.opt.env.as_ref().as_ref(), &self.path, 1)
     }
@@ -383,43 +386,47 @@ impl DB {
 impl DB {
     // WRITE //
 
-    /// Adds a single entry. It's a short, non-synchronous, form of `write()`; in order to make
-    /// sure that the written entry is on disk, call `flush()` afterwards.
+    /// Adds a single entry without requesting a durable sync.
     pub fn put(&mut self, k: &[u8], v: &[u8]) -> Result<()> {
         let mut wb = WriteBatch::new();
         wb.put(k, v);
         self.write(wb, false)
     }
 
-    /// Deletes a single entry. Like with `put()`, you can call `flush()` to guarantee that
-    /// the operation made it to disk.
+    /// Deletes a single entry without requesting a durable sync.
     pub fn delete(&mut self, k: &[u8]) -> Result<()> {
         let mut wb = WriteBatch::new();
         wb.delete(k);
         self.write(wb, false)
     }
 
-    /// Writes an entire WriteBatch. `sync` determines whether the write should be flushed to
-    /// disk.
-    pub fn write(&mut self, batch: WriteBatch, sync: bool) -> Result<()> {
+    /// Writes an entire WriteBatch. A synchronous write persists the log before returning.
+    pub fn write(&mut self, mut batch: WriteBatch, sync: bool) -> Result<()> {
         assert!(self.log.is_some());
 
+        if let Some(error) = &self.write_error {
+            return Err(error.clone());
+        }
         self.make_room_for_write(false)?;
 
         let entries = batch.count() as u64;
         let log = self.log.as_mut().unwrap();
         let next = self.vset.borrow().last_seq + 1;
 
-        batch.insert_into_memtable(next, &mut self.mem);
-        log.add_record(&batch.encode(next))?;
-        if sync {
-            log.flush()?;
+        batch.set_sequence(next);
+        let result = log.add_record(batch.contents()).and_then(|_| {
+            if sync { log.sync() } else { log.flush() }
+        });
+        if let Err(error) = result {
+            self.write_error = Some(error.clone());
+            return Err(error);
         }
+        batch.insert_into_memtable(next, &mut self.mem);
         self.vset.borrow_mut().last_seq += entries;
         Ok(())
     }
 
-    /// flush makes sure that all pending changes (e.g. from put()) are stored on disk.
+    /// Flushes buffered log data to the environment without a durable sync.
     pub fn flush(&mut self) -> Result<()> {
         if let Some(ref mut log) = self.log.as_mut() {
             log.flush()?;
@@ -566,6 +573,9 @@ impl DB {
     /// make_room_for_write checks if the memtable has become too large, and triggers a compaction
     /// if it's the case.
     fn make_room_for_write(&mut self, force: bool) -> Result<()> {
+        if let Some(error) = &self.write_error {
+            return Err(error.clone());
+        }
         if !force && self.mem.approx_mem_usage() < self.opt.write_buffer_size || self.mem.len() == 0
         {
             Ok(())
@@ -671,6 +681,7 @@ impl DB {
             let r = self.vset.borrow_mut().log_and_apply(compaction.into_edit());
             if let Err(e) = r {
                 log!(self.opt.log, "trivial move failed: {}", e);
+                self.write_error = Some(e.clone());
                 Err(e)
             } else {
                 log!(
@@ -698,8 +709,13 @@ impl DB {
             if let Err(e) = self.do_compaction_work(&mut state) {
                 state.cleanup(self.opt.env.as_ref().as_ref(), &self.path);
                 log!(self.opt.log, "Compaction work failed: {}", e);
+                self.write_error = Some(e.clone());
+                return Err(e);
             }
-            self.install_compaction_results(state)?;
+            if let Err(e) = self.install_compaction_results(state) {
+                self.write_error = Some(e.clone());
+                return Err(e);
+            }
             log!(
                 self.opt.log,
                 "Compaction finished: {}",
@@ -719,10 +735,16 @@ impl DB {
         let imm = self.imm.take().unwrap();
         if let Err(e) = self.write_l0_table(&imm, &mut ve, Some(&base.borrow())) {
             self.imm = Some(imm);
+            self.write_error = Some(e.clone());
             return Err(e);
         }
         ve.set_log_num(self.log_num.unwrap_or(0));
-        self.vset.borrow_mut().log_and_apply(ve)?;
+        let result = self.vset.borrow_mut().log_and_apply(ve);
+        if let Err(e) = result {
+            self.imm = Some(imm);
+            self.write_error = Some(e.clone());
+            return Err(e);
+        }
         if let Err(e) = self.delete_obsolete_files() {
             log!(self.opt.log, "Error deleting obsolete files: {}", e);
         }
@@ -862,7 +884,7 @@ impl DB {
 
                 let fname = table_file_name(&self.path, fnum);
                 let f = self.opt.env.open_writable_file(Path::new(&fname))?;
-                let f = Box::new(BufWriter::new(f));
+                let f: Box<dyn WritableFile> = Box::new(BufWriter::new(f));
                 cs.builder = Some(TableBuilder::new(self.opt.clone(), f));
                 cs.outputs.push(fmd);
             }
@@ -909,7 +931,8 @@ impl DB {
         // (it's not good for corruptions, in any case)
         let b = cs.builder.take().unwrap();
         let entries = b.entries();
-        let bytes = b.finish()?;
+        let (bytes, mut file) = b.finish_with_writer()?;
+        file.sync()?;
         cs.total_bytes += bytes;
 
         cs.current_output().size = bytes;
@@ -965,7 +988,7 @@ struct CompactionState {
     compaction: Compaction,
     smallest_seq: SequenceNumber,
     outputs: Vec<FileMetaData>,
-    builder: Option<TableBuilder<Box<dyn Write>>>,
+    builder: Option<TableBuilder<Box<dyn WritableFile>>>,
     total_bytes: usize,
 }
 
@@ -1041,7 +1064,8 @@ pub fn build_table<I: LdbIterator, P: AsRef<Path>>(
                 panic!("Iterator should be valid here");
             }
         }
-        builder.finish()?;
+        let (_, mut file) = builder.finish_with_writer()?;
+        file.sync()?;
         Ok(())
     })();
 

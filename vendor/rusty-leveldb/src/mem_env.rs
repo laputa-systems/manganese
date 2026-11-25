@@ -1,6 +1,6 @@
 //! An in-memory implementation of Env.
 
-use crate::env::{path_to_str, path_to_string, Env, FileLock, Logger, RandomAccess};
+use crate::env::{path_to_str, path_to_string, Env, FileLock, Logger, RandomAccess, WritableFile};
 use crate::env_common::{micros, sleep_for};
 use crate::error::{err, Result, StatusCode};
 
@@ -109,6 +109,12 @@ impl Write for MemFileWriter {
     }
 }
 
+impl WritableFile for MemFileWriter {
+    fn sync(&mut self) -> Result<()> {
+        Ok(())
+    }
+}
+
 impl RandomAccess for MemFile {
     fn read_at(&self, off: usize, dst: &mut [u8]) -> Result<usize> {
         let guard = self.0.lock().unwrap();
@@ -158,7 +164,7 @@ impl MemFS {
         }
     }
     /// Open a file for writing.
-    fn open_w(&self, p: &Path, append: bool, truncate: bool) -> Result<Box<dyn Write>> {
+    fn open_w(&self, p: &Path, append: bool, truncate: bool) -> Result<Box<dyn WritableFile>> {
         let f = self.open(p, true)?;
         if truncate {
             f.0.lock().unwrap().clear();
@@ -298,11 +304,15 @@ impl Env for MemEnv {
             .open(p, false)
             .map(|m| Box::new(m) as Box<dyn RandomAccess>)
     }
-    fn open_writable_file(&self, p: &Path) -> Result<Box<dyn Write>> {
+    fn open_writable_file(&self, p: &Path) -> Result<Box<dyn WritableFile>> {
         self.0.open_w(p, true, true)
     }
-    fn open_appendable_file(&self, p: &Path) -> Result<Box<dyn Write>> {
+    fn open_appendable_file(&self, p: &Path) -> Result<Box<dyn WritableFile>> {
         self.0.open_w(p, true, false)
+    }
+
+    fn sync_dir(&self, _: &Path) -> Result<()> {
+        Ok(())
     }
 
     fn exists(&self, p: &Path) -> Result<bool> {

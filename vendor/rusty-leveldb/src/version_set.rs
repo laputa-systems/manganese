@@ -1,5 +1,5 @@
 use crate::cmp::{Cmp, InternalKeyCmp};
-use crate::env::Env;
+use crate::env::{Env, WritableFile};
 use crate::error::{err, Result, StatusCode};
 use crate::key_types::{parse_internal_key, InternalKey, UserKey};
 use crate::log::{LogReader, LogWriter};
@@ -180,7 +180,7 @@ pub struct VersionSet {
     current: Option<Shared<Version>>,
     compaction_ptrs: [Bytes; NUM_LEVELS],
 
-    descriptor_log: Option<LogWriter<Box<dyn Write>>>,
+    descriptor_log: Option<LogWriter<Box<dyn WritableFile>>>,
 }
 
 impl VersionSet {
@@ -512,7 +512,8 @@ impl VersionSet {
         let encoded = edit.encode();
         if let Some(ref mut lw) = self.descriptor_log {
             lw.add_record(&encoded)?;
-            lw.flush()?;
+            self.opt.env.sync_dir(&self.dbname)?;
+            lw.sync()?;
         }
         set_current_file(
             self.opt.env.as_ref().as_ref(),
@@ -880,10 +881,15 @@ pub fn set_current_file<P: AsRef<Path>>(
     let dbname = dbname.as_ref();
     let manifest_base = manifest_name(manifest_file_num);
     let tempfile = temp_file_name(dbname, manifest_file_num);
-    {
+    let write_result = (|| -> Result<()> {
         let mut f = env.open_writable_file(Path::new(&tempfile))?;
         f.write_all(manifest_base.display().to_string().as_bytes())?;
         f.write_all(b"\n")?;
+        f.sync()
+    })();
+    if let Err(e) = write_result {
+        let _ = env.delete(Path::new(&tempfile));
+        return Err(e);
     }
     let currentfile = current_file_name(dbname);
     if let Err(e) = env.rename(Path::new(&tempfile), Path::new(&currentfile)) {

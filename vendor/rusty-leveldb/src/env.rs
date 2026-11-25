@@ -5,6 +5,7 @@ use crate::error::Result;
 
 use std::fs::File;
 use std::io::prelude::*;
+use std::io::BufWriter;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
 #[cfg(windows)]
@@ -33,11 +34,46 @@ pub struct FileLock {
     pub id: String,
 }
 
+/// A writable file whose sync operation persists earlier writes or returns an error.
+pub trait WritableFile: Write {
+    fn sync(&mut self) -> Result<()>;
+}
+
+impl WritableFile for File {
+    fn sync(&mut self) -> Result<()> {
+        #[cfg(target_os = "macos")]
+        {
+            use std::os::fd::AsRawFd;
+            // SAFETY: the descriptor belongs to this open file and F_FULLFSYNC takes no argument.
+            if unsafe { libc::fcntl(self.as_raw_fd(), libc::F_FULLFSYNC) } == 0 {
+                return Ok(());
+            }
+        }
+        self.sync_all()?;
+        Ok(())
+    }
+}
+
+impl<T: WritableFile + ?Sized> WritableFile for Box<T> {
+    fn sync(&mut self) -> Result<()> {
+        (**self).sync()
+    }
+}
+
+impl<T: WritableFile> WritableFile for BufWriter<T> {
+    fn sync(&mut self) -> Result<()> {
+        self.flush()?;
+        self.get_mut().sync()
+    }
+}
+
 pub trait Env {
     fn open_sequential_file(&self, _: &Path) -> Result<Box<dyn Read>>;
     fn open_random_access_file(&self, _: &Path) -> Result<Box<dyn RandomAccess>>;
-    fn open_writable_file(&self, _: &Path) -> Result<Box<dyn Write>>;
-    fn open_appendable_file(&self, _: &Path) -> Result<Box<dyn Write>>;
+    fn open_writable_file(&self, _: &Path) -> Result<Box<dyn WritableFile>>;
+    fn open_appendable_file(&self, _: &Path) -> Result<Box<dyn WritableFile>>;
+
+    fn sync_dir(&self, _: &Path) -> Result<()>;
 
     fn exists(&self, _: &Path) -> Result<bool>;
     fn children(&self, _: &Path) -> Result<Vec<PathBuf>>;

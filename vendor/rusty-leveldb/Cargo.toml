@@ -55,3 +55,6 @@ members = [
   "examples/mcpe",
   "examples/kvserver",
 ]
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

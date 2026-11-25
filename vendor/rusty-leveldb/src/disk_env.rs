@@ -1,4 +1,4 @@
-use crate::env::{path_to_str, Env, FileLock, Logger, RandomAccess};
+use crate::env::{path_to_str, Env, FileLock, Logger, RandomAccess, WritableFile};
 use crate::env_common::{micros, sleep_for};
 use crate::error::{err, Result, Status, StatusCode};
 use crate::types::{share, Shared};
@@ -6,7 +6,7 @@ use fs2::FileExt;
 
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{self, ErrorKind, Read, Write};
+use std::io::{self, ErrorKind, Read};
 use std::iter::FromIterator;
 use std::path::{Path, PathBuf};
 
@@ -59,7 +59,7 @@ impl Env for PosixDiskEnv {
             })
             .map_err(|e| map_err_with_name("open (randomaccess)", p, e))
     }
-    fn open_writable_file(&self, p: &Path) -> Result<Box<dyn Write>> {
+    fn open_writable_file(&self, p: &Path) -> Result<Box<dyn WritableFile>> {
         Ok(Box::new(
             fs::OpenOptions::new()
                 .create(true)
@@ -70,7 +70,7 @@ impl Env for PosixDiskEnv {
                 .map_err(|e| map_err_with_name("open (write)", p, e))?,
         ))
     }
-    fn open_appendable_file(&self, p: &Path) -> Result<Box<dyn Write>> {
+    fn open_appendable_file(&self, p: &Path) -> Result<Box<dyn WritableFile>> {
         Ok(Box::new(
             fs::OpenOptions::new()
                 .create(true)
@@ -78,6 +78,17 @@ impl Env for PosixDiskEnv {
                 .open(p)
                 .map_err(|e| map_err_with_name("open (append)", p, e))?,
         ))
+    }
+
+    fn sync_dir(&self, p: &Path) -> Result<()> {
+        #[cfg(unix)]
+        {
+            let mut dir = File::open(p).map_err(|e| map_err_with_name("open (directory)", p, e))?;
+            dir.sync()?;
+        }
+        #[cfg(not(unix))]
+        let _ = p;
+        Ok(())
     }
 
     fn exists(&self, p: &Path) -> Result<bool> {

@@ -4,12 +4,12 @@
 //! checksum is the crc32 sum of type and data; type is one of RecordType::{Full/First/Middle/Last}
 
 use crate::crc;
+use crate::env::WritableFile;
 use crate::error::{err, Result, StatusCode};
 
 use std::io::{Read, Write};
 
 use integer_encoding::FixedInt;
-use integer_encoding::FixedIntWriter;
 
 const BLOCK_SIZE: usize = 32 * 1024;
 const HEADER_SIZE: usize = 4 + 2 + 1;
@@ -93,12 +93,12 @@ impl<W: Write> LogWriter<W> {
 
         let chksum = mask_crc(digest.finalize());
 
-        let mut s = 0;
-        s += self.dst.write(&chksum.encode_fixed_vec())?;
-        s += self.dst.write_fixedint(len as u16)?;
-        s += self.dst.write(&[t as u8])?;
-        s += self.dst.write(&data[0..len])?;
+        self.dst.write_all(&chksum.encode_fixed_vec())?;
+        self.dst.write_all(&(len as u16).encode_fixed_vec())?;
+        self.dst.write_all(&[t as u8])?;
+        self.dst.write_all(&data[0..len])?;
 
+        let s = HEADER_SIZE + len;
         self.current_block_offset += s;
         Ok(s)
     }
@@ -106,6 +106,12 @@ impl<W: Write> LogWriter<W> {
     pub fn flush(&mut self) -> Result<()> {
         self.dst.flush()?;
         Ok(())
+    }
+}
+
+impl<W: WritableFile> LogWriter<W> {
+    pub fn sync(&mut self) -> Result<()> {
+        self.dst.sync()
     }
 }
 
@@ -235,6 +241,30 @@ mod tests {
         }
 
         assert_eq!(lw.current_block_offset, total_len + 3 * super::HEADER_SIZE);
+    }
+
+    #[test]
+    fn writer_retries_short_writes() {
+        struct ShortWriter(Vec<u8>);
+
+        impl Write for ShortWriter {
+            fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+                let len = data.len().min(1);
+                self.0.extend_from_slice(&data[..len]);
+                Ok(len)
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut writer = LogWriter::new(ShortWriter(Vec::new()));
+        writer.add_record(b"key and value").unwrap();
+        let mut reader = LogReader::new(writer.dst.0.as_slice(), true);
+        let mut record = Vec::new();
+        assert_eq!(reader.read(&mut record).unwrap(), 13);
+        assert_eq!(record, b"key and value");
     }
 
     #[test]
