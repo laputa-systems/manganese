@@ -1,0 +1,18 @@
+version 1
+box zlib
+revision ed6fc8bb5721529cba186983f0d8141ee18ba00b
+arch x86_64
+spec sha256:31001af100c3683085b4bcb989ac20c71fb119b8277b91b938fdc57252ba8bcf
+corpus sha256:3df210e6e3462d34c9deeebc2409d77e0597042eff8792d400bc6bbfe51e0a45 seen 980 holdout 610
+oracle .work/tmp/zlib/oracle sha256:0d8fe60fc4744493b476f70212ac9c316a0cfcb6e3967b167b8ad443eeb81dde
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/zlib sha256:a3282b8f2a9cde353fd701cb263812089e4f3bbfc6925db472609de80c882996
+dependencies cargo-lock sha256:1a708f80605ea65ad6f34668a4a3ead0f3511cc0256846c3ac1b08e844407f3a tree sha256:a8fc801abf4272589ae6dec16e4d68ffb2ee4499217d4464a21055e437b4fbbf
+snapshot vendor/zlib-rs tree 9a493a2f929a7bb40819d77683fc13106302813d
+run seen exit 0 items 980 980
+run holdout exit 0 items 610 610
+run fuzz exit 0 seed 1795640470170435173 requested 20000 completed 20000
+run anchor make zlib-anchor exit 0
+level source-harness met
+level frozen-browser met: make zlib-anchor
+level integration pending: arm64 evidence (public_api: CompressionStream in the frozen arm64 browser) and make closure have not run
