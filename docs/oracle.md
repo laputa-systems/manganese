@@ -170,6 +170,15 @@ zero-based case index, input and outputs, and saves the input as
 `.work/tmp/fuzz-<box>-<seed>.bin`. `INJECT=1` selects the selftest injected
 candidate as a negative control.
 
+When the oracle disagrees with itself on an input, the runner asks it six more times. In the seen
+and holdout lanes, a spec whose `varying_relationships` is `none: ...` fails with an oracle
+self-disagreement as before; a spec that declares a varying relationship passes the item only when
+the recorded golden is among the oracle's answers. In fuzzing, a difference on which the oracle is
+stable is a divergence and is minimized as above; when the oracle varies, the case passes only if the
+spec declares a varying relationship and the candidate gave one of the oracle's own answers, the
+input is saved as `.work/tmp/fuzz-<box>-<seed>-variation<index>.bin`, and the run fails once such
+cases exceed 1% of `CASES`. A varying oracle never excuses an answer the oracle itself did not give.
+
 Every adapter response, in the seen and holdout lanes and in fuzzing, must arrive within
 `PEER_TIMEOUT_SECS` (default 300) and announce at most `PEER_MAX_OUTPUT` bytes (default 1 GiB). An
 adapter that hangs, exits early, frames its output wrongly, writes an unrequested record or exits

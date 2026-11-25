@@ -1,5 +1,5 @@
 use crate::process::{Limits, Peer, Scratch, env_number, parse_positive};
-use crate::{Fuzz, Lane, Spec, compare, load_blob, lock_items, name, sha256};
+use crate::{Declaration, Fuzz, Lane, ORACLE_RESAMPLES, OracleAgreement, Spec, compare, load_blob, lock_items, name, oracle_agreement, sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -130,10 +130,27 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     let mut scratch = Scratch::create(&format!("{id}-fuzz"))?;
     let mut oracle = Peer::start(Path::new(&spec.oracle), &[], "oracle", limits, &scratch.fresh()?)?;
     let mut candidate = Peer::start(&candidate_path, &[], "candidate", limits, &scratch.fresh()?)?;
+    let declared = matches!(spec.varying, Declaration::Present(_));
+    let mut variations = 0u64;
     for index in 0..cases {
         let mut input = generate(&mut random, &seeds, max);
         let (a, b) = outputs(&mut oracle, &mut candidate, &input).map_err(|e| preserved(id, budget, index, &input, &identities, &e))?;
         if compare(&spec.comparator, &a, &b) { continue; }
+        let mut answers = vec![a];
+        for _ in 0..ORACLE_RESAMPLES { answers.push(oracle.record(&input).map_err(|e| preserved(id, budget, index, &input, &identities, &e))?); }
+        match oracle_agreement(&answers, &b, declared, &spec.comparator) {
+            OracleAgreement::Stable => {}
+            OracleAgreement::DeclaredVariation => {
+                variations += 1;
+                let path = format!(".work/tmp/fuzz-{id}-{seed}-variation{index}.bin");
+                fs::create_dir_all(".work/tmp").and_then(|_| fs::write(&path, &input)).map_err(|e| format!("write {path}: {e}"))?;
+                eprintln!("oracle variation seed={seed} case={index}: the candidate gave one of the oracle's answers; saved {path}");
+                if variations * 100 > cases { return Err(preserved(id, budget, index, &input, &identities, &format!("the oracle varied on {variations} cases, over 1% of {cases}"))); }
+                continue;
+            }
+            OracleAgreement::UndeclaredVariation => return Err(preserved(id, budget, index, &input, &identities, "the oracle varies on this input and the spec declares no varying relationship")),
+            OracleAgreement::UnmatchedVariation => return Err(preserved(id, budget, index, &input, &identities, "the oracle varies on this input and the candidate gave none of its answers")),
+        }
         let mut size = input.len();
         while size > 0 {
             let mut offset = 0;
@@ -154,7 +171,7 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     }
     oracle.finish()?;
     candidate.finish()?;
-    println!("fuzz passed {cases} cases seed={seed}");
+    println!("fuzz passed {cases} cases seed={seed} oracle_variations={variations}");
     Ok(())
 }
 
