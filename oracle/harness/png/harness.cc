@@ -1,30 +1,43 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <optional>
+#include <set>
 #include <vector>
 
-#include "base/containers/span.h"
-#include "third_party/blink/renderer/platform/graphics/color_behavior.h"
-#include "third_party/blink/renderer/platform/image-decoders/png/png_image_decoder.h"
-#include "third_party/blink/renderer/platform/wtf/shared_buffer.h"
-#include "third_party/skia/include/core/SkBitmap.h"
-#include "third_party/skia/include/core/SkImageInfo.h"
-#include "third_party/skia/include/core/SkPixmap.h"
-#include "third_party/skia/include/core/SkStream.h"
-#include "third_party/skia/include/encode/SkPngRustEncoder.h"
-#include "ui/gfx/codec/png_codec.h"
+#include "include/codec/SkCodec.h"
+#include "include/codec/SkCodecAnimation.h"
+#include "include/codec/SkPngRustDecoder.h"
+#include "include/core/SkAlphaType.h"
+#include "include/core/SkColorType.h"
+#include "include/core/SkImageInfo.h"
+#include "include/core/SkPixmap.h"
+#include "include/core/SkStream.h"
+#include "include/encode/SkPngRustEncoder.h"
 
 using Bytes = std::vector<uint8_t>;
 
-static void put32(Bytes& output, uint32_t value) {
+namespace {
+
+constexpr int kLoopOnce = 0;
+constexpr int kLoopInfinite = -1;
+constexpr int kNone = -2;
+constexpr uint64_t kMaxFrameBytes = 64u << 20;
+constexpr uint32_t kMaxSide = 1000000;
+
+enum Status : uint32_t { kEmpty, kInitialized, kPartial, kComplete };
+
+void put32(Bytes& output, uint32_t value) {
   output.push_back(value >> 24);
   output.push_back(value >> 16);
   output.push_back(value >> 8);
   output.push_back(value);
 }
 
-static bool take32(const Bytes& data, size_t& offset, uint32_t& value) {
+bool take32(const Bytes& data, size_t& offset, uint32_t& value) {
   if (data.size() - offset < 4) return false;
   value = (uint32_t(data[offset]) << 24) | (uint32_t(data[offset + 1]) << 16) |
           (uint32_t(data[offset + 2]) << 8) | data[offset + 3];
@@ -32,78 +45,335 @@ static bool take32(const Bytes& data, size_t& offset, uint32_t& value) {
   return true;
 }
 
-static bool decode(const Bytes& input, Bytes& output) {
+class PrefixStream : public SkStream {
+ public:
+  PrefixStream(const uint8_t* data, size_t size) : data_(data), size_(size) {}
+
+  size_t read(void* buffer, size_t size) override {
+    if (position_ > size_) return 0;
+    size = std::min(size, size_ - position_);
+    if (buffer) memcpy(buffer, data_ + position_, size);
+    position_ += size;
+    return size;
+  }
+  size_t peek(void* buffer, size_t size) const override {
+    if (position_ > size_) return 0;
+    size = std::min(size, size_ - position_);
+    memcpy(buffer, data_ + position_, size);
+    return size;
+  }
+  bool isAtEnd() const override { return position_ >= size_; }
+  bool rewind() override { position_ = 0; return true; }
+  bool hasPosition() const override { return true; }
+  size_t getPosition() const override { return position_; }
+  bool seek(size_t position) override { position_ = position; return true; }
+  bool move(long offset) override { position_ += offset; return true; }
+  bool hasLength() const override { return true; }
+  size_t getLength() const override { return size_; }
+
+ private:
+  const uint8_t* data_;
+  size_t size_;
+  size_t position_ = 0;
+};
+
+struct Frame {
+  uint32_t status = kEmpty;
+  bool has_alpha = true;
+  int duration = 0;
+  int required = -1;
+  int disposal = 0;
+  int blend = 0;
+  SkIRect rect = SkIRect::MakeEmpty();
+  Bytes pixels;
+  bool allocated = false;
+};
+
+struct Decoder {
+  std::unique_ptr<SkCodec> codec;
+  bool failed = false;
+  bool size_available = false;
+  bool all_received = false;
+  int width = 0;
+  int height = 0;
+  std::vector<Frame> frames;
+  std::set<size_t> failed_frames;
+  std::optional<size_t> already_started;
+  int prior_frame = SkCodec::kNoFrame;
+  int repetition_count = kLoopOnce;
+
+  void SetFailed() {
+    codec.reset();
+    failed = true;
+  }
+
+  size_t DecodeFrameCount() { return codec ? size_t(codec->getFrameCount()) : frames.size(); }
+
+  void SetFailedFrame(size_t index) {
+    failed_frames.insert(index);
+    if (failed_frames.size() == DecodeFrameCount()) SetFailed();
+  }
+
+  bool FrameIsReceived(size_t index) {
+    if (all_received) return true;
+    SkCodec::FrameInfo info;
+    return codec && codec->getFrameInfo(int(index), &info) && info.fFullyReceived;
+  }
+
+  size_t FrameCount() {
+    size_t old_size = frames.size();
+    size_t new_size = DecodeFrameCount();
+    if (old_size != new_size) {
+      frames.resize(new_size);
+      for (size_t i = old_size; i < new_size; ++i) InitializeNewFrame(i);
+    }
+    return new_size;
+  }
+
+  void InitializeNewFrame(size_t index) {
+    SkCodec::FrameInfo info;
+    if (!codec->getFrameInfo(int(index), &info)) abort();
+    Frame& frame = frames[index];
+    frame.duration = info.fDuration;
+    frame.required = info.fRequiredFrame;
+    frame.rect = info.fFrameRect;
+    switch (info.fDisposalMethod) {
+      case SkCodecAnimation::DisposalMethod::kKeep: frame.disposal = 0; break;
+      case SkCodecAnimation::DisposalMethod::kRestoreBGColor: frame.disposal = 1; break;
+      case SkCodecAnimation::DisposalMethod::kRestorePrevious: frame.disposal = 2; break;
+      default: frame.disposal = 3; break;
+    }
+    frame.blend = info.fBlend == SkCodecAnimation::Blend::kSrc ? 1 : 0;
+  }
+
+  bool CanReuse(size_t index) const { return frames[index].disposal != 2; }
+
+  size_t ViableReference(size_t dependent) const {
+    size_t required = size_t(frames[dependent].required);
+    for (size_t i = dependent - 1; i != required; i--) {
+      const Frame& frame = frames[i];
+      if (frame.disposal == 2) continue;
+      if (frame.status == kComplete) return i;
+    }
+    return SIZE_MAX;
+  }
+
+  void Decode(size_t index) {
+    struct Item { size_t index; size_t previous; };
+    std::vector<Item> stack{{index, SIZE_MAX}};
+    while (!stack.empty()) {
+      Item item = stack.back();
+      stack.pop_back();
+      size_t current = item.index;
+      size_t previous = item.previous;
+      if (!codec || failed_frames.count(current)) continue;
+      Frame& frame = frames[current];
+      if (frame.status == kComplete) continue;
+      if (frame.status == kEmpty) {
+        already_started.reset();
+        if (frame.required < 0) {
+          uint64_t bytes = uint64_t(width) * height * 4;
+          if (bytes > kMaxFrameBytes) {
+            SetFailedFrame(current);
+            continue;
+          }
+          frame.pixels.assign(bytes, 0);
+          frame.allocated = true;
+          frame.status = kInitialized;
+          prior_frame = SkCodec::kNoFrame;
+        } else {
+          if (previous == SIZE_MAX) {
+            previous = ViableReference(current);
+            if (previous == SIZE_MAX) {
+              stack.push_back({current, size_t(frame.required)});
+              stack.push_back({size_t(frame.required), SIZE_MAX});
+              continue;
+            }
+          }
+          if (failed_frames.count(previous)) {
+            SetFailedFrame(current);
+            continue;
+          }
+          frame.pixels = frames[previous].pixels;
+          frame.allocated = true;
+          frame.status = kInitialized;
+          prior_frame = int(previous);
+        }
+      }
+      bool started = already_started && *already_started == current;
+      if (!started) {
+        SkCodec::FrameInfo info;
+        if (!codec->getFrameInfo(int(current), &info)) abort();
+        SkAlphaType alpha = info.fAlphaType != kOpaque_SkAlphaType ? kPremul_SkAlphaType : kOpaque_SkAlphaType;
+        SkImageInfo image_info = codec->getInfo()
+                                     .makeColorType(kN32_SkColorType)
+                                     .makeAlphaType(alpha)
+                                     .makeColorSpace(nullptr);
+        SkCodec::Options options;
+        options.fFrameIndex = int(current);
+        options.fPriorFrame = prior_frame;
+        options.fZeroInitialized = SkCodec::kNo_ZeroInitialized;
+        already_started.reset();
+        SkCodec::Result result = codec->startIncrementalDecode(image_info, frame.pixels.data(), size_t(width) * 4, &options);
+        if (result == SkCodec::kIncompleteInput) continue;
+        if (result != SkCodec::kSuccess) {
+          SetFailedFrame(current);
+          continue;
+        }
+        frame.status = kPartial;
+        already_started = current;
+      }
+      SkCodec::Result result = codec->incrementalDecode();
+      if (result == SkCodec::kSuccess) {
+        already_started.reset();
+        SkCodec::FrameInfo info;
+        if (!codec->getFrameInfo(int(current), &info)) abort();
+        frame.has_alpha = info.fAlphaType != kOpaque_SkAlphaType;
+        frame.status = kComplete;
+      } else if (result == SkCodec::kIncompleteInput) {
+        if (FrameIsReceived(current)) SetFailedFrame(current);
+      } else {
+        already_started.reset();
+        SetFailedFrame(current);
+      }
+    }
+  }
+
+  void DecodeFrame(size_t index) {
+    if (index >= FrameCount()) return;
+    if (frames[index].status != kComplete) Decode(index);
+  }
+
+  int RepetitionCount() {
+    if (!codec) return repetition_count;
+    int count = codec->getRepetitionCount();
+    if (count == 0) {
+      switch (codec->isAnimated()) {
+        case SkCodec::IsAnimated::kYes: repetition_count = kLoopOnce; return repetition_count;
+        case SkCodec::IsAnimated::kNo: repetition_count = kNone; return repetition_count;
+        case SkCodec::IsAnimated::kUnknown: break;
+      }
+      repetition_count = all_received && codec->getFrameCount() == 1 ? kNone : kLoopOnce;
+    } else if (count == SkCodec::kRepetitionCountInfinite) {
+      repetition_count = kLoopInfinite;
+    } else {
+      repetition_count = count;
+    }
+    return repetition_count;
+  }
+};
+
+void Step(const Bytes& prefix, bool all_received, Bytes& output) {
+  Decoder decoder;
+  decoder.all_received = all_received;
+  auto stream = std::make_unique<PrefixStream>(prefix.data(), prefix.size());
+  SkCodec::Result result;
+  decoder.codec = SkPngRustDecoder::Decode(std::move(stream), &result);
+  switch (result) {
+    case SkCodec::kSuccess: {
+      SkImageInfo info = decoder.codec->getInfo();
+      uint32_t width = uint32_t(info.width());
+      uint32_t height = uint32_t(info.height());
+      uint64_t total = uint64_t(width) * height * 4;
+      if (width > kMaxSide || height > kMaxSide || total > 0x7fffffffu) {
+        decoder.SetFailed();
+      } else {
+        decoder.width = int(width);
+        decoder.height = int(height);
+        decoder.size_available = true;
+      }
+      break;
+    }
+    case SkCodec::kIncompleteInput:
+      if (all_received) {
+        decoder.codec.reset();
+        decoder.SetFailed();
+      }
+      break;
+    default:
+      decoder.SetFailed();
+      break;
+  }
+  if (decoder.size_available && !decoder.failed) {
+    for (size_t i = 0; i < decoder.FrameCount(); ++i) decoder.DecodeFrame(i);
+  }
+  int repetition = decoder.size_available ? decoder.RepetitionCount() : decoder.repetition_count;
+  bool available = decoder.size_available && !decoder.failed;
+  put32(output, available);
+  put32(output, decoder.failed);
+  put32(output, available ? decoder.width : 0);
+  put32(output, available ? decoder.height : 0);
+  put32(output, decoder.frames.size());
+  put32(output, uint32_t(repetition));
+  for (const Frame& frame : decoder.frames) {
+    put32(output, frame.status);
+    put32(output, frame.has_alpha);
+    put32(output, uint32_t(frame.duration));
+    put32(output, uint32_t(frame.required));
+    put32(output, uint32_t(frame.disposal));
+    put32(output, uint32_t(frame.blend));
+    put32(output, uint32_t(frame.rect.x()));
+    put32(output, uint32_t(frame.rect.y()));
+    put32(output, uint32_t(frame.rect.width()));
+    put32(output, uint32_t(frame.rect.height()));
+    put32(output, frame.allocated ? frame.pixels.size() : 0);
+    if (frame.allocated) output.insert(output.end(), frame.pixels.begin(), frame.pixels.end());
+  }
+}
+
+bool decode(const Bytes& input, Bytes& output) {
   size_t offset = 1;
   uint32_t count;
   if (!take32(input, offset, count)) return false;
-  auto decoder = std::make_unique<blink::PngImageDecoder>(
-      blink::ImageDecoder::kAlphaPremultiplied, blink::ColorBehavior::kIgnore,
-      blink::ImageDecoder::kNoDecodedImageByteLimit);
-  auto data = blink::SharedBuffer::Create();
+  Bytes data;
   for (uint32_t index = 0; index < count; ++index) {
     uint32_t size;
     if (!take32(input, offset, size) || size > input.size() - offset) return false;
-    data->Append(base::span(reinterpret_cast<const char*>(input.data() + offset), size));
+    data.insert(data.end(), input.begin() + offset, input.begin() + offset + size);
     offset += size;
-    decoder->SetData(data.get(), index + 1 == count);
-    bool available = decoder->IsSizeAvailable();
-    put32(output, available);
-    put32(output, decoder->Failed());
-    put32(output, available ? decoder->Size().width() : 0);
-    put32(output, available ? decoder->Size().height() : 0);
-    auto frames = decoder->FrameCount();
-    put32(output, frames);
-    put32(output, decoder->RepetitionCount());
-    for (size_t frame_index = 0; frame_index < frames; ++frame_index) {
-      auto* frame = decoder->DecodeFrameBufferAtIndex(frame_index);
-      put32(output, frame != nullptr);
-      if (!frame) continue;
-      put32(output, frame->GetStatus());
-      put32(output, frame->HasAlpha());
-      put32(output, frame->Duration().InMilliseconds());
-      put32(output, frame->GetDisposalMethod());
-      put32(output, frame->GetAlphaBlendSource());
-      auto rect = frame->OriginalFrameRect();
-      put32(output, rect.x()); put32(output, rect.y());
-      put32(output, rect.width()); put32(output, rect.height());
-      const auto& bitmap = frame->Bitmap();
-      size_t length = bitmap.getPixels() ? bitmap.computeByteSize() : 0;
-      put32(output, length);
-      const auto* pixels = static_cast<const uint8_t*>(bitmap.getPixels());
-      if (length) output.insert(output.end(), pixels, pixels + length);
-    }
-    put32(output, decoder->Failed());
+    Step(data, index + 1 == count, output);
   }
   return offset == input.size();
 }
 
-static bool encode(const Bytes& input, Bytes& output) {
+bool EncodeLevel(const SkPixmap& pixmap, SkPngRustEncoder::CompressionLevel level, Bytes& output) {
+  SkDynamicMemoryWStream stream;
+  SkPngRustEncoder::Options options;
+  options.fCompressionLevel = level;
+  if (!SkPngRustEncoder::Encode(&stream, pixmap, options)) return false;
+  auto encoded = stream.detachAsData();
+  output.insert(output.end(), encoded->bytes(), encoded->bytes() + encoded->size());
+  return true;
+}
+
+bool encode(const Bytes& input, Bytes& output) {
   size_t offset = 1;
   uint32_t width, height, mode;
   if (!take32(input, offset, width) || !take32(input, offset, height) ||
-      !take32(input, offset, mode) || mode > 5 || width == 0 || height == 0 ||
+      !take32(input, offset, mode) || mode >= 15 || width == 0 || height == 0 ||
       (input.size() - offset) % 4 || uint64_t(width) * height != (input.size() - offset) / 4) return false;
-  auto alpha = mode >= 3 ? kOpaque_SkAlphaType : kPremul_SkAlphaType;
-  mode %= 3;
+  SkAlphaType alpha = mode % 3 == 0 ? kPremul_SkAlphaType : mode % 3 == 1 ? kOpaque_SkAlphaType : kUnpremul_SkAlphaType;
+  uint32_t op = mode / 3;
   auto info = SkImageInfo::Make(width, height, kN32_SkColorType, alpha);
   SkPixmap pixmap(info, input.data() + offset, size_t(width) * 4);
-  if (mode == 0) {
-    SkDynamicMemoryWStream stream;
-    SkPngRustEncoder::Options options;
-    options.fCompressionLevel = SkPngRustEncoder::CompressionLevel::kLow;
-    if (!SkPngRustEncoder::Encode(&stream, pixmap, options)) return false;
-    auto encoded = stream.detachAsData();
-    output.insert(output.end(), encoded->bytes(), encoded->bytes() + encoded->size());
-    return true;
+  using Level = SkPngRustEncoder::CompressionLevel;
+  bool ok;
+  if (op <= 2) {
+    ok = EncodeLevel(pixmap, op == 0 ? Level::kLow : op == 1 ? Level::kMedium : Level::kHigh, output);
+  } else {
+    Level level = op == 3 ? Level::kMedium : Level::kLow;
+    if (alpha != kOpaque_SkAlphaType && pixmap.computeIsOpaque()) {
+      SkPixmap opaque(info.makeAlphaType(kOpaque_SkAlphaType), pixmap.addr(), pixmap.rowBytes());
+      ok = EncodeLevel(opaque, level, output);
+    } else {
+      ok = EncodeLevel(pixmap, level, output);
+    }
   }
-  SkBitmap bitmap;
-  if (!bitmap.installPixels(info, const_cast<uint8_t*>(input.data() + offset), size_t(width) * 4)) return false;
-  auto encoded = mode == 1 ? gfx::PNGCodec::EncodeBGRASkBitmap(bitmap, false)
-                           : gfx::PNGCodec::FastEncodeBGRASkBitmap(bitmap, false);
-  if (!encoded) return false;
-  output = std::move(*encoded);
+  if (!ok) output.clear();
   return true;
 }
+
+}  // namespace
 
 int main() {
   uint8_t header[4];
