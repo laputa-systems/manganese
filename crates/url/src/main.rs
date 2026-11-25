@@ -85,7 +85,8 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         Err(_) => return Ok(vec![0]),
     };
     let origin = parsed.origin();
-    let serialized_origin = origin.ascii_serialization();
+    let is_file = parsed.scheme() == "file";
+    let serialized_origin = if is_file { "file://".to_owned() } else { origin.ascii_serialization() };
     let port = parsed.port().map(|value| value.to_string());
     let host = parsed.host_str();
     let domain = host.and_then(|value| registrable_domain(value, include_private));
@@ -96,7 +97,7 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         let b = registrable_domain(other_host, include_private).unwrap_or(other_host);
         Some(a == b)
     });
-    let mut output = vec![1, u8::from(matches!(origin, Origin::Opaque(_)))];
+    let mut output = vec![1, u8::from(!is_file && matches!(origin, Origin::Opaque(_)))];
     for field in [Some(parsed.as_str()), Some(parsed.scheme()), Some(parsed.username()),
                   parsed.password(), host, port.as_deref(), Some(parsed.path()), parsed.query(),
                   parsed.fragment(), Some(serialized_origin.as_str()), domain] {
@@ -166,5 +167,19 @@ mod tests {
         assert_eq!(values[9], Some("https://a.blogspot.com"));
         assert_eq!(values[10], Some("a.blogspot.com"));
         assert_eq!(fields, &[0]);
+    }
+
+    #[test]
+    fn file_origin_matches_chromium() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("file:///tmp/a"));
+        put_field(&mut request, None);
+        put_field(&mut request, None);
+        request.push(0);
+        let response = respond(&request).unwrap();
+        assert_eq!(&response[..2], &[1, 0]);
+        let mut fields = &response[2..];
+        let values: Vec<_> = (0..11).map(|_| take_field(&mut fields).unwrap()).collect();
+        assert_eq!(values[9], Some("file://"));
     }
 }
