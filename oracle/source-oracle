@@ -2,7 +2,10 @@
 # Drive the source oracle: oracle/build with the capture series (oracle/capture/series) applied,
 # in its own builder image and Docker volumes.
 #   oracle/source-oracle tree          apply the series to a fresh copy under .work/oracle/build
-#   oracle/source-oracle PHASE...      run chromium-build phases (image, ensure-source, gate-a, poc, build, ...)
+#   oracle/source-oracle PHASE...      run chromium-build phases (image, ensure-source, gate-a, poc, build, ...);
+#                                      build-target:NAME builds one Ninja target, export copies the packaged
+#                                      archive out of the work volume and qualifies it with the frozen
+#                                      qualify-package.py into .work/oracle/artifacts
 set -eu
 
 fail() { printf 'source-oracle: %s\n' "$*" >&2; exit 1; }
@@ -58,6 +61,27 @@ record_source() {
         sh -c 'printf "%s\n" "$1" > /work/metadata/capture-series' sh "$digest"
 }
 
+# Copy the packaged archive and its test-fast report out of the work volume, then bind them with the
+# frozen qualify-package.py, as the frozen release workflow does.
+export_archive() {
+    artifacts=$root/.work/oracle/artifacts
+    name=chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz
+    rm -rf "$artifacts"
+    mkdir -p "$artifacts"
+    cid=$(docker create -v "$CHROMIUM_WORK_VOLUME:/work:ro" "$CHROMIUM_BUILDER_IMAGE" true)
+    docker cp "$cid:/work/artifacts/$name" "$artifacts/$name" \
+        && docker cp "$cid:/work/artifacts/$name.sha256" "$artifacts/$name.sha256" \
+        && docker cp "$cid:/work/test-output/chromium-wayland-release/test-fast.json" "$artifacts/test-fast.json"
+    status=$?
+    docker rm -v "$cid" >/dev/null
+    [ "$status" = 0 ] || fail "no packaged archive in $CHROMIUM_WORK_VOLUME; run the package phase first"
+    docker run --rm --network=none -v "$artifacts:/qual" -v "$tree:/repo:ro" "$CHROMIUM_BUILDER_IMAGE" sh -euc "
+        owner=\$(stat -c '%u:%g' /qual)
+        trap 'chown -hR \"\$owner\" /qual' EXIT
+        python3 /repo/scripts/qualify-package.py --archive /qual/$name --report /qual/test-fast.json"
+    printf '%s\n' "$digest" > "$artifacts/capture-series"
+}
+
 [ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | PHASE..."
 make_tree
 [ "$1" = tree ] && exit 0
@@ -65,11 +89,20 @@ for phase in "$@"; do
     case $phase in
         ensure-source)
             reset_stale_source
-            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release ensure-source)
+            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
+                --jobs "$JOBS" ensure-source)
             record_source
             ;;
+        build-target:*)
+            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
+                --jobs "$JOBS" build-target "${phase#build-target:}")
+            ;;
+        export)
+            export_archive
+            ;;
         *)
-            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release "$phase")
+            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
+                --jobs "$JOBS" "$phase")
             ;;
     esac
 done
