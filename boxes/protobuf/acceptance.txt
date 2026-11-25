@@ -1,0 +1,16 @@
+version 1
+box protobuf
+revision 7dbbb638b792a19c698b00e5f4d023d4e73c9a54
+arch x86_64
+spec sha256:55746a82f6649e504e2b687d467b92e048671270d37236a71e640f7e829834f9
+corpus sha256:26890684f2fab7379ddb9ffa23690065ca1bfe1a19605617cc4033e90890bf67 seen 562 holdout 500
+oracle .work/tmp/protobuf/oracle sha256:85d995032f888373d2e0cb19b1641d2b73d881035e34637fa7828e92c37adc7a
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/protobuf sha256:a3477ea411f6f72318d7c1314df232e05c1dc2d9741db281eadda9e79ea336c5
+dependencies cargo-lock sha256:1a708f80605ea65ad6f34668a4a3ead0f3511cc0256846c3ac1b08e844407f3a tree sha256:7562ee2d15591e46953bc619faf87c19e523dd671d8252dda06e1dc7196358f7
+run seen exit 0 items 562 562
+run holdout exit 0 items 500 500
+run fuzz exit 0 seed 1795639811767222967 requested 20000 completed 20000
+level source-harness met
+level frozen-browser pending: profile-format must witness frozen-browser shared_proto_db metadata, PersistentOriginTrials, background sync and payment values across restart
+level integration pending: arm64 evidence (assembly: profile-format read and write against the frozen arm64 browser) and make closure have not run
