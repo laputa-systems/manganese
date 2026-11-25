@@ -81,7 +81,15 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn utf8_distinguishes_noncharacters_from_invalid_sequences() {
+        assert_eq!(validate_utf8(b"valid"), (true, true));
+        assert_eq!(validate_utf8("\u{fdd0}".as_bytes()), (false, true));
+        assert_eq!(validate_utf8(&[0xed, 0xa0, 0x80]), (false, false));
+        assert_eq!(validate_utf8(&[0xc0, 0x80]), (false, false));
+    }
 
     #[test]
     fn integer_parsing_preserves_partial_value_and_saturation() {
@@ -361,4 +369,14 @@ pub fn parse_integer(input: &[u8], kind: IntegerKind, radix: IntegerRadix) -> (u
     }
     let value = value as u64;
     (if negative { value.wrapping_neg() } else { value }, valid)
+}
+
+pub fn validate_utf8(input: &[u8]) -> (bool, bool) {
+    match std::str::from_utf8(input) {
+        Ok(text) => (text.chars().all(|c| {
+            let n = u32::from(c);
+            !(0xfdd0..=0xfdef).contains(&n) && n & 0xfffe != 0xfffe
+        }), true),
+        Err(_) => (false, false),
+    }
 }

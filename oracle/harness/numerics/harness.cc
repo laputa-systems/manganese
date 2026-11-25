@@ -5,6 +5,8 @@
 #include "base/third_party/double_conversion/double-conversion/double-conversion.h"
 #include "third_party/simdutf/simdutf.h"
 #include "base/strings/string_number_conversions_internal.h"
+#include "base/strings/string_util_impl_helpers.h"
+#include "base/strings/utf_string_conversion_utils.h"
 
 using double_conversion::DoubleToStringConverter;
 using double_conversion::StringBuilder;
@@ -60,6 +62,11 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 9) {
+      std::string_view text(reinterpret_cast<char*>(input + 1), length - 1);
+      output[0] = base::internal::DoIsStringUTF8<base::IsValidCharacter>(text);
+      output[1] = base::internal::DoIsStringUTF8<base::IsValidCodepoint>(text);
+      out_len = 2;
     } else if (input[0] == 7 && length >= 2) {
       switch (input[1]) {
         case 0: parse_integer<int32_t, 10>(input + 2, length - 2, output); break;

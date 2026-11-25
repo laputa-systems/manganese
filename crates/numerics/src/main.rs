@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,13 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 9 {
+            let (all_characters, valid_codepoints) = validate_utf8(&request[1..]);
+            output.write_all(&2u32.to_be_bytes())?;
+            output.write_all(&[u8::from(all_characters), u8::from(valid_codepoints)])?;
+            output.flush()?;
+            continue;
+        }
         if request[0] == 7 && length >= 2 {
             let kind = match request[1] % 4 {
                 0 => IntegerKind::I32, 1 => IntegerKind::U32,
