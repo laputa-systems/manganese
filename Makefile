@@ -21,3 +21,8 @@ oracle-launch:
 	python3 -B oracle/launch/launch.py --arch $(ARCH) --mode $(MODE)
 
 .PHONY: setup check lint test artifact-selftest oracle-launch
+
+capability-probes:
+	python3 -B oracle/probes/capability/run.py
+
+.PHONY: capability-probes
