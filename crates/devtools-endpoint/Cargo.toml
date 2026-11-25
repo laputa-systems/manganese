@@ -1,0 +1,9 @@
+[package]
+name = "devtools-endpoint"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "devtools-endpoint-oracle"
+path = "src/bin/oracle.rs"

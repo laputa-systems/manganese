@@ -84,3 +84,12 @@ abi-census:
 .PHONY: cdp-trace
 cdp-trace:
 	python3 -B oracle/probes/cdp/run.py
+
+.PHONY: devtools-endpoint-oracle
+devtools-endpoint-oracle:
+	python3 -B oracle/harness/devtools-endpoint/daemon.py
+
+.PHONY: devtools-endpoint-record
+devtools-endpoint-record:
+	CARGO_TARGET_DIR=$(CURDIR)/.work/tmp/target RUSTC_WRAPPER=kache cargo build --locked --offline --target x86_64-unknown-linux-musl -p devtools-endpoint
+	python3 -B oracle/harness/devtools-endpoint/record.py
