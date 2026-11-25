@@ -89,3 +89,12 @@ abi-census:
 .PHONY: cdp-trace
 cdp-trace:
 	python3 -B oracle/probes/cdp/run.py
+
+.PHONY: brotli-harness
+brotli-harness:
+	mkdir -p .work/tmp/brotli
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/brotli $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/brotli/build.py
+
+.PHONY: brotli-anchor
+brotli-anchor:
+	PYTHONPATH=oracle/harness/brotli python3 -B oracle/harness/brotli/anchor.py

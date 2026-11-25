@@ -1,0 +1,22 @@
+[package]
+name = "laputa-brotli"
+version = "9.1.0"
+edition = "2015"
+license = "BSD-3-Clause AND MIT"
+
+[lib]
+name = "brotli"
+
+[dependencies]
+alloc-no-stdlib = ">=3.0.0, <4.0.0"
+alloc-stdlib = { version = ">=0.3.0, <0.4", optional = true }
+brotli-decompressor = { version = ">=6.2, <7", default-features = false }
+
+[features]
+default = ["std", "decoder-only"]
+std = ["alloc-stdlib", "brotli-decompressor/std"]
+decoder-only = []
+benchmark = ["brotli-decompressor/benchmark"]
+simd = []
+ffi-api = ["brotli-decompressor/ffi-api"]
+no-stdlib-ffi-binding = []
