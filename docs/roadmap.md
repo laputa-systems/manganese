@@ -4,7 +4,7 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** active; P0, M0 and M1 done (`m1-oracle-equivalence` re-accepted under the fixed comparison); `kache-chromium` accepted; M2 and M3 boxes in parallel lanes.
+- **State:** winding down (2026-11-25); was active; P0, M0 and M1 done (`m1-oracle-equivalence` re-accepted under the fixed comparison); `kache-chromium` accepted; M2 and M3 boxes in parallel lanes.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m0-workloads`, `m1-source-oracle`, `m0-abi`, `m0-cdp-trace`, `m1-oracle-equivalence`, `kache-chromium`.
 - **Box qualification.** A box is accepted when `make accept BOX=<id>` writes `boxes/<id>/acceptance.txt` at a committed revision; the receipt records source-harness parity (seen, holdout and fuzz at `acceptance_cases`), frozen-browser agreement (the spec's `make <target>` anchor) and integration (arm64 evidence and `make closure`, pending for every box) separately.
