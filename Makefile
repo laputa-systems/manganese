@@ -78,6 +78,10 @@ zlib-harness:
 checksums-harness:
 	mkdir -p .work/tmp/checksums
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/checksums $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/checksums/build.py
+.PHONY: zstd-harness
+zstd-harness:
+	mkdir -p .work/tmp/zstd
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zstd $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/zstd/build.py
 
 .PHONY: zlib-anchor
 zlib-anchor:

@@ -80,6 +80,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruzstd"
+version = "0.9.1"
+dependencies = [
+ "twox-hash",
+]
+
+[[package]]
 name = "selftest"
 version = "0.1.0"
 
@@ -88,6 +95,12 @@ name = "semver"
 version = "1.0.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
+
+[[package]]
+name = "twox-hash"
+version = "2.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86a801b3cea342a06d468c8710662aa29e5e05e4f5c0d62f00bbb7f2ad7941c2"
 
 [[package]]
 name = "zlib"
@@ -99,3 +112,10 @@ dependencies = [
 [[package]]
 name = "zlib-rs"
 version = "0.6.8"
+
+[[package]]
+name = "zstd"
+version = "0.1.0"
+dependencies = [
+ "ruzstd",
+]
