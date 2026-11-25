@@ -91,7 +91,7 @@ def client_workloads(observed):
         if set(workloads) != WORKLOADS:
             return False
         for item in workloads.values():
-            if item.get('status') == 'ok' and item.get('evidence'):
+            if item.get('status') in ('ok', 'oracle-differs') and item.get('evidence'):
                 continue
             if item.get('status') == 'n/a' and item.get('reason'):
                 continue

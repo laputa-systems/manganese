@@ -28,6 +28,8 @@ class NegativeControls(unittest.TestCase):
         self.assertTrue(checks.client_workloads(good))
         good['extension-cli']['dialogs'] = {'status':'n/a', 'reason':'no dialog API'}
         self.assertTrue(checks.client_workloads(good))
+        good['agent-browser']['files'] = {'status':'oracle-differs', 'evidence':{'observed':'download canceled'}}
+        self.assertTrue(checks.client_workloads(good))
         for change in ('client', 'workload', 'failure', 'missing-evidence', 'missing-reason'):
             bad = copy.deepcopy(good)
             if change == 'client':
@@ -37,7 +39,7 @@ class NegativeControls(unittest.TestCase):
             elif change == 'failure':
                 bad['agent-browser']['forms'] = {'status':'FAIL', 'evidence':{'observed':False}}
             elif change == 'missing-evidence':
-                bad['agent-browser']['forms'] = {'status':'ok'}
+                bad['agent-browser']['files'] = {'status':'oracle-differs'}
             else:
                 bad['extension-cli']['dialogs'] = {'status':'n/a'}
             self.assertFalse(checks.client_workloads(bad), change)

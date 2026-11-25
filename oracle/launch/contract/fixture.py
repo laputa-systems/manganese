@@ -30,7 +30,7 @@ class HTTP(http.server.BaseHTTPRequestHandler):
 <input id="upload" type="file"><button id="send-upload" onclick="fetch('/upload',{method:'POST',body:document.querySelector('#upload').files[0]})">Upload</button>
 <button id="confirm" onclick="document.body.dataset.confirm=confirm('Confirm workload')">Confirm</button>
 <button id="popup" onclick="window.open('/popup')">Popup</button>
-<button id="blob" onclick="let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['client download']));a.download='client-download.txt';a.click()">Download</button>'''
+<button id="blob" onclick="let a=document.createElement('a');a.href=window.URL.createObjectURL(new Blob(['client download']));a.download='client-download.txt';a.click()">Download</button>'''
             content_type = 'text/html'
         elif self.path == '/same':
             body = b'<!doctype html><p id="same-text">same-origin frame</p>'
