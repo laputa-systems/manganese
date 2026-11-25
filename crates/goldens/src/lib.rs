@@ -2,7 +2,7 @@ mod digest;
 mod fuzz;
 mod spec;
 pub use digest::sha256;
-pub use spec::{Arm64Evidence, Comparator, Declaration, Fuzz, Spec};
+pub use spec::{Anchor, Arm64Evidence, Comparator, Declaration, Fuzz, Spec};
 pub use fuzz::run as fuzz;
 
 mod process;
@@ -161,6 +161,7 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
         result?;
     }
     if !failing.is_empty() { return Err(format!("golden mismatch: {}", failing.join(", "))); }
+    println!("lane={} items={} passed={}", if options.lane == Lane::Seen { "seen" } else { "holdout" }, corpus.len(), passing.len());
     Ok(())
 }
 

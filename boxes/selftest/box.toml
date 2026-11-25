@@ -19,3 +19,4 @@ oracle = ".work/tmp/target-oracle/x86_64-unknown-linux-musl/debug/selftest-oracl
 candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/candidate"
 fuzz = "bytes"
 fuzz_max_len = 64
+acceptance_cases = 1000

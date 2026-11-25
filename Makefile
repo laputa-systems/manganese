@@ -16,7 +16,7 @@ check:
 
 .PHONY: lint
 lint:
-	shellcheck -s sh scripts/setup-dev scripts/check scripts/artifact scripts/artifact-selftest scripts/box scripts/assembly oracle/source-oracle
+	shellcheck -s sh scripts/setup-dev scripts/check scripts/artifact scripts/artifact-selftest scripts/box scripts/accept scripts/assembly oracle/source-oracle
 
 .PHONY: test
 test: check
@@ -48,6 +48,10 @@ census:
 .PHONY: box
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
+
+.PHONY: accept
+accept:
+	sh scripts/accept "$(BOX)"
 
 .PHONY: box-fuzz
 box-fuzz:

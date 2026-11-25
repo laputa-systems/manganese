@@ -19,3 +19,4 @@ oracle = ".work/tmp/brotli/oracle"
 candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/brotli"
 fuzz = "driver"
 fuzz_driver = "oracle/harness/brotli/fuzz.py"
+acceptance_cases = 20000
