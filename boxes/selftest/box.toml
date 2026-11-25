@@ -17,3 +17,5 @@ arm64_evidence = "harness: run the synthetic protocol harness natively on arm64"
 holdout_percent = 40
 oracle = ".work/tmp/target-oracle/x86_64-unknown-linux-musl/debug/selftest-oracle"
 candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/candidate"
+fuzz = "bytes"
+fuzz_max_len = 64
