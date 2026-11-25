@@ -1,0 +1,18 @@
+version 1
+box brotli
+revision 22d7560d7b007e25665add9eeba121bdd2cb8459
+arch x86_64
+spec sha256:9838e1f4b6641c761db08cae571e65e8763f9c7f60153065856a32f28c3f9d4c
+corpus sha256:804ff21f3b19c2dcebb954d0a4d7003a3df715ca8910ee77b7862f1251878954 seen 3492 holdout 2066
+oracle .work/tmp/brotli/oracle sha256:2fcc53d881f0c3e961d8229033f255bba87b46f6ba538699e4e33f004724fb6e
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/brotli sha256:252199e24b2bf43f8360fe816ac9c16762952dd90b0b234fc851122f3719b3b2
+dependencies cargo-lock sha256:1a708f80605ea65ad6f34668a4a3ead0f3511cc0256846c3ac1b08e844407f3a tree sha256:e922758d0a55338865a81f683f35e84fa8e8a1018d9193b12563b9e8269f18b2
+snapshot vendor/rust-brotli tree 49b1505c9c604c619f470090385f757f1dc963e4
+run seen exit 0 items 3492 3492
+run holdout exit 0 items 2066 2066
+run fuzz exit 0 seed 1795640807137391994 requested 20000 completed 20000
+run anchor make brotli-anchor exit 0
+level source-harness met
+level frozen-browser met: make brotli-anchor
+level integration pending: arm64 evidence (public_api: Content-Encoding br response bodies fetched in the frozen arm64 browser) and make closure have not run
