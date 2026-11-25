@@ -6,8 +6,10 @@
 #                                      build-target:NAME builds one Ninja target, export copies the packaged
 #                                      archive out of the work volume and qualifies it with the frozen
 #                                      qualify-package.py into .work/oracle/artifacts
-#   oracle/source-oracle kache-report  classify the kache events of the last build; fails when over 1% of its
-#                                      C/C++ compiles were not cached
+#   oracle/source-oracle kache-report  classify the kache events of the last build-target; fails when over 1%
+#                                      of its C/C++ compiles were not cacheable
+#   oracle/source-oracle kache-report:warm  as kache-report, and also fails when under 99% of the cacheable
+#                                      compiles hit; run it after rebuilding unchanged inputs
 #   oracle/source-oracle image-tag     print the builder image tag for the current series and kache lock
 #   oracle/source-oracle kache         build the kache commit in oracle/capture/kache.lock from KACHE_REPO
 #                                      (default ~/repos/kache) into the artifact store
@@ -157,15 +159,20 @@ for phase in "$@"; do
             record_source
             ;;
         build-target:*)
+            docker run --rm --network=none -v "$CHROMIUM_WORK_VOLUME:/work" "$CHROMIUM_BUILDER_IMAGE" \
+                sh -c 'mkdir -p /work/metadata && touch /work/metadata/kache-build-start'
             (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
                 --jobs "$JOBS" build-target "${phase#build-target:}")
             ;;
         export)
             export_archive
             ;;
-        kache-report)
+        kache-report|kache-report:warm)
+            gate=
+            [ "$phase" = kache-report:warm ] && gate="--min-hit-share 0.99"
+            # shellcheck disable=SC2086
             docker run --rm --network=none -v "$CHROMIUM_WORK_VOLUME:/work" -v "$CHROMIUM_CACHE_VOLUME:/ccache" \
-                -v "$capture/kache-report.py:/kache-report.py:ro" "$CHROMIUM_BUILDER_IMAGE" python3 -I /kache-report.py
+                -v "$capture/kache-report.py:/kache-report.py:ro" "$CHROMIUM_BUILDER_IMAGE" python3 -I /kache-report.py $gate
             ;;
         *)
             (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
