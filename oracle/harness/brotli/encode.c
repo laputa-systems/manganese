@@ -4,8 +4,8 @@
 #include "brotli/encode.h"
 
 int main(int argc, char **argv) {
-    if (argc != 3 && argc != 4) return 1;
-    int quality = atoi(argv[1]), window = atoi(argv[2]);
+    if (argc != 4 && argc != 5) return 1;
+    int quality = atoi(argv[1]), window = atoi(argv[2]), mode = atoi(argv[3]);
     size_t size = 0, cap = 65536;
     uint8_t *data = malloc(cap);
     if (!data) return 1;
@@ -22,11 +22,11 @@ int main(int argc, char **argv) {
     }
     if (ferror(stdin)) return 1;
     BrotliEncoderState *state = BrotliEncoderCreateInstance(NULL, NULL, NULL);
-    if (!state || !BrotliEncoderSetParameter(state, BROTLI_PARAM_QUALITY, quality)) return 1;
+    if (!state || !BrotliEncoderSetParameter(state, BROTLI_PARAM_QUALITY, quality) || !BrotliEncoderSetParameter(state, BROTLI_PARAM_MODE, mode)) return 1;
     uint8_t *dictionary = NULL;
     BrotliEncoderPreparedDictionary *prepared = NULL;
-    if (argc == 4) {
-        FILE *file = fopen(argv[3], "rb");
+    if (argc == 5) {
+        FILE *file = fopen(argv[4], "rb");
         if (!file || fseek(file, 0, SEEK_END)) return 1;
         long length = ftell(file);
         if (length <= 0 || fseek(file, 0, SEEK_SET)) return 1;
