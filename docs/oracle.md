@@ -37,7 +37,7 @@ A golden box wraps one oracle subsystem behind a seam Chromium already has. Seam
 | CDP messages | DevTools endpoint | A recording proxy between each frozen client workload (appliance contract 7.5) and the oracle |
 | NetLog and wire captures | HTTP/1.1, HTTP/2, TLS, cookies, cache | `--log-net-log` and packet captures through a SOCKS5 proxy for the same workloads |
 | Mojo messages | IPC wire format and validation | Messages recorded at the oracle's Mojo boundary |
-| Seccomp-BPF programs | Sandbox policy per process type | The programs Chromium's policy compiler emits, compared exactly |
+| Seccomp-BPF programs | Sandbox policy per process type | The programs Chromium's policy compiler emits, evaluated as decision tables over syscall, argument class and architecture, plus broker outcomes; byte identity is an optional witness |
 | `PaintOpBuffer` | 2D raster (I01) | Paint streams serialized from real pages |
 | GPU command buffer | Software WebGL | Command streams from WebGL conformance and real pages |
 | Layout and DOM dumps | Style, layout and DOM | Chromium web_tests expectations and dumps from real pages |
@@ -47,7 +47,34 @@ Capture hooks are batched: one oracle rebuild per milestone adds every hook that
 
 A box must model the seam's real call protocol, not only its inputs and outputs. That means streaming chunks, pauses for script, re-entrancy, callbacks and threading, traced from Hydrogen running real workloads. A crate that passes coarse goldens but cannot sit behind the real protocol is not done. Subsystems too entangled for a box (DOM, bindings, V8, GC and the event loop) use behavioral oracles instead: WPT and web_tests results, and Test262 through `d8`.
 
-Each box has a ratcheting scoreboard that fails on any regression, a holdout corpus the hill-climbing lane never sees, and a differential-fuzz lane against the live oracle harness. Comparator classes come from F16: exact for anything a page or server can hash, tolerance only where the manifest allows it.
+Each box has a ratcheting scoreboard that fails on any regression, a holdout corpus the hill-climbing lane never sees, and a differential-fuzz lane against the live oracle harness. A holdout case that exposes a failure becomes a regression case once fixed, and the holdout is replenished so it stays unseen.
+
+### Comparators
+
+Comparator classes come from F16: exact for anything a page or server can hash, tolerance only where the manifest allows it. Every exact comparison names the observable surface that justifies it. For example, zlib deflate output is exact because `CompressionStream` and `toDataURL('image/png')` expose it, while a cache's internal file layout is compared only through what the browser reads back. `box.toml` also declares the environment inputs that change the answer, the values that legitimately vary and the relationships checked in their place, the orderings that matter, and the expected oracle defects and required improvements with their own absolute assertions (U15). Before a candidate is compared, the oracle harness must agree with itself across repeated runs and processes; a box whose oracle disagrees with itself has a missing environment input.
+
+### Oracle equivalence
+
+Goldens come from rebuilt and instrumented builds, so three builds are tied together (U17):
+
+1. The frozen production archive is authoritative.
+2. A clean rebuild from `oracle/build/` must agree with it on every surface the M0 inventories record and on the frozen `test-fast`.
+3. Each capture-hook batch must leave the enclosing behavior unchanged with hooks enabled and disabled.
+
+Each box also has an anchor check that ties its harness to the frozen archive through a public surface: for example, decoding a corpus image through the harness and through `getImageData` on the frozen browser. A rebuilt or instrumented oracle carries its own identity in every receipt.
+
+### arm64 evidence
+
+The source oracle is x86_64-only, but F16 is per architecture. Each architecture-sensitive box records one evidence path in `box.toml`:
+
+| Path | What it establishes |
+|---|---|
+| Pinned arm64 captures | Comparison at the internal seam |
+| Public APIs of the frozen arm64 browser (canvas, Web Audio, WebGL, DOM) | Comparison at the observable surface |
+| A narrowly scoped arm64 harness | Internal behavior no browser API exposes |
+| An arm64 assembly boundary | Acceptance at a larger, named boundary |
+
+The frozen arm64 archive runs in an arm64 Linux container (proved 2026-11-24), so the second path needs no arm64 Chromium build. Emulated arm64 is not evidence: an emulated CPU reports different features, so SIMD dispatch differs.
 
 ## Iteration lanes
 

@@ -164,13 +164,17 @@ The workloads each client runs:
 
 ## 11. Persona
 
-11.1. Pages and servers must not be able to tell Manganese from the oracle (owner, 2026-11-24; requirements F16). The identity strings in 7.2 are part of it. The M0 surface inventory (`m0-persona`) records the rest, and the U16 report enforces it.
+11.1. Manganese matches the oracle exactly over the declared persona surfaces, under declared conditions, with timing excluded and legitimately random values compared by structure and distribution (owner, 2026-11-24; requirements F16). The identity strings in 7.2 are part of it. The M0 surface inventory (`m0-persona`) records the rest, and the U16 report enforces it.
 
 ## Expected differences
 
+These clauses are not compared with the oracle; each has its own absolute assertion.
+
+
 - Crashpad: the oracle runs `chrome_crashpad_handler`, and its renderers carry `--crashpad-handler-pid`; Manganese has neither (owner, 2026-11-24).
 - GPU and network services run out of process in headless mode too (3.5).
-- `/json/protocol` survives repeated requests (7.3).
+- `/json/protocol` survives repeated requests (7.3): 100 consecutive requests, browser still answering.
+- The 60-minute soak passes (8.3): no lost CDP session and no unbounded footprint growth, although the oracle fails it.
 
 ## Consumer changes outside scope
 

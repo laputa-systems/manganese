@@ -22,7 +22,7 @@ This is the single plan for this repository: all current and future work, and th
 - Parallel lanes for the disjoint sets named in **Sequence**, serial otherwise, each in a worktree at `.work/wt/<lane>`, never `/tmp`, following the orchestrate worktree lifecycle.
 - Every commit is a Conventional Commit with the workstream as its scope (`ground`, `oracle`, `lanes`, `box`, `assembly`, `contract`, `release`). The item ID belongs in the body. Code comments never cite the roadmap.
 - Run the parent steering checkpoint after each accepted slice, on resume, and whenever a slice fails twice.
-- A failing slice gets its cause before any retry (root-cause). After 3 failed attempts, park it on its branch with the cause and a retry condition, and take the next ready slice.
+- A failing slice gets its cause before any retry (root-cause). An attempt is one submission of the slice's acceptance command, made after a stated remediation hypothesis; ordinary red-green iterations in L0 while hill-climbing are not attempts. After 3 failed attempts with 3 distinct hypotheses, park the slice on its branch with the cause and a retry condition, and take the next ready slice.
 
 ## Sequence
 
@@ -59,9 +59,10 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 |---|---|---|---|---|
 | `m1-kache-oracle` | T16 | `oracle/capture/kache.patch` | `p0-ground` | `make oracle-gate-a`: the frozen Gate A cache-reuse check passes with kache as `cc_wrapper` and as the rustc wrapper |
 | `m1-source-oracle` | T15 | `oracle/Makefile` targets | `m1-kache-oracle` | `make source-oracle`: `oracle/build` produces an x86_64 package revision 2 archive that passes the frozen `test-fast` and `qualify-package.py`; a second run with no input change is an incremental no-op |
-| `m1-workspace` | U15, A11, A13, A14, B01, T01, T02, T03, T06 | `crates/goldens/`, `boxes/selftest/`, `make box`, `make assembly` | `p0-artifacts` | `make box BOX=selftest`: a synthetic box passes with exact goldens; its negative control (a deliberately wrong crate) fails; a scoreboard regression fails; and the holdout set is unreadable from the L0 lane |
-| `m1-fuzz-lane` | U05 | `crates/goldens/` fuzz runner | `m1-workspace`, `m1-source-oracle` | `make box-fuzz BOX=selftest`: 10 000 differential cases against a prebuilt harness with no divergence, and an injected divergence is reported with a minimized input |
-| `m1-zlib` | Q01 | box `zlib` | `m1-fuzz-lane` | `make box BOX=zlib` (Q01): zlib-rs output matches the oracle's zlib inflate and deflate on the corpus, the holdout set and 10 000 fuzz cases |
+| `m1-oracle-equivalence` | U17 | `oracle/probes/equivalence/` | `m1-source-oracle`, `m0-persona`, `m0-probes`, `m0-cdp-trace`, `m0-abi` | `make oracle-equivalence`: the clean rebuild agrees with the frozen x86_64 archive on every M0 inventory and on the frozen `test-fast`, and a capture build with hooks disabled and enabled agrees with the clean rebuild on the enclosing behavior; each discrepancy found is recorded under the rebuild's own identity |
+| `m1-workspace` | U15, A11, A13, A14, B01, T01, T02, T03, T06 | `crates/goldens/`, `boxes/selftest/`, `make box`, `make assembly` | `p0-artifacts` | `make box BOX=selftest`: a synthetic box passes with exact goldens; its negative control (a deliberately wrong crate) fails; a scoreboard regression fails; the holdout set is unreadable from the L0 lane; a `box.toml` missing any U15 declaration is rejected; and an oracle harness that disagrees with itself across two runs fails before any candidate is compared |
+| `m1-fuzz-lane` | U05 | `crates/goldens/` fuzz runner | `m1-workspace`, `m1-oracle-equivalence` | `make box-fuzz BOX=selftest`: 10 000 differential cases against a prebuilt harness with no divergence, and an injected divergence is reported with a minimized input |
+| `m1-zlib` | Q01 | box `zlib` | `m1-fuzz-lane` | `make box BOX=zlib` (Q01): zlib-rs output matches the oracle's zlib inflate and deflate on the corpus, the holdout set and 10 000 fuzz cases, and the anchor check agrees with `CompressionStream` output from the frozen archive |
 
 ### M2 — leaf boxes (*box*, parallel)
 
@@ -85,10 +86,9 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 | `color` | M10, M11 | skcms port |
 | `font-sanitize` | H05 | OTS and WOFF2 port |
 | `shaping` | H01, H02 | Laputa HarfRust, Fontations |
-| `glyph-raster` | H03 | Skrifa with Skia's mask path |
+| `glyph-outlines` | H03 | Skrifa outlines, hinting and metrics, exact with the oracle's FreeType or Skrifa path |
 | `font-match` | H04, H08 | rust-fontconfig against the frozen configuration |
 | `font-subset` | H06 | write-fonts, skera |
-| `text-qualification` | H09 | needs `shaping`, `glyph-raster`, `font-match` |
 | `url` | F12 | url, idna |
 | `encoding` | F13 | encoding_rs |
 | `protobuf` | P09 | prost |
@@ -103,8 +103,6 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 | `yuv` | K12 | libyuv port |
 | `codec-licensing` | K19, K20 | records only |
 | `common-codecs` | B09 | std, existing crates |
-| `svg` | M09 | resvg/usvg components where compatible |
-| `image-qualification` | M12 | needs every image box |
 | `native-support` | Q09 | removal of each native support library by consumer |
 
 ### M3 — services on Smolith (*box* unless marked)
@@ -140,18 +138,19 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 | ID | TODOs | Note |
 |---|---|---|
 | `mojo` | D01, D02, D07 | Mojo wire format and validation against recorded messages |
-| `sandbox` | D04, D06, D08, D09 | Seccomp-BPF programs per process type exact; broker and zygote behavior |
+| `sandbox` | D04, D06, D08, D09 | Seccomp-BPF policy accepted by its decisions per syscall, argument class and architecture, plus broker outcomes and negative controls; byte-identical programs are an optional witness |
 | `linux-abi` | B04, B08 | Inside the frozen ABI census (contract 10) |
 | `process-model` | B05, B06, B07, C01, C05 | |
-| `ozone-wayland` | J01, J02, J03, J09, J10 | Against Tinyland at the frozen revision |
+| `ozone-wayland` | J01, J02, J03, J09 | Against Tinyland at the frozen revision |
 | `input` | J04, J07 | kbvm |
-| `process-host` (*asm*) | U04 | Launches sandboxed browser, renderer, GPU, network and utility roles; contract 4.2 witness and negative controls |
+| `process-host` (*asm*) | U04 | Launches sandboxed browser, renderer, GPU, network and utility roles with shared memory and IPC, and shuts down cleanly; contract 4.2 witness and negative controls; `make abi-check A=process-host` shows every observed syscall, flag combination, ioctl and `madvise` advice inside the frozen census (contract 10). The same assembly on the appliance kernel is N8 |
 
 ### M5 — graphics and compositing (*box* unless marked)
 
 | ID | TODOs | Note |
 |---|---|---|
 | `raster-2d` | I01, I02 | `PaintOpBuffer` to pixels, Skia-exact |
+| `glyph-masks` | H03 | Glyph coverage masks through the Skia-exact text-mask stage; needs `raster-2d` and `glyph-outlines` |
 | `compositor` | I03, I04, I05, I14 | |
 | `webgl` | I06 to I13, I15 to I17 | GPU command buffer to pixels, exact with the oracle's software path |
 | `replay` (*asm*) | M5 exit | Captured paint and compositor streams from real pages match Hydrogen's screenshots exactly |
@@ -163,12 +162,15 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 | `blink-foundation` | F01, C03 | Oilpan in Rust |
 | `html-parser` | F02 | html5lib-tests plus the oracle's own dumps |
 | `dom` | F03, F05, F06, F14 | |
-| `bindings` | F04, E09 | Against native V8 through the test-only bridge |
+| `bindings` | F04, E09 | Against native V8 through the test-only bridge. The bridge's own acceptance: callback re-entry, cross-heap roots and weak wrappers, exception propagation in both directions, microtask checkpoints and worker termination, each with a fixture that fails when the bridge is wrong |
 | `css` | G01, G02 | |
 | `layout` | G03, G04, G05, G06 | Layout dumps |
 | `paint` | G07, G08, G09 | |
 | `navigation` | F07, F08, F09, F10, F11, F15, D05 | |
 | `media-pipeline` | K04, K13 to K18 | |
+| `svg` | M09 | resvg/usvg components where compatible; live SVG DOM through Blink |
+| `image-qualification` | M12 | Canvas export, screenshots and animated image timing; needs every M2 image box |
+| `text-qualification` | H09 | Real pages, selection, accessibility and screenshots in both modes; needs `glyph-masks`, `layout` and `font-match` |
 | `shell` | R01, R02, R06, R07, R08, R09, B03 | |
 | `extensions` | R05 | Extension suite tests (contract 7.6) |
 | `cdp-domains` | S02 to S08, S10, S12 to S14 | |
@@ -179,7 +181,18 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 
 | ID | TODOs | Note |
 |---|---|---|
-| `v8` | E01 to E08, E10 to E14, C04 | The `d8` box: Test262, mjsunit and captured scripts; inspector transcripts |
+| `v8-parser` | E01 | Test262 parse-phase tests, early errors and their exact messages |
+| `v8-runtime` | E02 | Tagged values, objects, shapes and builtins; numeric primitives exact (`Math`, number formatting) |
+| `v8-ignition` | E03 | Interpreter execution, exceptions, interrupts and microtask order on Test262 and mjsunit subsets |
+| `v8-heap` | E06, C04 | Handles, rooting, barriers, weak references, finalization and collection under stress |
+| `v8-baseline` | E04 | Baseline compilation and calling conventions on both ISAs |
+| `v8-optimizing` | E05, E14 | Safepoints, deoptimization, OSR and tier transitions; outputs equal to the interpreter's |
+| `v8-regexp` | E07 | ECMAScript regexp semantics, exact with Irregexp |
+| `v8-wasm` | E08 | Wasm spec tests and the JS/Wasm embedding |
+| `v8-snapshot` | E10 | Reproducible builtins and snapshot generation |
+| `v8-inspector` | E11 | Debugger, profiler and Runtime transcripts |
+| `v8-scheduling` | E12, E13 | Termination, workers, SharedArrayBuffer gating; component-reuse boundary |
+| `v8` | none | Outer box: the full `d8` behavior on Test262, mjsunit and captured scripts; each unit above leaves it visibly incomplete until all pass |
 | `intl` | H07 | Intl output exact with ICU4C |
 | `rust-v8` (*asm*) | M7 exit | Rust V8 replaces the bridge in every M6 assembly; the bridge is deleted |
 
@@ -189,7 +202,7 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 |---|---|---|---|---|
 | `m8-browser` | T11, U06 | `crates/manganese/` | M7 | `make assembly A=browser`: the full browser passes the M6 and M7 assembly goldens |
 | `m8-archive` | T04, T05, T07, T08, T12 | `release/` | `m8-browser` | `make archive`: Cargo-only offline build (`cargo build --release --locked --offline --target x86_64-unknown-linux-musl`) produces an archive that the frozen verifier accepts, with the ELF rules of contract 1.4 and 1.8 |
-| `m8-contract` | U02, U03, U07, U08, U09, U10, U11 | none | `m8-archive` | `make contract ARCHIVE=<manganese archive>` gives the same results as on the oracle archive, including 8.3 (60-minute soak) |
+| `m8-contract` | U02, U03, U07, U08, U09, U10, U11, J10 | none | `m8-archive` | `make contract ARCHIVE=<manganese archive>` gives the same results as on the oracle archive for every clause except the improvement clauses, which pass their own absolute assertions (contract, Expected differences): 100 `/json/protocol` requests survived, and the 60-minute soak with no lost CDP session and no unbounded footprint growth |
 | `m8-persona` | U16 | none | `m8-archive` | `make persona ARCHIVE=<manganese archive>`: the U16 report shows no unapproved difference from the oracle |
 | `m8-closure` | C02, C06, C07, C08, R10, T09, T10, U12, U13, U14 | none | `m8-archive` | `make closure`: T02 to T10, T13, T14 and the remaining U items; two clean builds give identical digests |
 
@@ -252,6 +265,10 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
 - A profile Manganese writes must reopen in Hydrogen, so rollback stays safe (contract 5.3).
 - Capture hooks are batched: one oracle rebuild per milestone carries every hook that milestone needs.
 - A box that stays inexact after 3 attempts is parked with its evidence. The comparator is never relaxed; only an owner decision can change a surface's class.
+- Exactness attaches to the observable surface: a box compares exactly only what a page, server or the appliance can observe, and names that surface. The seccomp policy is accepted by its decisions, not its bytes.
+- Golden trust follows U17: the frozen archive is authoritative; a rebuild or capture build earns trust through `m1-oracle-equivalence` and each box's anchor check, and keeps its own identity in receipts.
+- arm64 evidence uses the frozen arm64 archive's public surfaces unless a box names another path; emulated arm64 is never evidence, because the emulated CPU changes SIMD dispatch.
+- The improvement clauses (contract 7.3, 8.3) have absolute assertions; every other contract clause is compared with the oracle.
 - Browser performance is measured and logged, never gating, before the optimization phase.
 
 **Delegated** (the executor decides inside the bound and logs only decisions a later slice depends on).
@@ -297,11 +314,12 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
 
 | ID | Proof | Command the owner runs |
 |---|---|---|
-| N3 | arm64 parity | On an arm64 Alpine host: `make oracle-launch ARCH=aarch64`, the arm64 goldens for architecture-sensitive boxes, and `make contract ARCHIVE=<arm64 manganese archive>` |
+| N3 | arm64 parity | On an arm64 Alpine host, or an arm64 Linux VM on Apple Silicon (never emulation): `make oracle-launch ARCH=aarch64`; the M0 inventories against the frozen arm64 archive (`make persona-inventory capability-probes cdp-trace abi-census ARCH=aarch64`); each architecture-sensitive box's arm64 evidence path (oracle, arm64 evidence); and `make contract ARCHIVE=<arm64 manganese archive>` |
 | N4 | Appliance acceptance | Build both production appliance images from the Manganese archive, then run the appliance's interop, profile-mode, audio-worklet, render-pass, egress, adblock and soak suites |
 | N5 | Shadowdriver workloads | Provide `GH_TOKEN` with read access to `joshuarli/shadowdriver` on the campaign host, or run `make contract CLIENTS=shadowdriver` on a host that has it |
 | N6 | Publish corpora and goldens | On a host with `stuff` credentials: `scripts/artifact publish manganese/goldens:<tag> <files>` for the store entries the executor lists |
 | N7 | Push owned-project branches | Push the branches listed in each `vendor/<project>/UPSTREAM.md`, then replace the vendored snapshot with a pinned revision |
+| N8 | Appliance-kernel platform check | After `process-host` is accepted: run that assembly under the appliance kernel on both architectures (role launch, sandbox, IPC and shared memory, the census's synchronization and mapping operations, clean shutdown). It is a disposable diagnostic fixture, not a shipped image |
 
 ### Execution boundary and non-goals
 

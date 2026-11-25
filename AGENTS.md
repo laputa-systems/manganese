@@ -10,7 +10,7 @@ Manganese is a Rust reimplementation of a reduced Chromium browser that drops in
 
 ## Rules
 
-- `oracle/build/`, `oracle/frozen/` and `oracle/workloads/` are frozen. `make check` fails if any byte changes. The roadmap names the only slices that may add frozen evidence.
+- `oracle/build/`, `oracle/frozen/`, `oracle/workloads/`, `docs/requirements.md` and `docs/appliance-contract.md` are frozen. `make check` fails if any byte changes or an unlisted file appears. The roadmap names the only slices that may add frozen evidence; the two documents change only with an owner decision, a new manifest version and a regenerated `docs/FROZEN.sha256`.
 - Python, GN and Docker build logic live under `oracle/` only. Everything else is Rust or POSIX shell.
 - Large files never enter git; they live in the artifact store (`scripts/artifact`).
 - Scratch and worktrees go under `.work/`, which is disposable. Durable records go in the roadmap, commit messages or `docs/`.

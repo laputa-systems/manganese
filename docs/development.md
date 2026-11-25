@@ -25,7 +25,7 @@ make check lint
 
 ## Checks
 
-`make check` verifies that the frozen tree and evidence are byte-identical to their manifests, that the artifact lock is well formed, and that every relative documentation link resolves. It also checks that the frozen verifier runs on this host's Python, and that the oracle builder's pinned base image pulls and runs under Docker. Finally, a probe program built through kache must link as a musl-dynamic PIE and run both directly and through musl's loader. `make lint` runs shellcheck on the scripts.
+`make check` verifies that the frozen tree, evidence, requirements and appliance contract are byte-identical to their manifests with no unlisted files, that the artifact lock is well formed, and that every relative documentation link resolves. It also checks that the frozen verifier runs on this host's Python, and that the oracle builder's pinned base image pulls and runs under Docker. Finally, a probe program built through kache must link as a musl-dynamic PIE and run both directly and through musl's loader. `make lint` runs shellcheck on the scripts.
 
 ## Artifacts
 

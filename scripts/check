@@ -30,7 +30,16 @@ frozen_tree() {
 }
 
 frozen_evidence() {
-    (cd oracle/frozen && sha256sum -c -s SHA256SUMS) && (cd oracle/workloads && sha256sum -c -s SHA256SUMS)
+    for dir in oracle/frozen oracle/workloads; do
+        (cd "$dir" && sha256sum -c -s SHA256SUMS) || return 1
+        listed=$(awk '{ print $2 }' "$dir/SHA256SUMS" | sed 's|^\./||' | LC_ALL=C sort)
+        actual=$(cd "$dir" && find . -type f ! -name SHA256SUMS | sed 's|^\./||' | LC_ALL=C sort)
+        [ "$listed" = "$actual" ] || { echo "$dir has files outside its SHA256SUMS"; return 1; }
+    done
+}
+
+frozen_docs() {
+    sha256sum -c -s docs/FROZEN.sha256
 }
 
 artifacts_lock() {
@@ -90,6 +99,7 @@ musl_link_mode() {
 
 step frozen-tree frozen_tree
 step frozen-evidence frozen_evidence
+step frozen-docs frozen_docs
 step artifacts-lock artifacts_lock
 step doc-links doc_links
 step frozen-verifier frozen_verifier
