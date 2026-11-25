@@ -1,0 +1,16 @@
+version 1
+box devtools-endpoint
+revision 55fb088aef33dc682ec2b714a54703d8b039f7ae
+arch x86_64
+spec sha256:e79e07414f470a73799825739d5e2ea797050541122cfe953e672bfd1f75be2f
+corpus sha256:caa378b65c3bd01226c85cdda9910e138c3983c162301f4d114f36f46015ce33 seen 96 holdout 45
+oracle .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint-oracle sha256:980088223d2c8bef0b7c2aefcbfa8a5d65da5bca455701557203b7346c7cd146
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint sha256:174c0c33ddef7ada14b9b718716b8aa93fa548131bf5aa78143439d2f936a87b
+dependencies cargo-lock sha256:fa2ebd1a7af3ca65e468a1f8aa2503f9312c225a61d1a54d650078d80187fa08 tree sha256:dc05d2f919b5f574bd2d9ff851e2b813b708048726feecda55b0ed4469186665
+run seen exit 0 items 96 96
+run holdout exit 0 items 45 45
+run fuzz exit 0 seed 1795642344239259328 requested 20000 completed 20000
+level source-harness met
+level frozen-browser not applicable: the oracle is the frozen browser itself, driven through oracle/harness/devtools-endpoint/daemon.py, so every golden is a frozen-browser observation
+level integration pending: arm64 evidence (captures: the frozen arm64 CDP trace (oracle/frozen/cdp/) exercises the same endpoint) and make closure have not run
