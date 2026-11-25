@@ -1,4 +1,4 @@
-use crate::process::{Limits, Peer, env_number, parse_positive};
+use crate::process::{Limits, Peer, Scratch, env_number, parse_positive};
 use crate::{Fuzz, Lane, Spec, compare, load_blob, lock_items, name, sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -127,8 +127,9 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     println!("fuzz box={id} seed={seed} cases={cases}");
     let limits = Limits::from_env()?;
     let mut random = Random(seed);
-    let mut oracle = Peer::start(Path::new(&spec.oracle), &[], "oracle", limits)?;
-    let mut candidate = Peer::start(&candidate_path, &[], "candidate", limits)?;
+    let mut scratch = Scratch::create(&format!("{id}-fuzz"))?;
+    let mut oracle = Peer::start(Path::new(&spec.oracle), &[], "oracle", limits, &scratch.fresh()?)?;
+    let mut candidate = Peer::start(&candidate_path, &[], "candidate", limits, &scratch.fresh()?)?;
     for index in 0..cases {
         let mut input = generate(&mut random, &seeds, max);
         let (a, b) = outputs(&mut oracle, &mut candidate, &input).map_err(|e| preserved(id, budget, index, &input, &identities, &e))?;

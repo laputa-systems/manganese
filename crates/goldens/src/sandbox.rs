@@ -25,7 +25,9 @@ pub fn lock_ratchet(id: &str) -> io::Result<File> {
     Ok(file)
 }
 
-pub fn restrict(executables: &[&Path], store: &Path) -> io::Result<()> {
+/// Confine this process and its adapters: they may execute and read the adapters and runtime
+/// libraries and read back their scratch tree, and nothing under the blob store.
+pub fn restrict(executables: &[&Path], store: &Path, scratch: &Path) -> io::Result<()> {
     const EXECUTE: u64 = 1;
     const READ_FILE: u64 = 4;
     const READ_DIR: u64 = 8;
@@ -39,13 +41,17 @@ pub fn restrict(executables: &[&Path], store: &Path) -> io::Result<()> {
             if !paths.contains(&p) { paths.push(p); }
         }
     }
+    let scratch = scratch.canonicalize()?;
+    if scratch.starts_with(&store) || store.starts_with(&scratch) {
+        return Err(io::Error::other("scratch overlaps the store"));
+    }
     let attr = RulesetAttr { handled_access_fs: EXECUTE | READ_FILE | READ_DIR };
     // SAFETY: the pointer refers to a live ruleset attribute of the stated size.
     let fd = unsafe { syscall(444, &attr as *const RulesetAttr, std::mem::size_of::<RulesetAttr>(), 0u32) };
     if fd < 0 { return Err(io::Error::last_os_error()); }
     // SAFETY: a successful landlock_create_ruleset returns a new owned descriptor.
     let ruleset = unsafe { OwnedFd::from_raw_fd(fd as i32) };
-    for path in paths.iter().map(|p| (p.as_path(), EXECUTE | READ_FILE | READ_DIR)).chain(executables.iter().map(|p| (*p, EXECUTE | READ_FILE))) {
+    for path in paths.iter().map(|p| (p.as_path(), EXECUTE | READ_FILE | READ_DIR)).chain(executables.iter().map(|p| (*p, EXECUTE | READ_FILE))).chain(std::iter::once((scratch.as_path(), READ_FILE | READ_DIR))) {
         let canonical = path.0.canonicalize()?;
         if canonical.starts_with(&store) { return Err(io::Error::other("executable is in the store")); }
         let file = File::open(canonical)?;

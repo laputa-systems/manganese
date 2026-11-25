@@ -156,7 +156,10 @@ Run `make box BOX=<id>` for L0 or `make box BOX=<id> LANE=holdout` for L1.
 L0 loads seen blobs only, then applies Linux Landlock before invoking either
 adapter. The sandbox permits read and execution of the adapter binaries and
 runtime libraries but denies access to the blob store. L0 fails closed when
-Landlock is unavailable. L1 loads holdout blobs and runs the same oracle and
+Landlock is unavailable. Every adapter run, in every lane and in fuzzing, gets an empty private
+directory named by `GOLDENS_SCRATCH` under `.work/tmp/goldens-scratch/` for working files it writes
+and reads back, such as a database it reopens; L0 permits reading that tree, which never overlaps
+the store, and the runner removes it. L1 loads holdout blobs and runs the same oracle and
 candidate comparisons. Run `make box-fuzz BOX=<id>` for L1 differential
 fuzzing against the prebuilt oracle named by the spec. Build the harness beforehand. The lane starts one
 oracle and one candidate and sends each a stream of requests. `SEED` selects a

@@ -1,6 +1,7 @@
+use std::fs;
 use std::io::{ErrorKind, Read, Write};
 use std::os::unix::process::CommandExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread::JoinHandle;
@@ -53,6 +54,43 @@ pub fn parse_positive(key: &str, value: &str) -> Result<u64, String> {
     }
 }
 
+/// The private directory tree adapters may write and read back, such as a database an adapter opens
+/// and reopens. Each adapter run gets an empty subdirectory named by GOLDENS_SCRATCH; the tree is
+/// removed when the scratch is dropped.
+pub struct Scratch {
+    root: PathBuf,
+    next: u64,
+}
+
+impl Scratch {
+    pub fn create(label: &str) -> Result<Self, String> {
+        let root = Path::new(".work/tmp/goldens-scratch").join(format!("{label}-{}", std::process::id()));
+        match fs::remove_dir_all(&root) {
+            Err(e) if e.kind() != ErrorKind::NotFound => return Err(format!("clear {}: {e}", root.display())),
+            _ => {}
+        }
+        fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
+        let root = root.canonicalize().map_err(|e| format!("resolve {}: {e}", root.display()))?;
+        Ok(Self { root, next: 0 })
+    }
+
+    pub fn root(&self) -> &Path { &self.root }
+
+    pub fn fresh(&mut self) -> Result<PathBuf, String> {
+        self.next += 1;
+        let dir = self.root.join(self.next.to_string());
+        fs::create_dir(&dir).map_err(|e| format!("create {}: {e}", dir.display()))?;
+        Ok(dir)
+    }
+}
+
+impl Drop for Scratch {
+    fn drop(&mut self) {
+        // Scratch holds only adapter working files; a tree left behind is disposable .work/tmp content.
+        let _ = fs::remove_dir_all(&self.root);
+    }
+}
+
 enum Frame {
     Record(Vec<u8>),
     End,
@@ -76,8 +114,8 @@ pub struct Peer {
 }
 
 impl Peer {
-    pub fn start(program: &Path, args: &[String], label: &str, limits: Limits) -> Result<Self, String> {
-        let mut child = Command::new(program).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).process_group(0).spawn()
+    pub fn start(program: &Path, args: &[String], label: &str, limits: Limits, scratch: &Path) -> Result<Self, String> {
+        let mut child = Command::new(program).args(args).env("GOLDENS_SCRATCH", scratch).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).process_group(0).spawn()
             .map_err(|e| format!("{label} {}: {e}", program.display()))?;
         let (Some(mut stdin), Some(mut stdout), Some(mut stderr)) = (child.stdin.take(), child.stdout.take(), child.stderr.take()) else {
             kill_group(&child);
@@ -266,11 +304,11 @@ mod tests {
     fn an_echoing_peer_answers_and_exits_cleanly() {
         let dir = scratch("echo");
         let peer = script(&dir, "echo", "exec cat");
-        let mut session = Peer::start(&peer, &[], "echo", limits()).unwrap();
+        let mut session = Peer::start(&peer, &[], "echo", limits(), &dir).unwrap();
         assert_eq!(session.record(b"abc").unwrap(), b"abc");
         assert_eq!(session.record(b"").unwrap(), b"");
         session.finish().unwrap();
-        assert_eq!(Peer::start(&peer, &[], "echo", limits()).unwrap().exchange(b"one").unwrap(), b"one");
+        assert_eq!(Peer::start(&peer, &[], "echo", limits(), &dir).unwrap().exchange(b"one").unwrap(), b"one");
     }
 
     #[test]
@@ -278,7 +316,7 @@ mod tests {
         let dir = scratch("hang");
         let peer = script(&dir, "hang", "exec sleep 30");
         let started = Instant::now();
-        let error = Peer::start(&peer, &[], "hang", limits()).unwrap().exchange(b"x").unwrap_err();
+        let error = Peer::start(&peer, &[], "hang", limits(), &dir).unwrap().exchange(b"x").unwrap_err();
         assert!(error.contains("did not respond within"), "{error}");
         assert!(started.elapsed() < Duration::from_secs(10));
     }
@@ -287,7 +325,7 @@ mod tests {
     fn an_early_exiting_peer_is_reported_with_its_stderr() {
         let dir = scratch("exit");
         let peer = script(&dir, "exit", "echo broken >&2; exit 3");
-        let error = Peer::start(&peer, &[], "exit", limits()).unwrap().exchange(b"x").unwrap_err();
+        let error = Peer::start(&peer, &[], "exit", limits(), &dir).unwrap().exchange(b"x").unwrap_err();
         assert!(error.contains("exited before responding") && error.contains("broken"), "{error}");
     }
 
@@ -301,7 +339,7 @@ mod tests {
             ("budget", "printf MGB1; printf '\\000\\001\\000\\000'", "output budget"),
         ] {
             let peer = script(&dir, name, &format!("cat >/dev/null & {body}; wait"));
-            let error = Peer::start(&peer, &[], name, limits()).unwrap().exchange(b"x").unwrap_err();
+            let error = Peer::start(&peer, &[], name, limits(), &dir).unwrap().exchange(b"x").unwrap_err();
             assert!(error.contains(expected), "{name}: {error}");
         }
     }
@@ -310,8 +348,18 @@ mod tests {
     fn a_peer_writing_an_unrequested_record_fails_its_finish() {
         let dir = scratch("extra");
         let peer = script(&dir, "extra", "cat >/dev/null; printf 'MGB1\\000\\000\\000\\001a\\000\\000\\000\\001b'");
-        let error = Peer::start(&peer, &[], "extra", limits()).unwrap().exchange(b"x").unwrap_err();
+        let error = Peer::start(&peer, &[], "extra", limits(), &dir).unwrap().exchange(b"x").unwrap_err();
         assert!(error.contains("unrequested record"), "{error}");
+    }
+
+    #[test]
+    fn an_adapter_writes_and_reads_back_its_scratch() {
+        let dir = scratch("scratch");
+        let peer = script(&dir, "scratch", "printf state > \"$GOLDENS_SCRATCH/db\"; cat \"$GOLDENS_SCRATCH/db\" >&2; exec cat");
+        let work = dir.join("work");
+        std::fs::create_dir(&work).unwrap();
+        assert_eq!(Peer::start(&peer, &[], "scratch", limits(), &work).unwrap().exchange(b"x").unwrap(), b"x");
+        assert_eq!(std::fs::read(work.join("db")).unwrap(), b"state");
     }
 
     #[test]
