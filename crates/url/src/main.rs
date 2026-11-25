@@ -1,9 +1,11 @@
 use publicsuffix::{IcannList, List, Psl};
 use std::io::{self, Read, Write};
 use std::sync::OnceLock;
-use url_parser::{Origin, Url};
+use url_parser::{Host, Origin, Position, Url};
 
 mod file_url;
+mod filesystem_url;
+mod host;
 
 const SUFFIX_DATA: &[u8] = include_bytes!("effective_tld_names.dat");
 
@@ -22,9 +24,10 @@ fn suffix_lists() -> &'static SuffixLists {
 
 fn registrable_domain(host: &str, include_private: bool) -> Option<&str> {
     let ip = host.strip_prefix('[').and_then(|h| h.strip_suffix(']')).unwrap_or(host);
-    if host.is_empty() || ip.parse::<std::net::IpAddr>().is_ok() {
+    if host.is_empty() || ip.parse::<std::net::IpAddr>().is_ok() || matches!(Host::parse(host), Ok(Host::Ipv4(_) | Host::Ipv6(_))) {
         return None;
     }
+    if host.ends_with("..") { return None; }
     let host = host.trim_start_matches('.');
     if host.is_empty() {
         return None;
@@ -69,7 +72,38 @@ fn put_field(output: &mut Vec<u8>, value: Option<&str>) {
 
 fn parse(input: &str, base: Option<&str>) -> Result<Url, url_parser::ParseError> {
     match base {
-        Some(base) => Url::parse(base)?.join(input),
+        Some(base) => {
+            let mut base = Url::parse(base)?;
+            let count = input.chars().take_while(|c| *c == '/' || *c == '\\').count();
+            let special = matches!(base.scheme(), "http" | "https" | "ftp" | "ws" | "wss");
+            let mut marker = String::from("manganese-drive-");
+            while base.as_str().contains(&marker) || input.contains(&marker) { marker.push('x'); }
+            let mut marked = false;
+            let path = base.path().split('/').map(|part| {
+                let bytes = part.as_bytes();
+                if bytes.len() == 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' {
+                    marked = true;
+                    format!("{marker}{part}")
+                } else { part.to_owned() }
+            }).collect::<Vec<_>>().join("/");
+            if marked { base.set_path(&path); }
+            let mut result = if !special && input.starts_with('\\') && count == 1 {
+                base.join(&format!("/{}", &input[1..]))
+            } else if !special && input.starts_with('\\') {
+                Url::parse(&format!("{}:/{}", base.scheme(), input))
+            } else if count > 2 && special {
+                base.join(&format!("//{}", &input[count..]))
+            } else {
+                base.join(input)
+            }?;
+            if marked { result.set_path(&result.path().replace(&marker, "")); }
+            Ok(result)
+        }
+        None if input.get(..5).is_some_and(|s| s.eq_ignore_ascii_case("data:")) && input.contains('#') => {
+            let (head, fragment) = input.split_once('#').unwrap();
+            let fragment = fragment.replace('\t', "%09").replace('\n', "%0A").replace('\r', "%0D");
+            Url::parse(&format!("{head}#{fragment}"))
+        }
         None => Url::parse(input),
     }
 }
@@ -89,6 +123,19 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         trimmed.as_bytes()[..i].iter().all(|b| b.is_ascii_alphanumeric() || b"+-.".contains(b))
     });
     let file_base = base.is_some_and(|s| s.trim_matches(|c: char| c <= ' ').get(..5).is_some_and(|p| p.eq_ignore_ascii_case("file:")));
+    if trimmed.get(..11).is_some_and(|s| s.eq_ignore_ascii_case("filesystem:")) {
+        let value = match filesystem_url::parse(trimmed) {
+            Some(value) => value,
+            None => return Ok(vec![0]),
+        };
+        let mut output = vec![1, u8::from(value.opaque)];
+        for field in [Some(value.spec.as_str()), Some("filesystem"), Some(""), None, None, None,
+                      Some(value.path.as_str()), value.query.as_deref(), value.fragment.as_deref(), Some(value.origin.as_str()), None] {
+            put_field(&mut output, field);
+        }
+        output.push(2);
+        return Ok(output);
+    }
     if file_scheme || (file_base && !input_scheme) {
         let file = match file_url::parse(input, if file_base { base } else { None }) {
             Some(file) => file,
@@ -108,15 +155,36 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         output.push(match same { Some(true) => 1, Some(false) => 0, None => 2 });
         return Ok(output);
     }
-    let parsed = match parse(input, base) {
-        Ok(parsed) => parsed,
+    let (parsed, host_override) = match parse(input, base) {
+        Ok(parsed) => (parsed, None),
+        Err(_) if base.is_none_or(|value| Url::parse(value).is_ok()) => match host::parse(input) {
+            Some((parsed, host)) => (parsed, Some(host)),
+            None => return Ok(vec![0]),
+        },
         Err(_) => return Ok(vec![0]),
     };
+    if matches!(parsed.scheme(), "android" | "drivefs" | "chromeos-steam" | "steam" | "materialized-view") {
+        let path = &parsed[Position::AfterScheme..Position::AfterPath][1..];
+        let mut output = vec![1, 1];
+        for field in [Some(parsed.as_str()), Some(parsed.scheme()), Some(""), None, None, None,
+                      Some(path), parsed.query(), parsed.fragment(), Some("null"), None] {
+            put_field(&mut output, field);
+        }
+        output.push(2);
+        return Ok(output);
+    }
     let origin = parsed.origin();
-    let is_file = parsed.scheme() == "file";
-    let serialized_origin = if is_file { "file://".to_owned() } else { origin.ascii_serialization() };
+    let blob_inner = parsed.as_str().strip_prefix("blob:");
+    let blob_file = blob_inner.is_some_and(|inner| inner.starts_with("file:"));
+    let blob_nested = blob_inner.is_some_and(|inner| inner.starts_with("blob:"));
+    let serialized_origin = if blob_file { "file://".to_owned() } else if blob_nested { "null".to_owned() } else {
+        let value = origin.ascii_serialization().replace('*', "%2A");
+        if let Some(host) = &host_override { value.replace("manganese.invalid", host) } else { value }
+    };
     let port = parsed.port().map(|value| value.to_string());
-    let host = parsed.host_str();
+    let special = matches!(parsed.scheme(), "http" | "https" | "ftp" | "ws" | "wss");
+    let host_owned = host_override.or_else(|| parsed.host_str().map(|value| if special { value.replace('*', "%2A") } else { value.to_owned() }));
+    let host = host_owned.as_deref();
     let domain = host.and_then(|value| registrable_domain(value, include_private));
     let same = other.and_then(|value| Url::parse(value).ok()).and_then(|value| {
         let other_host = value.host_str()?;
@@ -125,9 +193,40 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         let b = registrable_domain(other_host, include_private).unwrap_or(other_host);
         Some(a == b)
     });
-    let mut output = vec![1, u8::from(!is_file && matches!(origin, Origin::Opaque(_)))];
-    for field in [Some(parsed.as_str()), Some(parsed.scheme()), Some(parsed.username()),
-                  parsed.password(), host, port.as_deref(), Some(parsed.path()), parsed.query(),
+    let username = parsed.username().replace('\'', "%27");
+    let password = parsed.password().map(|value| value.replace('\'', "%27"));
+    let path = if parsed.cannot_be_a_base() { parsed.path().to_owned() } else { parsed.path().replace('^', "%5E").replace('|', "%7C") };
+    let query = parsed.query().map(|value| value.replace('\'', "%27"));
+    let mut spec = String::new();
+    if parsed.has_authority() {
+        spec.push_str(&parsed[..Position::BeforeUsername]);
+        spec.push_str(&username);
+        spec.push_str(&parsed[Position::AfterUsername..Position::BeforeHost].replace('\'', "%27"));
+        if let Some(value) = host { spec.push_str(value); }
+        spec.push_str(&parsed[Position::AfterHost..Position::BeforePath]);
+    } else {
+        spec.push_str(&parsed[..Position::BeforePath]);
+    }
+    spec.push_str(&path);
+    if let Some(value) = &query { spec.push('?'); spec.push_str(value); }
+    if let Some(value) = parsed.fragment() { spec.push('#'); spec.push_str(value); }
+    if !input_scheme && !special {
+        if let Some(base_url) = base.and_then(|value| Url::parse(value).ok()) {
+            if base_url.scheme() == parsed.scheme() && base_url.host_str().is_some() && base_url.path().is_empty() {
+                spec = base_url.as_str().to_owned();
+                spec.push_str(&path);
+                if let Some(value) = &query { spec.push('?'); spec.push_str(value); }
+                if let Some(value) = parsed.fragment() { spec.push('#'); spec.push_str(value); }
+            } else if input.starts_with(['?', '#']) && base_url.host_str().is_none() && base_url.path().starts_with("//") && path.starts_with("//") {
+                spec = format!("{}:{path}", parsed.scheme());
+                if let Some(value) = &query { spec.push('?'); spec.push_str(value); }
+                if let Some(value) = parsed.fragment() { spec.push('#'); spec.push_str(value); }
+            }
+        }
+    }
+    let mut output = vec![1, u8::from(!blob_file && (blob_nested || matches!(origin, Origin::Opaque(_))))];
+    for field in [Some(spec.as_str()), Some(parsed.scheme()), Some(username.as_str()),
+                  password.as_deref(), host, port.as_deref(), Some(path.as_str()), query.as_deref(),
                   parsed.fragment(), Some(serialized_origin.as_str()), domain] {
         put_field(&mut output, field);
     }
@@ -172,6 +271,7 @@ mod tests {
             ("a.b.ck", true, Some("a.b.ck")),
             ("www.ck", true, Some("www.ck")),
             ("127.0.0.1", true, None),
+            ("127.1", true, None),
             ("[::1]", true, None),
             ("..www.example.com.", true, Some("example.com.")),
             ("...", true, None),
@@ -209,5 +309,56 @@ mod tests {
         let mut fields = &response[2..];
         let values: Vec<_> = (0..11).map(|_| take_field(&mut fields).unwrap()).collect();
         assert_eq!(values[9], Some("file://"));
+    }
+
+    #[test]
+    fn wpt_974_opaque_android_scheme_keeps_authority_in_path() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("android://x:0/a"));
+        put_field(&mut request, None);
+        put_field(&mut request, None);
+        request.push(0);
+        let response = respond(&request).unwrap();
+        let mut fields = &response[2..];
+        let values: Vec<_> = (0..11).map(|_| take_field(&mut fields).unwrap()).collect();
+        assert_eq!(values[4], None);
+        assert_eq!(values[5], None);
+        assert_eq!(values[6], Some("//x:0/a"));
+    }
+
+    fn spec(input: &str, base: Option<&str>) -> String {
+        let mut request = Vec::new();
+        put_field(&mut request, Some(input));
+        put_field(&mut request, base);
+        put_field(&mut request, None);
+        request.push(0);
+        let response = respond(&request).unwrap();
+        assert_eq!(response[0], 1);
+        take_field(&mut &response[2..]).unwrap().unwrap().to_owned()
+    }
+
+    #[test]
+    fn wpt_1008_non_special_single_backslash_keeps_host() {
+        assert_eq!(spec("\\a", Some("foo://foo/a")), "foo://foo/a");
+    }
+
+    #[test]
+    fn wpt_1009_non_special_two_slashes_become_path() {
+        assert_eq!(spec("\\/a", Some("foo://foo/a")), "foo:/\\/a");
+    }
+
+    #[test]
+    fn wpt_1017_empty_non_special_base_path_retains_spec_prefix() {
+        assert_eq!(spec("?q2", Some("git://host?q#r")), "git://host?q#r?q2");
+    }
+
+    #[test]
+    fn wpt_769_non_special_double_slash_path_stays_unambiguous() {
+        assert_eq!(spec("path", Some("non-spec:/..//p")), "non-spec:/.//path");
+    }
+
+    #[test]
+    fn wpt_853_userinfo_apostrophe_is_escaped() {
+        assert_eq!(spec("wss://a'b@host/", None), "wss://a%27b@host/");
     }
 }

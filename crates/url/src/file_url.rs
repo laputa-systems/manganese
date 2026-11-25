@@ -50,18 +50,31 @@ fn absolute(input: &str) -> Option<FileUrl> {
     let count = tail.chars().take_while(|c| slash(*c)).count();
     let rest = &tail[count..];
     let (authority, path, has_host) = if count == 2 {
-        let end = rest.find(|c| slash(c) || c == '?' || c == '#').unwrap_or(rest.len());
+        let end = rest.find(slash).unwrap_or(rest.len());
         let host = &rest[..end];
-        if host.contains('@') || (host.contains(':') && !host.starts_with('[')) { return None; }
+        if host.contains(['@', '?', '#']) || (host.contains(':') && !host.starts_with('[')) { return None; }
         (if host.is_empty() { "manganese.invalid" } else { host }, &rest[end..], !host.is_empty())
     } else {
         ("manganese.invalid", if count > 0 { &tail[count - 1..] } else { tail }, false)
     };
     let path = path_input(path);
     let path = if path.starts_with('/') || path.starts_with('?') || path.starts_with('#') || path.is_empty() { path } else { format!("/{path}") };
-    let url = Url::parse(&format!("http://{authority}{path}")).ok()?;
+    let raw = format!("http://{authority}{path}");
+    let (url, host_override) = match Url::parse(&raw) {
+        Ok(url) => (url, None),
+        Err(_) if has_host => {
+            let (url, host) = crate::host::parse(&raw)?;
+            (url, Some(host))
+        }
+        Err(_) => return None,
+    };
     if url.username() != "" || url.password().is_some() || url.port().is_some() { return None; }
-    Some(from_http(url, has_host))
+    let mut file = from_http(url, has_host);
+    if let Some(host) = host_override {
+        file.spec = file.spec.replacen("manganese.invalid", &host, 1);
+        file.host = Some(host);
+    }
+    Some(file)
 }
 
 pub fn parse(input: &str, base: Option<&str>) -> Option<FileUrl> {
@@ -100,6 +113,9 @@ pub fn parse(input: &str, base: Option<&str>) -> Option<FileUrl> {
             file.path = format!("/{rest}");
             file.spec = file.spec.replacen(&prefix, "/", 1);
         }
+        if file.host.is_none() && file.path.starts_with("//") {
+            file.spec.insert_str("file://".len(), "/.");
+        }
         Some(file)
     } else if has_scheme { absolute(input) } else { None }
 }
@@ -136,5 +152,22 @@ mod tests {
     #[test]
     fn wpt_672_file_same_scheme_drive_keeps_host() {
         assert_eq!(parse("file:C:/", Some("file://host/")).unwrap().spec, "file://host/C:/");
+    }
+
+    #[test]
+    fn wpt_843_file_ascii_host_is_not_revalidated_as_idna() {
+        assert_eq!(parse("file://xn--/p", None).unwrap().spec, "file://xn--/p");
+    }
+
+    #[test]
+    fn file_relative_double_slash_path_is_disambiguated() {
+        let value = parse("..//", Some("file:///tmp/a")).unwrap();
+        assert_eq!(value.path, "//");
+        assert_eq!(value.spec, "file:///.//");
+    }
+
+    #[test]
+    fn file_host_without_path_cannot_contain_query() {
+        assert!(parse("file://example.com?x", None).is_none());
     }
 }
