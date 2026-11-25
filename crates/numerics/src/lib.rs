@@ -81,7 +81,17 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, shortest, ShortestStyle};
+    use super::{fixed, parse_double, shortest, ShortestStyle};
+
+    #[test]
+    fn parse_reports_prefix_and_saturation() {
+        assert_eq!(parse_double(b"  -1.25e+2junk"), (-125.0, 10));
+        assert_eq!(parse_double(b"1e+"), (1.0, 1));
+        assert_eq!(parse_double(b"- 1"), (0.0, 0));
+        assert_eq!(parse_double(b"  "), (0.0, 2));
+        assert_eq!(parse_double(b"1e999"), (f64::INFINITY, 5));
+        assert_eq!(parse_double(b"-0").0.to_bits(), (-0.0f64).to_bits());
+    }
 
     #[test]
     fn fixed_rounds_exact_values_away_from_zero() {
@@ -155,4 +165,30 @@ pub fn fixed(value: f64, places: usize) -> Option<String> {
         if index == places && places > 0 { result.push('.'); }
     }
     Some(result)
+}
+
+pub fn parse_double(input: &[u8]) -> (f64, usize) {
+    let mut cursor = 0;
+    while cursor < input.len() && matches!(input[cursor], b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c) { cursor += 1; }
+    if cursor == input.len() { return (0.0, cursor); }
+    let number_start = cursor;
+    if matches!(input[cursor], b'+' | b'-') { cursor += 1; }
+    let mut digits = 0;
+    while cursor < input.len() && input[cursor].is_ascii_digit() { cursor += 1; digits += 1; }
+    if cursor < input.len() && input[cursor] == b'.' {
+        cursor += 1;
+        while cursor < input.len() && input[cursor].is_ascii_digit() { cursor += 1; digits += 1; }
+    }
+    if digits == 0 { return (0.0, 0); }
+    if cursor < input.len() && matches!(input[cursor], b'e' | b'E') {
+        let exponent_start = cursor;
+        cursor += 1;
+        if cursor < input.len() && matches!(input[cursor], b'+' | b'-') { cursor += 1; }
+        let first_digit = cursor;
+        while cursor < input.len() && input[cursor].is_ascii_digit() { cursor += 1; }
+        if cursor == first_digit { cursor = exponent_start; }
+    }
+    let decimal = std::str::from_utf8(&input[number_start..cursor]).expect("decimal grammar is ASCII");
+    let value = decimal.parse::<f64>().expect("decimal grammar is valid");
+    (value, cursor)
 }

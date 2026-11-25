@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, shortest, ShortestStyle};
+use numerics::{fixed, parse_double, shortest, ShortestStyle};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -17,9 +17,18 @@ fn main() -> io::Result<()> {
             _ => unreachable!(),
         }
         let length = u32::from_be_bytes(length) as usize;
-        if length != 11 { return Err(io::ErrorKind::InvalidData.into()); }
-        let mut request = [0; 11];
+        if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
+        let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 5 {
+            let (value, consumed) = parse_double(&request[1..]);
+            output.write_all(&12_u32.to_be_bytes())?;
+            output.write_all(&(consumed as u32).to_be_bytes())?;
+            output.write_all(&value.to_bits().to_be_bytes())?;
+            output.flush()?;
+            continue;
+        }
+        if length != 11 { return Err(io::ErrorKind::InvalidData.into()); }
         let bits = u64::from_be_bytes(request[1..9].try_into().unwrap());
         let number = f64::from_bits(bits);
         let places = u16::from_be_bytes(request[9..11].try_into().unwrap());
