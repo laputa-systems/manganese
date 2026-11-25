@@ -6,12 +6,13 @@ This is the single plan for this repository: all current and future work, and th
 
 - **State:** active, M0 and M1 in progress.
 - **Campaign:** [Manganese](#campaign-manganese).
-- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m1-zlib`, `m0-workloads`, `m1-source-oracle`, `m0-abi`, `m0-cdp-trace`.
-- **In progress:** `m1-oracle-equivalence` (`make oracle-equivalence` against the rebuild, log in `.work/tmp/equivalence.log`).
+- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m1-zlib`, `m0-workloads`, `m1-source-oracle`, `m0-abi`, `m0-cdp-trace`, `m1-oracle-equivalence`. M0 and M1 are complete.
+- **In progress:** none.
 - **Red or parked:** none.
 - **Owned-project branches awaiting push (N7):** zlib-rs `manganese/chromium-deflate` (cf79d59), vendored under `vendor/zlib-rs/`.
 - **Source oracle rebuild:** `.work/oracle/artifacts/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz`, sha256 `3a3b1863af0cdb8f663cfdfc7c9733674b6c536c8cb828930fd6a7f3aacb98d4` (capture series `9535972e6a8a`), built in its work volume `manganese-oracle-work-amd64`; it is regenerable with `oracle/source-oracle`, not published.
-- **Next:** record `m1-oracle-equivalence` when `make oracle-equivalence REBUILD=.work/oracle/artifacts/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz` reports zero discrepancies; M2 leaf boxes follow.
+- **Next:** M2 leaf boxes, in parallel lanes, starting with the boxes whose oracle harness links objects the source oracle already built (as `m1-zlib` does): `brotli`, `zstd`, `checksums`, `png`.
+- **Capture hooks:** the M1 capture series is build tooling only (kache as compiler and rustc wrapper); it carries no runtime hook, so the rebuild is the capture build and the hooks-enabled versus hooks-disabled comparison of U17 first has content with the M2 hook batch.
 - **Repeatability rule for observed inventories:** the ABI census and the CDP trace record the workloads twice per invocation and freeze the union, listing items not seen in both runs (`abi/x86_64-unstable.txt`, `cdp/unstable.tsv`); timing decides a few epoll and futex flag combinations and whether `Inspector.targetCrashed` arrives before teardown.
 - **Oracle findings that later slices depend on:** a download with the default behavior is canceled (target confirmation with no file chooser); agent-browser cannot download over `--cdp`; `chrome.downloads.download` ignores the requested file name (saves `download.txt`); `/json/protocol` kills the oracle on the first request on native Linux (7.3 reports it as the expected defect); x86_64 WebGL exists only headed (ANGLE on SwiftShader Vulkan); XSLT and speculation rules are exposed, so those cuts are not compatible.
 - **Frozen archives:** both architectures' package revision 2 archives and sidecars are published by digest (`oracle/frozen/artifacts.lock`).
