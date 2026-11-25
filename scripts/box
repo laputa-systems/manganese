@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+box=${1:?usage: scripts/box BOX [seen|holdout|ratchet]}
+mode=${2:-seen}
+case $box in *[!a-z0-9_-]*|'') echo "invalid box id" >&2; exit 2 ;; esac
+mkdir -p .work/tmp
+TMPDIR=$root/.work/tmp
+CARGO_TARGET_DIR=$root/.work/tmp/target
+RUSTC_WRAPPER=kache
+export TMPDIR CARGO_TARGET_DIR RUSTC_WRAPPER
+cargo build --locked --offline --target x86_64-unknown-linux-musl -p goldens
+runner=$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/goldens
+if [ "$box" = selftest ]; then
+    cargo build --locked --offline --target x86_64-unknown-linux-musl -p selftest --bins
+    CARGO_TARGET_DIR=$root/.work/tmp/target-oracle cargo build --locked --offline --target x86_64-unknown-linux-musl --manifest-path boxes/selftest/Cargo.toml
+    if [ "$mode" = seen ]; then exec "$runner" selftest; fi
+else
+    cargo build --locked --offline --target x86_64-unknown-linux-musl -p "$box"
+fi
+case $mode in
+    seen|holdout) exec "$runner" run "$box" "$mode" ;;
+    ratchet) exec "$runner" run "$box" seen --ratchet ;;
+    *) echo "unknown box mode: $mode" >&2; exit 2 ;;
+esac
