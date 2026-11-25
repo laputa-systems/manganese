@@ -10,12 +10,14 @@ readiness, sandbox and shutdown roles (probe.py). Writes a JSON report and exits
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -98,6 +100,30 @@ def verify(archive: Archive, run_dir: Path) -> tuple[Path, dict[str, object]]:
     result = run(["python3", "-B", str(VERIFIER), "--archive", str(archive.path), "--verify-extract", str(destination)])
     clause = {"ok": result.returncode == 0, "returncode": result.returncode, "stderr": result.stderr.strip()}
     return destination, clause
+
+
+def verified_root(archive: Archive) -> Path:
+    """The archive's verified extraction, shared by every session of the same archive digest.
+
+    Each extraction is about 1 GB, so harnesses that open many sessions reuse one per digest under
+    .work/tmp/browser-roots instead of extracting into every run directory. Sessions mount it read-only.
+    """
+    digest = hashlib.sha256(archive.path.read_bytes()).hexdigest()
+    cache = ROOT / ".work/tmp/browser-roots" / digest
+    if (cache / "verified").is_file():
+        return cache / "browser"
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f".{digest}.", dir=cache.parent))
+    root, clause = verify(archive, staging)
+    if not clause["ok"]:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise LaunchError(f"the frozen verifier rejected {archive.path.name}: {clause['stderr']}")
+    (staging / "verified").write_text(json.dumps(clause) + "\n", encoding="utf-8")
+    try:
+        staging.rename(cache)
+    except OSError:
+        shutil.rmtree(staging, ignore_errors=True)
+    return cache / "browser"
 
 
 def ensure_probe_image() -> None:
@@ -384,9 +410,7 @@ def resolve_archive(run_dir: Path, arch: str, archive: Path | None, frozen: str 
 
 def open_session(run_dir: Path, archive: Archive) -> Session:
     """Verify and extract ARCHIVE (1.7) and start its container; raises LaunchError if verification fails."""
-    browser_root, verified = verify(archive, run_dir)
-    if not verified["ok"]:
-        raise LaunchError(f"the frozen verifier rejected {archive.path.name}: {verified['stderr']}")
+    browser_root = verified_root(archive)
     ensure_probe_image()
     return Session(run_dir, browser_root, f"manganese-{run_dir.parent.name}-{os.getpid()}")
 
