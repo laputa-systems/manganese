@@ -8,6 +8,7 @@
 #                                      qualify-package.py into .work/oracle/artifacts
 #   oracle/source-oracle kache-report  classify the kache events of the last build; fails when over 1% of its
 #                                      C/C++ compiles were not cached
+#   oracle/source-oracle image-tag     print the builder image tag for the current series and kache lock
 #   oracle/source-oracle kache         build the kache commit in oracle/capture/kache.lock from KACHE_REPO
 #                                      (default ~/repos/kache) into the artifact store
 set -eu
@@ -132,11 +133,11 @@ export_archive() {
     printf '%s\n' "$digest" > "$artifacts/capture-series"
 }
 
-[ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | kache | PHASE..."
-if [ "$1" = kache ]; then
-    build_kache
-    exit 0
-fi
+[ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | kache | image-tag | PHASE..."
+case $1 in
+    kache) build_kache; exit 0 ;;
+    image-tag) printf '%s\n' "$CHROMIUM_BUILDER_IMAGE"; exit 0 ;;
+esac
 make_tree
 [ "$1" = tree ] && exit 0
 for phase in "$@"; do
