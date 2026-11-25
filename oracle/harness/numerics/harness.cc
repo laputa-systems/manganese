@@ -7,6 +7,7 @@
 #include "base/strings/string_number_conversions_internal.h"
 #include "base/strings/string_util_impl_helpers.h"
 #include "base/strings/utf_string_conversion_utils.h"
+#include "base/strings/utf_string_conversions.h"
 #include "third_party/blink/renderer/platform/wtf/dtoa.h"
 #include <optional>
 #include <string>
@@ -18,6 +19,7 @@
 #undef private
 
 struct JsonNumber { unsigned char tag; unsigned char size; unsigned char data[8]; };
+extern "C" size_t css_format(double value, char* output);
 extern "C" JsonNumber json_number(const unsigned char* input, uint32_t len);
 
 using double_conversion::DoubleToStringConverter;
@@ -74,6 +76,52 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 17) {
+      std::u16string text;
+      bool success = base::UTF8ToUTF16(reinterpret_cast<const char*>(input + 1), length - 1, &text);
+      output[0] = success;
+      out_len = 1 + text.size() * 2;
+      for (size_t i = 0; i < text.size(); ++i) { output[1 + 2 * i] = text[i] >> 8; output[2 + 2 * i] = text[i]; }
+    } else if (input[0] == 18 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + 2 * i]) << 8) | input[2 + 2 * i];
+      std::string text;
+      bool success = base::UTF16ToUTF8(units, count, &text);
+      output[0] = success;
+      out_len = 1 + text.size();
+      memcpy(output + 1, text.data(), text.size());
+      free(units);
+    } else if ((input[0] == 15 || input[0] == 16) && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      if (input[0] == 15) {
+        if (input[9] || input[10]) return 1;
+        out_len = css_format(value, reinterpret_cast<char*>(output));
+      } else {
+        unsigned mode = input[9];
+        unsigned digits = input[10];
+        if (mode > 3 || digits > 20) return 1;
+        if (mode == 3) {
+          int count = snprintf(reinterpret_cast<char*>(output), sizeof(output), "%.*f", int(digits), value);
+          if (count < 0 || size_t(count) >= sizeof(output)) return 1;
+          out_len = count;
+        } else {
+          int flags = DoubleToStringConverter::EMIT_POSITIVE_EXPONENT_SIGN;
+          if (mode < 2) flags |= DoubleToStringConverter::NO_TRAILING_ZERO;
+          DoubleToStringConverter converter(flags, "inf", "nan", 'e', -4, 12, 6, 0, 2);
+          char text[1024];
+          StringBuilder builder(text, sizeof(text));
+          bool success = mode == 0 ? converter.ToShortest(value, &builder) : mode == 1 ? converter.ToPrecision(value, digits ? digits : 1, &builder) : converter.ToExponential(value, digits, &builder);
+          if (!success) return 1;
+          out_len = builder.position();
+          memcpy(output, text, out_len);
+          builder.Finalize();
+        }
+      }
     } else if (input[0] == 14 && length % 2 == 1) {
       size_t count = (length - 1) / 2;
       auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));

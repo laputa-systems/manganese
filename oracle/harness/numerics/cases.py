@@ -61,10 +61,27 @@ def generate_blink_wide(rng: random.Random) -> bytes:
     return b'\x0e' + b''.join(struct.pack('>H', unit) for unit in units)
 
 
+def generate_format(rng: random.Random) -> bytes:
+    bits = rng.choice((rng.getrandbits(64), rng.choice((0, 1, 0x8000000000000000, 0x7ff0000000000000, 0xfff0000000000000, 0xfff8000000000000))))
+    if rng.randrange(2): return struct.pack('>BQBB', 15, bits, 0, 0)
+    return struct.pack('>BQBB', 16, bits, rng.randrange(4), rng.randrange(21))
+
+
+def generate_base_utf(rng: random.Random) -> bytes:
+    if rng.randrange(2):
+        if rng.randrange(2): data = rng.randbytes(rng.randrange(100))
+        else: data = ''.join(chr(rng.choice((rng.randrange(0xd800), rng.randrange(0xe000, 0x110000)))) for _ in range(rng.randrange(30))).encode()
+        return b'\x11' + data
+    units = [rng.randrange(65536) for _ in range(rng.randrange(100))]
+    return b'\x12' + b''.join(struct.pack('>H', unit) for unit in units)
+
+
 def generate(rng: random.Random) -> bytes:
-    selected = rng.randrange(9)
+    selected = rng.randrange(11)
     if selected == 0: return generate_blink(rng)
     if selected == 1: return generate_json(rng)
     if selected == 2: return generate_json_writer(rng)
     if selected == 3: return generate_blink_wide(rng)
+    if selected == 4: return generate_format(rng)
+    if selected == 5: return generate_base_utf(rng)
     return generate_base(rng)

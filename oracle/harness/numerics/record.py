@@ -4,7 +4,7 @@ import pathlib
 import random
 import struct
 import subprocess
-from cases import generate_base, generate_blink, generate_json, generate_json_writer, generate_blink_wide
+from cases import generate_base, generate_blink, generate_json, generate_json_writer, generate_blink_wide, generate_format, generate_base_utf
 
 root = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(root)
@@ -93,6 +93,26 @@ for lane, seed in [('seen', 88101), ('holdout', 88102)]:
     count = 0
     while count < 500:
         count += add(lane, generate_blink_wide(rng))
+for lane, seed in [('seen', 99101), ('holdout', 99102)]:
+    rng = random.Random(seed)
+    for value in (0.0, 1.0, 1e-6, 1e-5, 123456.5, 123457.5, 1e12, 1e20):
+        value = -value if lane == 'holdout' else value
+        bits = struct.unpack('>Q', struct.pack('>d', value))[0]
+        add(lane, struct.pack('>BQBB', 15, bits, 0, 0))
+        for mode in range(4):
+            for digits in (0, 2, 6, 20): add(lane, struct.pack('>BQBB', 16, bits, mode, digits))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_format(rng))
+for lane, seed in [('seen', 101101), ('holdout', 101102)]:
+    rng = random.Random(seed)
+    malformed = [b'\x80', b'\xc0\x80', b'\xe0\x80\x80', b'\xed\xa0\x80', b'\xf0\x80\x80\x80', b'\xf4\x90\x80\x80', b'\xf5\x80\x80\x80', b'\xe2\x82', b'\xef\xb7\x90', b'\xef\xbf\xbe']
+    for data in malformed: add(lane, b'\x11' + (b'A' if lane == 'seen' else b'B') + data)
+    for units in ([0xd800], [0xdc00], [0xd800, 0x41], [0xdc00, 0xd800], [0xd83d, 0xde00], [0, 0xffff]):
+        add(lane, b'\x12' + struct.pack('>H', 65 if lane == 'seen' else 66) + b''.join(struct.pack('>H', unit) for unit in units))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_base_utf(rng))
 proc.stdin.close()
 if proc.wait(): raise SystemExit('oracle failed')
 lock = pathlib.Path('goldens.lock')

@@ -81,7 +81,26 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn base_transcoding_replaces_invalid_units_and_reports_failure() {
+        let (units, valid) = base_utf8_to_utf16(&[0xe2, 0x82]);
+        assert_eq!((units, valid), (vec![0xfffd], false));
+        let (text, valid) = base_utf16_to_utf8(&[0xd800, 0x41, 0xdc00]);
+        assert_eq!((text.as_str(), valid), ("�A�", false));
+    }
+
+    #[test]
+    fn css_and_blink_general_use_distinct_halfway_rounding() {
+        assert_eq!(css_number(123456.5), "123456");
+        assert_eq!(blink_format(123456.5, BlinkFormat::General(6)), "123457");
+        assert_eq!(blink_format(1e-5, BlinkFormat::Shortest), "1e-05");
+        assert_eq!(blink_format(-0.0, BlinkFormat::Fixed(2)), "-0.00");
+        let negative_nan = f64::from_bits(0xfff6a3fa7c9f62d9);
+        assert_eq!(blink_format(negative_nan, BlinkFormat::Fixed(3)), "-nan");
+        assert_eq!(blink_format(negative_nan, BlinkFormat::General(6)), "nan");
+    }
 
     #[test]
     fn json_writer_preserves_or_omits_double_type() {
@@ -267,6 +286,10 @@ pub enum PrecisionStyle {
 }
 
 pub fn precision(value: f64, count: usize, style: PrecisionStyle) -> Option<String> {
+    significant(value, count, style, false)
+}
+
+fn significant(value: f64, count: usize, style: PrecisionStyle, css: bool) -> Option<String> {
     let exponential = matches!(style, PrecisionStyle::Exponential);
     if !value.is_finite() { return shortest(value, ShortestStyle::EcmaScript); }
     if count == 0 || count > 121 || (!exponential && count > 120) { return None; }
@@ -274,7 +297,8 @@ pub fn precision(value: f64, count: usize, style: PrecisionStyle) -> Option<Stri
     let mut point = digits.len() as i32 - scale as i32;
     if digits.len() > count {
         let drop = digits.len() - count;
-        let round = digits[drop - 1] >= 5;
+        let first = digits[drop - 1];
+        let round = first > 5 || (first == 5 && (!css || digits[..drop - 1].iter().any(|&digit| digit != 0) || digits[drop] % 2 == 1));
         digits.drain(..drop);
         if round {
             let mut carry = 1;
@@ -293,7 +317,7 @@ pub fn precision(value: f64, count: usize, style: PrecisionStyle) -> Option<Stri
     let text: String = digits.iter().rev().map(|digit| char::from(b'0' + *digit)).collect();
     let mut result = String::new();
     if value.is_sign_negative() && value != 0.0 { result.push('-'); }
-    if exponential || 1 - point > 6 || point > count as i32 {
+    if exponential || (if css { point - 1 < -4 || point - 1 >= count as i32 } else { 1 - point > 6 || point > count as i32 }) {
         result.push(text.as_bytes()[0] as char);
         if count > 1 { result.push('.'); result.push_str(&text[1..]); }
         result.push('e');
@@ -488,4 +512,67 @@ pub fn write_json_double(value: f64, style: JsonDoubleStyle) -> String {
     if result.starts_with('.') { result.insert(0, '0'); }
     else if result.starts_with("-.") { result.insert(1, '0'); }
     result
+}
+
+fn trim_fraction(text: &mut String) {
+    let end = text.find('e').unwrap_or(text.len());
+    if let Some(point) = text[..end].find('.') {
+        let mut last = end;
+        while last > point + 1 && text.as_bytes()[last - 1] == b'0' { last -= 1; }
+        if last == point + 1 { last = point; }
+        text.replace_range(last..end, "");
+    }
+}
+
+fn pad_exponent(text: &mut String) {
+    if let Some(position) = text.find('e') {
+        let digit = position + 2;
+        if text.len() - digit < 2 { text.insert(digit, '0'); }
+    }
+}
+
+pub fn css_number(value: f64) -> String {
+    if value.is_nan() { return "NaN".into(); }
+    if value == f64::INFINITY { return "infinity".into(); }
+    if value == f64::NEG_INFINITY { return "-infinity".into(); }
+    let mut text = significant(value, 6, PrecisionStyle::Precision, true).expect("valid CSS precision");
+    if value == 0.0 && value.is_sign_negative() { text.insert(0, '-'); }
+    trim_fraction(&mut text);
+    pad_exponent(&mut text);
+    text
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum BlinkFormat { Shortest, General(usize), Exponential(usize), Fixed(usize) }
+
+pub fn blink_format(value: f64, mode: BlinkFormat) -> String {
+    if value.is_nan() {
+        return if matches!(mode, BlinkFormat::Fixed(_)) && value.is_sign_negative() { "-nan" } else { "nan" }.into();
+    }
+    if value == f64::INFINITY { return "inf".into(); }
+    if value == f64::NEG_INFINITY { return "-inf".into(); }
+    let mut text = match mode {
+        BlinkFormat::Shortest => {
+            let exponent = shortest_exponential(value).split_once('e').expect("finite exponential").1.parse::<i32>().expect("decimal exponent");
+            if (-6..-4).contains(&exponent) { shortest_exponential(value) }
+            else { shortest(value, ShortestStyle::Base).expect("finite value") }
+        }
+        BlinkFormat::General(digits) => precision(value, digits.max(1), PrecisionStyle::Precision).expect("valid precision"),
+        BlinkFormat::Exponential(digits) => precision(value, digits + 1, PrecisionStyle::Exponential).expect("valid precision"),
+        BlinkFormat::Fixed(digits) => format!("{value:.digits$}"),
+    };
+    if value == 0.0 && value.is_sign_negative() && !text.starts_with('-') { text.insert(0, '-'); }
+    if matches!(mode, BlinkFormat::General(_)) { trim_fraction(&mut text); }
+    if !matches!(mode, BlinkFormat::Fixed(_)) { pad_exponent(&mut text); }
+    text
+}
+
+pub fn base_utf8_to_utf16(input: &[u8]) -> (Vec<u16>, bool) {
+    let valid = std::str::from_utf8(input).is_ok();
+    (String::from_utf8_lossy(input).encode_utf16().collect(), valid)
+}
+
+pub fn base_utf16_to_utf8(input: &[u16]) -> (String, bool) {
+    let valid = std::char::decode_utf16(input.iter().copied()).all(|value| value.is_ok());
+    (String::from_utf16_lossy(input), valid)
 }

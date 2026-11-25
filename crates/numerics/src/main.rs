@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,46 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 17 {
+            let (text, valid) = base_utf8_to_utf16(&request[1..]);
+            output.write_all(&((1 + text.len() * 2) as u32).to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            for unit in text { output.write_all(&unit.to_be_bytes())?; }
+            output.flush()?;
+            continue;
+        }
+        if request[0] == 18 && length % 2 == 1 {
+            let units: Vec<u16> = request[1..].chunks_exact(2).map(|pair| u16::from_be_bytes([pair[0], pair[1]])).collect();
+            let (text, valid) = base_utf16_to_utf8(&units);
+            output.write_all(&((1 + text.len()) as u32).to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(text.as_bytes())?;
+            output.flush()?;
+            continue;
+        }
+        if matches!(request[0], 15 | 16) && length == 11 {
+            let bits = u64::from_be_bytes(request[1..9].try_into().unwrap());
+            let value = f64::from_bits(bits);
+            let text = if request[0] == 15 {
+                if request[9] != 0 || request[10] != 0 { return Err(io::ErrorKind::InvalidData.into()); }
+                css_number(value)
+            } else {
+                let digits = usize::from(request[10]);
+                if digits > 20 { return Err(io::ErrorKind::InvalidData.into()); }
+                let mode = match request[9] {
+                    0 => BlinkFormat::Shortest,
+                    1 => BlinkFormat::General(digits),
+                    2 => BlinkFormat::Exponential(digits),
+                    3 => BlinkFormat::Fixed(digits),
+                    _ => return Err(io::ErrorKind::InvalidData.into()),
+                };
+                blink_format(value, mode)
+            };
+            output.write_all(&(text.len() as u32).to_be_bytes())?;
+            output.write_all(text.as_bytes())?;
+            output.flush()?;
+            continue;
+        }
         if request[0] == 14 && length % 2 == 1 {
             let chars: Vec<u8> = request[1..].chunks_exact(2).map(|pair| {
                 let value = u16::from_be_bytes([pair[0], pair[1]]);
