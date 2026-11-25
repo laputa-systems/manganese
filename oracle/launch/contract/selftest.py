@@ -120,6 +120,10 @@ class NegativeControls(unittest.TestCase):
         self.assertTrue(checks.protocol(True, False, True))
         self.assertFalse(checks.protocol(False, False, True))
         self.assertFalse(checks.protocol(True, False, False))
+        self.assertTrue(checks.hydrogen_revision('chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz'))
+        self.assertFalse(checks.hydrogen_revision('chromium-156.0.8078.79-r100-linux-aarch64-musl.tar.xz'))
+        with self.assertRaises(ValueError):
+            checks.hydrogen_revision('helium-0.1-r2-linux-x86_64-musl.tar.xz')
 
     def test_native(self):
         observed = {'methods':['m'], 'events':['e'], 'stable':True, 'screenshot_bytes':1}

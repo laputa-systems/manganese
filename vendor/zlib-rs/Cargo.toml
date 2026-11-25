@@ -1,0 +1,20 @@
+[package]
+name = "zlib-rs"
+version = "0.6.8"
+edition = "2021"
+license = "Zlib"
+
+[features]
+default = ["std"]
+std = ["rust-allocator"]
+rust-allocator = []
+c-allocator = []
+__internal-fuzz = []
+__internal-fuzz-disable-checksum = []
+__internal-test = []
+__internal-api = []
+ZLIB_DEBUG = []
+vpclmulqdq = []
+avx512 = ["vpclmulqdq"]
+lsx = []
+chromium-compat = []

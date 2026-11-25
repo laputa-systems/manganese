@@ -1,0 +1,183 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "fonts"
+  },
+  "mode": "headless",
+  "result": {
+    "availability": {
+      "Arial": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "Courier New": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "Helvetica": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "Noto Sans": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "Noto Sans Math": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans Math"
+        ],
+        "width": 260.2783508300781
+      },
+      "Noto Sans Mono": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans Mono",
+          "monospace"
+        ],
+        "width": 285.3340759277344
+      },
+      "Noto Sans Symbols": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans Symbols"
+        ],
+        "width": 260.08038330078125
+      },
+      "Noto Sans Symbols 2": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans Symbols 2"
+        ],
+        "width": 298.27618408203125
+      },
+      "Noto Serif": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Serif",
+          "serif"
+        ],
+        "width": 259.702392578125
+      },
+      "Noto Serif Display": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Serif Display"
+        ],
+        "width": 257.182373046875
+      },
+      "Times New Roman": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "monospace": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans Mono",
+          "monospace"
+        ],
+        "width": 285.3340759277344
+      },
+      "nonexistent-persona-font": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "sans-serif": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Sans",
+          "sans-serif",
+          "Arial",
+          "Times New Roman",
+          "Courier New",
+          "Helvetica",
+          "nonexistent-persona-font"
+        ],
+        "width": 260.1163635253906
+      },
+      "serif": {
+        "check": true,
+        "local": "NetworkError",
+        "sameWidthAs": [
+          "Noto Serif",
+          "serif"
+        ],
+        "width": 259.702392578125
+      }
+    },
+    "documentFonts": "object",
+    "fontFace": "function"
+  }
+}

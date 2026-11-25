@@ -14,13 +14,19 @@ cargo build --locked --offline --target x86_64-unknown-linux-musl -p goldens
 runner=$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/goldens
 if [ "$box" = selftest ]; then
     cargo build --locked --offline --target x86_64-unknown-linux-musl -p selftest --bins
-    CARGO_TARGET_DIR=$root/.work/tmp/target-oracle cargo build --locked --offline --target x86_64-unknown-linux-musl --manifest-path boxes/selftest/Cargo.toml
+    if [ "$mode" != fuzz ]; then CARGO_TARGET_DIR=$root/.work/tmp/target-oracle cargo build --locked --offline --target x86_64-unknown-linux-musl --manifest-path boxes/selftest/Cargo.toml; fi
     if [ "$mode" = seen ]; then exec "$runner" selftest; fi
 else
     cargo build --locked --offline --target x86_64-unknown-linux-musl -p "$box"
 fi
 case $mode in
     seen|holdout) exec "$runner" run "$box" "$mode" ;;
+    fuzz)
+        if [ "${INJECT:-0}" = 1 ]; then
+            [ "$box" = selftest ] || { echo "INJECT is only supported for selftest" >&2; exit 2; }
+            exec "$runner" fuzz "$box" --candidate "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/debug/fuzz-wrong"
+        fi
+        exec "$runner" fuzz "$box" ;;
     ratchet) exec "$runner" run "$box" seen --ratchet ;;
     *) echo "unknown box mode: $mode" >&2; exit 2 ;;
 esac

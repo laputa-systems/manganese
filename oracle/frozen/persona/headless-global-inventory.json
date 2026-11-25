@@ -1,0 +1,15 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "global-inventory"
+  },
+  "mode": "headless",
+  "result": {
+    "path": "oracle/frozen/capability/inventory.json",
+    "sha256": "cdff3c29a41619c48a4882129c2f7fffe5c85fef1bdc20d6cfe53f56e983133f"
+  }
+}

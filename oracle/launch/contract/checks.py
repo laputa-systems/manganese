@@ -1,3 +1,5 @@
+import re
+
 AD = 'pagead2.googlesyndication.com'
 VERSION = {'Browser': 'Chrome/156.0.8078.79', 'Protocol-Version': '1.3', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36', 'V8-Version': '15.6.75.27', 'WebKit-Version': '537.36 (@a21ce95c24ce3964416f09ae1862f53f319eb4d0)', 'File-Path-Style': 'posix'}
 CLIENTS = {'browser-use', 'agent-browser', 'extension-cli', 'shadowdriver-sdk', 'shadowdriver-crawler'}
@@ -43,6 +45,14 @@ def webmcp(value):
 
 def robust(outgoing, incoming, before_targets, after_targets, before_pages, after_pages):
     return outgoing == 33554432 and incoming == 33554432 and before_targets == after_targets and before_pages == after_pages
+
+
+def hydrogen_revision(archive_name):
+    """Hydrogen package revisions are below 100 and Manganese's start at 100 (contract 1.1)."""
+    match = re.fullmatch(r'chromium-[0-9.]+-r([0-9]+)-linux-(?:aarch64|x86_64)-musl\.tar\.xz', archive_name)
+    if match is None:
+        raise ValueError(f'not an appliance archive name: {archive_name}')
+    return int(match.group(1)) < 100
 
 
 def protocol(hard_ok, browser_answers, oracle):

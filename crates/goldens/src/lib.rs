@@ -1,7 +1,9 @@
 mod digest;
+mod fuzz;
 mod spec;
 pub use digest::sha256;
-pub use spec::{Arm64Evidence, Comparator, Declaration, Spec};
+pub use spec::{Arm64Evidence, Comparator, Declaration, Fuzz, Spec};
+pub use fuzz::run as fuzz;
 
 mod sandbox;
 use std::collections::BTreeSet;

@@ -155,7 +155,7 @@ def main():
                     session.probe('--close')
                     protocol['exit_status'] = browser.wait(timeout=15)
                 protocol['browser_log_tail'] = (directory / 'browser.log').read_text(errors='replace').splitlines()[-40:]
-                oracle = archive.identity.startswith('frozen:hydrogen-r2-')
+                oracle = checks.hydrogen_revision(archive.path.name)
                 defect = not protocol['browser_answers'] and oracle
                 if '7.1' in results:
                     results['7.1']['protocol'] = protocol

@@ -1,0 +1,508 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "intl"
+  },
+  "mode": "headed",
+  "result": {
+    "ar-EG": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "\u0627\u0644\u0627\u062b\u0646\u064a\u0646\u060c \u0663 \u0641\u0628\u0631\u0627\u064a\u0631 \u0662\u0660\u0662\u0660 \u0641\u064a \u0664:\u0660\u0665:\u0660\u0666 \u0635 UTC",
+      "display": "\u0627\u0644\u0648\u0644\u0627\u064a\u0627\u062a \u0627\u0644\u0645\u062a\u062d\u062f\u0629",
+      "list": "one \u0648two \u0648three",
+      "number": "\u200f\u0661\u0662\u066c\u0663\u0664\u0665\u066b\u0666\u0667\u00a0\u20ac",
+      "plural": [
+        "zero",
+        "one",
+        "two",
+        "few"
+      ],
+      "relative": "\u0623\u0645\u0633",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "de-DE": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "Montag, 3. Februar 2020 um 04:05:06 UTC",
+      "display": "Vereinigte Staaten",
+      "list": "one, two und three",
+      "number": "12.345,67\u00a0\u20ac",
+      "plural": [
+        "other",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "gestern",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "en-GB": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "Monday, 3 February 2020 at 04:05:06 UTC",
+      "display": "United States",
+      "list": "one, two and three",
+      "number": "\u20ac12,345.67",
+      "plural": [
+        "other",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "yesterday",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "en-US": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "Monday, February 3, 2020 at 4:05:06 AM UTC",
+      "display": "United States",
+      "list": "one, two, and three",
+      "number": "\u20ac12,345.67",
+      "plural": [
+        "other",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "yesterday",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "fr-FR": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "lundi 3 f\u00e9vrier 2020 \u00e0 04:05:06 UTC",
+      "display": "\u00c9tats-Unis",
+      "list": "one, two et three",
+      "number": "12\u202f345,67\u00a0\u20ac",
+      "plural": [
+        "one",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "hier",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "hi-IN": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "\u0938\u094b\u092e\u0935\u093e\u0930, 3 \u092b\u093c\u0930\u0935\u0930\u0940 2020 \u0915\u094b 4:05:06 am UTC \u092c\u091c\u0947",
+      "display": "\u0938\u0902\u092f\u0941\u0915\u094d\u0924 \u0930\u093e\u091c\u094d\u092f",
+      "list": "one, two, \u0914\u0930 three",
+      "number": "\u20ac12,345.67",
+      "plural": [
+        "one",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "\u0915\u0932",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "ja-JP": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "2020\u5e742\u67083\u65e5\u6708\u66dc\u65e5 4:05:06 UTC",
+      "display": "\u30a2\u30e1\u30ea\u30ab\u5408\u8846\u56fd",
+      "list": "one\u3001two\u3001three",
+      "number": "\u20ac12,345.67",
+      "plural": [
+        "other",
+        "other",
+        "other",
+        "other"
+      ],
+      "relative": "\u6628\u65e5",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "supported": {
+      "Collator": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "DateTimeFormat": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "DisplayNames": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "ListFormat": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "NumberFormat": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "PluralRules": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "RelativeTimeFormat": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ],
+      "Segmenter": [
+        "en-US",
+        "en-GB",
+        "fr-FR",
+        "de-DE",
+        "ar-EG",
+        "ja-JP",
+        "zh-CN",
+        "hi-IN",
+        "tr-TR"
+      ]
+    },
+    "tr-TR": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "3 \u015eubat 2020 Pazartesi 04:05:06 UTC",
+      "display": "Amerika Birle\u015fik Devletleri",
+      "list": "one, two ve three",
+      "number": "\u20ac12.345,67",
+      "plural": [
+        "other",
+        "one",
+        "other",
+        "other"
+      ],
+      "relative": "d\u00fcn",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    },
+    "zh-CN": {
+      "collator": [
+        "a",
+        "\u00e4",
+        "z",
+        "Z"
+      ],
+      "date": "2020\u5e742\u67083\u65e5\u661f\u671f\u4e00 UTC 04:05:06",
+      "display": "\u7f8e\u56fd",
+      "list": "one\u3001two\u548cthree",
+      "number": "\u20ac12,345.67",
+      "plural": [
+        "other",
+        "other",
+        "other",
+        "other"
+      ],
+      "relative": "\u6628\u5929",
+      "segments": [
+        {
+          "isWordLike": true,
+          "segment": "Hello"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "world"
+        },
+        {
+          "isWordLike": false,
+          "segment": "!"
+        },
+        {
+          "isWordLike": false,
+          "segment": " "
+        },
+        {
+          "isWordLike": true,
+          "segment": "\u4e2d\u6587"
+        }
+      ]
+    }
+  }
+}

@@ -41,9 +41,17 @@ contract:
 contract-selftest:
 	python3 -B oracle/launch/contract/selftest.py
 
+.PHONY: census
+census:
+	python3 -B oracle/probes/census/census.py
+
 .PHONY: box
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
+
+.PHONY: box-fuzz
+box-fuzz:
+	SEED="$(SEED)" CASES="$(CASES)" INJECT="$(INJECT)" sh scripts/box "$(BOX)" fuzz
 
 .PHONY: assembly
 assembly:
@@ -52,3 +60,16 @@ assembly:
 .PHONY: capability-probes
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
+
+.PHONY: persona-inventory
+persona-inventory:
+	python3 -B oracle/probes/persona/run.py
+
+.PHONY: zlib-harness
+zlib-harness:
+	mkdir -p .work/tmp/zlib
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zlib manganese-oracle-builder:156.0.8078.79-amd64-9535972e6a8a python3 -B /lane/oracle/harness/zlib/build.py
+
+.PHONY: zlib-anchor
+zlib-anchor:
+	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/anchor.py

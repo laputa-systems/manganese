@@ -54,6 +54,8 @@ class WebSocket:
         """The next text message, or None when the peer closes."""
         try:
             first, second = self.exactly(2)
+        except TimeoutError:
+            raise
         except OSError:
             return None
         length = second & 0x7F

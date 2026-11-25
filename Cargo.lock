@@ -9,3 +9,14 @@ version = "0.1.0"
 [[package]]
 name = "selftest"
 version = "0.1.0"
+
+[[package]]
+name = "zlib"
+version = "0.1.0"
+dependencies = [
+ "zlib-rs",
+]
+
+[[package]]
+name = "zlib-rs"
+version = "0.6.8"
