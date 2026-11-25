@@ -131,6 +131,12 @@ impl MergingIter {
 }
 
 impl LdbIterator for MergingIter {
+    fn status(&self) -> crate::Result<()> {
+        for iter in &self.iters {
+            iter.status()?;
+        }
+        Ok(())
+    }
     fn advance(&mut self) -> bool {
         if let Some(current) = self.current {
             self.update_direction(Direction::Forward);

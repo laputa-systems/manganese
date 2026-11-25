@@ -1,6 +1,7 @@
 use crate::cmp::{Cmp, InternalKeyCmp};
-use crate::error::Result;
+use crate::error::{Result, Status};
 use crate::key_types::{parse_internal_key, InternalKey, LookupKey, UserKey, ValueType};
+use crate::options::ReadOptions;
 use crate::table_cache::TableCache;
 use crate::table_reader::TableIterator;
 use crate::types::{FileMetaData, FileNum, LdbIterator, Shared, MAX_SEQUENCE_NUMBER, NUM_LEVELS};
@@ -61,6 +62,10 @@ impl Version {
     /// Version.
     #[allow(unused_assignments)]
     pub fn get(&self, key: InternalKey<'_>) -> Result<Option<(Bytes, GetStats)>> {
+        self.get_with_options(key, ReadOptions::verified())
+    }
+
+    pub(crate) fn get_with_options(&self, key: InternalKey<'_>, options: ReadOptions) -> Result<Option<(Bytes, GetStats)>> {
         let levels = self.get_overlapping(key);
         let ikey = key;
         let ukey = parse_internal_key(ikey).2;
@@ -84,7 +89,7 @@ impl Version {
                 // We receive both key and value from the table. Because we're using InternalKey
                 // keys, we now need to check whether the found entry's user key is equal to the
                 // one we're looking for (get() just returns the next-bigger key).
-                if let Ok(Some((k, v))) = self.table_cache.borrow_mut().get(f.borrow().num, ikey) {
+                if let Some((k, v)) = self.table_cache.borrow_mut().get_with_options(f.borrow().num, ikey, options)? {
                     // We don't need to check the sequence number; get() will not return an entry
                     // with a higher sequence number than the one in the supplied key.
                     let (typ, _, foundkey) = parse_internal_key(&k);
@@ -352,30 +357,35 @@ impl Version {
 
     /// new_concat_iter returns an iterator that iterates over the files in a level. Note that this
     /// only really makes sense for levels > 0.
-    fn new_concat_iter(&self, level: usize) -> VersionIter {
-        new_version_iter(
+    fn new_concat_iter(&self, level: usize, options: ReadOptions) -> VersionIter {
+        new_version_iter_with_options(
             self.files[level].clone(),
             self.table_cache.clone(),
             self.user_cmp.clone(),
+            options,
         )
     }
 
     /// new_iters returns a set of iterators that can be merged to yield all entries in this
     /// version.
     pub fn new_iters(&self) -> Result<Vec<Box<dyn LdbIterator>>> {
+        self.new_iters_with_options(ReadOptions::verified())
+    }
+
+    pub(crate) fn new_iters_with_options(&self, options: ReadOptions) -> Result<Vec<Box<dyn LdbIterator>>> {
         let mut iters: Vec<Box<dyn LdbIterator>> = vec![];
         for f in &self.files[0] {
             iters.push(Box::new(
                 self.table_cache
                     .borrow_mut()
                     .get_table(f.borrow().num)?
-                    .iter(),
+                    .iter_with_options(options),
             ));
         }
 
         for l in 1..NUM_LEVELS {
             if !self.files[l].is_empty() {
-                iters.push(Box::new(self.new_concat_iter(l)));
+                iters.push(Box::new(self.new_concat_iter(l, options)));
             }
         }
 
@@ -390,12 +400,23 @@ pub fn new_version_iter(
     cache: Shared<TableCache>,
     ucmp: Rc<Box<dyn Cmp>>,
 ) -> VersionIter {
+    new_version_iter_with_options(files, cache, ucmp, ReadOptions::verified())
+}
+
+pub(crate) fn new_version_iter_with_options(
+    files: Vec<FileMetaHandle>,
+    cache: Shared<TableCache>,
+    ucmp: Rc<Box<dyn Cmp>>,
+    options: ReadOptions,
+) -> VersionIter {
     VersionIter {
         files,
         cache,
         cmp: InternalKeyCmp(ucmp),
         current: None,
         current_ix: 0,
+        error: None,
+        options,
     }
 }
 
@@ -412,35 +433,51 @@ pub struct VersionIter {
 
     current: Option<TableIterator>,
     current_ix: usize,
+    error: Option<Status>,
+    options: ReadOptions,
+}
+
+impl VersionIter {
+    fn remember(&mut self, error: Status) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+    }
+
+    fn remember_current(&mut self) {
+        if let Some(error) = self.current.as_ref().and_then(|iter| iter.status().err()) {
+            self.remember(error);
+        }
+    }
 }
 
 impl LdbIterator for VersionIter {
     fn advance(&mut self) -> bool {
         assert!(!self.files.is_empty());
-
-        if let Some(ref mut t) = self.current {
-            if t.advance() {
-                return true;
-            } else if self.current_ix >= self.files.len() - 1 {
-                // Already on last table; can't advance further.
-                return false;
+        loop {
+            if let Some(ref mut t) = self.current {
+                if t.advance() {
+                    return true;
+                }
+                self.remember_current();
+                if self.current_ix + 1 >= self.files.len() {
+                    return false;
+                }
+                self.current_ix += 1;
+                self.current = None;
             }
-
-            // Load next table if current table is exhausted and we have more tables to go through.
-            self.current_ix += 1;
+            let result = self.cache.borrow_mut().get_table(self.files[self.current_ix].borrow().num);
+            match result {
+                Ok(table) => self.current = Some(table.iter_with_options(self.options)),
+                Err(error) => {
+                    self.remember(error);
+                    if self.current_ix + 1 >= self.files.len() {
+                        return false;
+                    }
+                    self.current_ix += 1;
+                }
+            }
         }
-
-        // Initialize iterator or load next table.
-        if let Ok(tbl) = self
-            .cache
-            .borrow_mut()
-            .get_table(self.files[self.current_ix].borrow().num)
-        {
-            self.current = Some(tbl.iter());
-        } else {
-            return false;
-        }
-        self.advance()
     }
     fn current(&self) -> Option<(Bytes, Bytes)> {
         if let Some(ref t) = self.current {
@@ -451,16 +488,25 @@ impl LdbIterator for VersionIter {
     }
     fn seek(&mut self, key: &[u8]) {
         if let Some(ix) = find_file(&self.cmp, &self.files, key) {
-            if let Ok(tbl) = self
-                .cache
-                .borrow_mut()
-                .get_table(self.files[ix].borrow().num)
-            {
-                let mut iter = tbl.iter();
-                iter.seek(key);
-                if iter.valid() {
-                    self.current_ix = ix;
+            self.remember_current();
+            self.current = None;
+            self.current_ix = ix;
+            let result = self.cache.borrow_mut().get_table(self.files[ix].borrow().num);
+            match result {
+                Ok(table) => {
+                    let mut iter = table.iter_with_options(self.options);
+                    iter.seek(key);
+                    let valid = iter.valid();
                     self.current = Some(iter);
+                    if valid { return; }
+                }
+                Err(error) => self.remember(error),
+            }
+            self.remember_current();
+            self.current = None;
+            if ix + 1 < self.files.len() {
+                self.current_ix = ix + 1;
+                if self.advance() {
                     return;
                 }
             }
@@ -468,6 +514,7 @@ impl LdbIterator for VersionIter {
         self.reset();
     }
     fn reset(&mut self) {
+        self.remember_current();
         self.current = None;
         self.current_ix = 0;
     }
@@ -478,22 +525,37 @@ impl LdbIterator for VersionIter {
         if let Some(ref mut t) = self.current {
             if t.prev() {
                 return true;
-            } else if self.current_ix > 0 {
-                let f = &self.files[self.current_ix - 1];
-                // Find previous table, seek to last entry.
-                if let Ok(tbl) = self.cache.borrow_mut().get_table(f.borrow().num) {
-                    let mut iter = tbl.iter();
-                    iter.seek(&f.borrow().largest);
-                    // The saved largest key must be in the table.
-                    assert!(iter.valid());
-                    self.current_ix -= 1;
-                    *t = iter;
-                    return true;
+            }
+        }
+        self.remember_current();
+        self.current = None;
+        while self.current_ix > 0 {
+            self.current_ix -= 1;
+            let file = self.files[self.current_ix].borrow();
+            let result = self.cache.borrow_mut().get_table(file.num);
+            let largest = file.largest.clone();
+            drop(file);
+            match result {
+                Ok(table) => {
+                    let mut iter = table.iter_with_options(self.options);
+                    iter.seek(&largest);
+                    let valid = iter.valid();
+                    self.current = Some(iter);
+                    if valid { return true; }
+                    self.remember_current();
+                    self.current = None;
                 }
+                Err(error) => self.remember(error),
             }
         }
         self.reset();
         false
+    }
+    fn status(&self) -> Result<()> {
+        if let Some(error) = &self.error {
+            return Err(error.clone());
+        }
+        self.current.as_ref().map_or(Ok(()), |iter| iter.status())
     }
 }
 
@@ -742,7 +804,7 @@ mod tests {
 
         let expected_entries = [0, 9, 8, 4];
         (1..4).for_each(|l| {
-            let mut iter = v.new_concat_iter(l);
+            let mut iter = v.new_concat_iter(l, ReadOptions::verified());
             let iter = LdbIteratorIter::wrap(&mut iter);
             assert_eq!(iter.count(), expected_entries[l]);
         });
@@ -751,7 +813,7 @@ mod tests {
     #[test]
     fn test_version_concat_iter_properties() {
         let v = make_version().0;
-        let iter = v.new_concat_iter(3);
+        let iter = v.new_concat_iter(3, ReadOptions::verified());
         test_iterator_properties(iter);
     }
 

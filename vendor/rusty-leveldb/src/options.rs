@@ -43,6 +43,25 @@ pub struct Options {
     pub filter_policy: filter::BoxedFilterPolicy,
 }
 
+/// Per-read checksum and block-cache policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ReadOptions {
+    pub verify_checksums: bool,
+    pub fill_cache: bool,
+}
+
+impl Default for ReadOptions {
+    fn default() -> Self {
+        Self { verify_checksums: false, fill_cache: true }
+    }
+}
+
+impl ReadOptions {
+    pub(crate) fn verified() -> Self {
+        Self { verify_checksums: true, fill_cache: true }
+    }
+}
+
 #[cfg(feature = "fs")]
 type DefaultEnv = crate::disk_env::PosixDiskEnv;
 

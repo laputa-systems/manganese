@@ -202,8 +202,10 @@ impl AsyncDB {
                     }
                 }
                 Request::Get { key } => {
-                    let r = db.get(&key).map(|bytes| bytes.to_vec());
-                    send_response(message.resp_channel, Response::Value(r));
+                    match db.get(&key) {
+                        Ok(value) => send_response(message.resp_channel, Response::Value(value.map(|bytes| bytes.to_vec()))),
+                        Err(error) => send_response(message.resp_channel, Response::Error(error)),
+                    }
                 }
                 Request::GetSnapshot => {
                     snapshots.insert(snapshot_counter, db.get_snapshot());

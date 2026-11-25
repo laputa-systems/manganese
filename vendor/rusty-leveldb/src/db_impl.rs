@@ -15,7 +15,7 @@ use crate::key_types::{parse_internal_key, InternalKey, LookupKey, ValueType};
 use crate::log::{LogReader, LogWriter};
 use crate::memtable::MemTable;
 use crate::merging_iter::MergingIter;
-use crate::options::Options;
+use crate::options::{Options, ReadOptions};
 use crate::snapshot::{Snapshot, SnapshotList};
 use crate::table_builder::TableBuilder;
 use crate::table_cache::{table_file_name, TableCache};
@@ -459,7 +459,7 @@ impl DB {
 impl DB {
     // READ //
 
-    fn get_internal(&mut self, seq: SequenceNumber, key: &[u8]) -> Result<Option<Bytes>> {
+    fn get_internal(&mut self, seq: SequenceNumber, key: &[u8], options: ReadOptions) -> Result<Option<Bytes>> {
         // Using this lookup key will skip all entries with higher sequence numbers, because they
         // will compare "Lesser" using the InternalKeyCmp
         let lkey = LookupKey::new(key, seq);
@@ -489,7 +489,7 @@ impl DB {
         {
             let current = self.current();
             let mut current = current.borrow_mut();
-            if let Ok(Some((v, st))) = current.get(lkey.internal_key()) {
+            if let Some((v, st)) = current.get_with_options(lkey.internal_key(), options)? {
                 if current.update_stats(st) {
                     do_compaction = true;
                 }
@@ -508,13 +508,24 @@ impl DB {
     /// get_at reads the value for a given key at or before snapshot. It returns Ok(None) if the
     /// entry wasn't found, and Err(_) if an error occurred.
     pub fn get_at(&mut self, snapshot: &Snapshot, key: &[u8]) -> Result<Option<Bytes>> {
-        self.get_internal(snapshot.sequence(), key)
+        self.get_internal(snapshot.sequence(), key, ReadOptions::verified())
     }
 
-    /// get is a simplified version of get_at(), translating errors to None.
-    pub fn get(&mut self, key: &[u8]) -> Option<Bytes> {
+    /// Reads a key at a snapshot with the requested read policy.
+    pub fn get_at_with_options(&mut self, snapshot: &Snapshot, key: &[u8], options: ReadOptions) -> Result<Option<Bytes>> {
+        self.get_internal(snapshot.sequence(), key, options)
+    }
+
+    /// Reads a key with the requested read policy.
+    pub fn get_with_options(&mut self, key: &[u8], options: ReadOptions) -> Result<Option<Bytes>> {
         let seq = self.vset.borrow().last_seq;
-        self.get_internal(seq, key).unwrap_or_default()
+        self.get_internal(seq, key, options)
+    }
+
+    /// Reads a key at the latest sequence, returning read errors to the caller.
+    pub fn get(&mut self, key: &[u8]) -> Result<Option<Bytes>> {
+        let seq = self.vset.borrow().last_seq;
+        self.get_internal(seq, key, ReadOptions::verified())
     }
 }
 
@@ -528,19 +539,30 @@ impl DB {
         self.new_iter_at(snapshot)
     }
 
+    /// Creates an iterator using the requested read policy.
+    pub fn new_iter_with_options(&mut self, options: ReadOptions) -> Result<DBIterator> {
+        let snapshot = self.get_snapshot();
+        self.new_iter_at_with_options(snapshot, options)
+    }
+
     /// new_iter_at returns a DBIterator at the supplied snapshot.
     pub fn new_iter_at(&mut self, ss: Snapshot) -> Result<DBIterator> {
+        self.new_iter_at_with_options(ss, ReadOptions::verified())
+    }
+
+    /// Creates an iterator at a snapshot using the requested read policy.
+    pub fn new_iter_at_with_options(&mut self, ss: Snapshot, options: ReadOptions) -> Result<DBIterator> {
         Ok(DBIterator::new(
             self.opt.cmp.clone(),
             self.vset.clone(),
-            self.merge_iterators()?,
+            self.merge_iterators(options)?,
             ss,
         ))
     }
 
     /// merge_iterators produces a MergingIter merging the entries in the memtable, the immutable
     /// memtable, and table files from all levels.
-    fn merge_iterators(&mut self) -> Result<MergingIter> {
+    fn merge_iterators(&mut self, options: ReadOptions) -> Result<MergingIter> {
         let mut iters: Vec<Box<dyn LdbIterator>> = vec![];
         if self.mem.len() > 0 {
             iters.push(Box::new(self.mem.iter()));
@@ -554,7 +576,7 @@ impl DB {
         // Add iterators for table files.
         let current = self.current();
         let current = current.borrow();
-        iters.extend(current.new_iters()?);
+        iters.extend(current.new_iters_with_options(options)?);
 
         Ok(MergingIter::new(self.internal_cmp.clone(), iters))
     }
@@ -842,7 +864,7 @@ impl DB {
             cs.compaction.level() + 1
         );
 
-        let mut input = self.vset.borrow().make_input_iterator(&cs.compaction);
+        let mut input = self.vset.borrow().make_input_iterator(&cs.compaction)?;
         input.seek_to_first();
 
         let mut last_seq_for_key = MAX_SEQUENCE_NUMBER;
@@ -922,6 +944,7 @@ impl DB {
             input.advance();
         }
 
+        input.status()?;
         if cs.builder.is_some() {
             self.finish_compaction_output(cs)?;
         }
@@ -947,9 +970,6 @@ impl DB {
         let output_num = cs.current_output().num;
         assert!(output_num > 0);
 
-        // The original checks if the input iterator has an OK status. For this, we'd need to
-        // extend the LdbIterator interface though -- let's see if we can without for now.
-        // (it's not good for corruptions, in any case)
         let b = cs.builder.take().unwrap();
         let entries = b.entries();
         let (bytes, mut file) = b.finish_with_writer()?;
@@ -1031,6 +1051,7 @@ impl CompactionState {
 
     /// cleanup cleans up after an aborted compaction.
     fn cleanup<P: AsRef<Path>>(&mut self, env: &dyn Env, name: P) {
+        self.builder.take();
         for o in self.outputs.drain(..) {
             let name = table_file_name(name.as_ref(), o.num);
             let _ = env.delete(&name);
@@ -1418,10 +1439,10 @@ mod tests {
         assert!(!opt.env.exists(&Path::new("db").join("000013.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000014.ldb")).unwrap());
 
-        assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap());
-        assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap());
-        assert_eq!(b"val3".to_vec(), db.get(b"aba").unwrap());
-        assert_eq!(b"val3".to_vec(), db.get(b"fab").unwrap());
+        assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap().unwrap());
+        assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap().unwrap());
+        assert_eq!(b"val3".to_vec(), db.get(b"aba").unwrap().unwrap());
+        assert_eq!(b"val3".to_vec(), db.get(b"fab").unwrap().unwrap());
     }
 
     #[test]
@@ -1481,11 +1502,11 @@ mod tests {
         assert!(!opt.env.exists(&Path::new("db").join("000015.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000016.ldb")).unwrap());
 
-        assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap());
-        assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap());
-        assert_eq!(b"val3".to_vec(), db.get(b"aba").unwrap());
-        assert_eq!(b"val3".to_vec(), db.get(b"fab").unwrap());
-        assert_eq!(b"123".to_vec(), db.get(b"xxx").unwrap());
+        assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap().unwrap());
+        assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap().unwrap());
+        assert_eq!(b"val3".to_vec(), db.get(b"aba").unwrap().unwrap());
+        assert_eq!(b"val3".to_vec(), db.get(b"fab").unwrap().unwrap());
+        assert_eq!(b"123".to_vec(), db.get(b"xxx").unwrap().unwrap());
     }
 
     #[allow(unused_variables)]
@@ -1575,17 +1596,17 @@ mod tests {
         assert!(db.get_at(&old_ss, b"xyz").unwrap().is_none());
 
         // memtable get
-        assert_eq!(b"123", db.get(b"xyz").unwrap().as_ref());
-        assert!(db.get_internal(31, b"xyy").unwrap().is_some());
-        assert!(db.get_internal(32, b"xyy").unwrap().is_some());
+        assert_eq!(b"123", db.get(b"xyz").unwrap().unwrap().as_ref());
+        assert!(db.get_internal(31, b"xyy", ReadOptions::verified()).unwrap().is_some());
+        assert!(db.get_internal(32, b"xyy", ReadOptions::verified()).unwrap().is_some());
 
-        assert!(db.get_internal(31, b"xyz").unwrap().is_none());
-        assert!(db.get_internal(32, b"xyz").unwrap().is_some());
+        assert!(db.get_internal(31, b"xyz", ReadOptions::verified()).unwrap().is_none());
+        assert!(db.get_internal(32, b"xyz", ReadOptions::verified()).unwrap().is_some());
 
         // table get
-        assert_eq!(b"val2", db.get(b"eab").unwrap().as_ref());
-        assert!(db.get_internal(3, b"eab").unwrap().is_none());
-        assert!(db.get_internal(32, b"eab").unwrap().is_some());
+        assert_eq!(b"val2", db.get(b"eab").unwrap().unwrap().as_ref());
+        assert!(db.get_internal(3, b"eab", ReadOptions::verified()).unwrap().is_none());
+        assert!(db.get_internal(32, b"eab", ReadOptions::verified()).unwrap().is_some());
 
         {
             let ss = db.get_snapshot();
@@ -1593,7 +1614,7 @@ mod tests {
         }
 
         // from table.
-        assert_eq!(b"val2", db.get(b"cab").unwrap().as_ref());
+        assert_eq!(b"val2", db.get(b"cab").unwrap().unwrap().as_ref());
     }
 
     #[test]
@@ -1603,16 +1624,16 @@ mod tests {
         db.put(b"xyy", b"123").unwrap();
         db.put(b"xyz", b"123").unwrap();
 
-        assert!(db.get(b"xyy").is_some());
-        assert!(db.get(b"gaa").is_some());
+        assert!(db.get(b"xyy").unwrap().is_some());
+        assert!(db.get(b"gaa").unwrap().is_some());
 
         // Delete one memtable entry and one table entry.
         db.delete(b"xyy").unwrap();
         db.delete(b"gaa").unwrap();
 
-        assert!(db.get(b"xyy").is_none());
-        assert!(db.get(b"gaa").is_none());
-        assert!(db.get(b"xyz").is_some());
+        assert!(db.get(b"xyy").unwrap().is_none());
+        assert!(db.get(b"gaa").unwrap().is_none());
+        assert!(db.get(b"xyz").unwrap().is_some());
     }
 
     #[test]
@@ -1738,6 +1759,28 @@ mod tests {
     }
 
     #[test]
+    fn compaction_keeps_input_files_when_a_checked_block_is_corrupt() {
+        use std::io::Read;
+
+        let (db, mut opt) = build_db();
+        drop(db);
+        opt.paranoid_checks = true;
+        let mut db = DB::open("db", opt.clone()).unwrap();
+        let path = Path::new("db/000003.ldb");
+        let mut data = Vec::new();
+        opt.env.open_sequential_file(path).unwrap().read_to_end(&mut data).unwrap();
+        data[0] ^= 1;
+        opt.env.open_writable_file(path).unwrap().write_all(&data).unwrap();
+        let v = db.current();
+        v.borrow_mut().compaction_score = Some(2.0);
+        v.borrow_mut().compaction_level = Some(1);
+        assert_eq!(db.maybe_do_compaction().unwrap_err().code, StatusCode::Corruption);
+        assert!(opt.env.exists(path).unwrap());
+        assert!(!opt.env.exists(Path::new("db/000013.ldb")).unwrap());
+        assert_eq!(db.current().borrow().files[1].len(), 3);
+    }
+
+    #[test]
     fn test_db_impl_compaction_trivial() {
         let (mut v, opt) = make_version();
 
@@ -1809,7 +1852,7 @@ mod tests {
         {
             let mut db = DB::open("db", opt.clone()).unwrap();
 
-            assert_eq!(None, db.get(b"xx5"));
+            assert_eq!(None, db.get(b"xx5").unwrap());
 
             let ss = db.get_snapshot();
             db.put(b"xx4", b"222").unwrap();

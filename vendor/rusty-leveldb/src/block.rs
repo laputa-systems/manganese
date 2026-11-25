@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use crate::options::Options;
+use crate::error::{err, Result, Status, StatusCode};
 use crate::types::LdbIterator;
 
 use bytes::{Bytes, BytesMut};
@@ -55,6 +56,7 @@ impl Block {
 
             key: BytesMut::new(),
             val_offset: 0,
+            error: None,
         }
     }
 
@@ -63,11 +65,34 @@ impl Block {
     }
 
     pub fn new(opt: Options, contents: BlockContents) -> Block {
-        assert!(contents.len() > 4);
+        assert!(contents.len() >= 4);
         Block {
             block: contents,
             opt,
         }
+    }
+
+    pub(crate) fn try_new(opt: Options, contents: BlockContents) -> Result<Block> {
+        if contents.len() < 4 {
+            return err(StatusCode::Corruption, "short table block");
+        }
+        let count = u32::decode_fixed(&contents[contents.len() - 4..]) as usize;
+        if count > (contents.len() - 4) / 4 {
+            return err(StatusCode::Corruption, "invalid block restart array");
+        }
+        let end = contents.len() - 4 - count * 4;
+        let mut previous = None;
+        for index in 0..count {
+            let offset = u32::decode_fixed(&contents[end + 4 * index..end + 4 * index + 4]) as usize;
+            if offset > end || (end != 0 && offset == end)
+                || (index == 0 && offset != 0)
+                || previous.is_some_and(|p| offset <= p)
+            {
+                return err(StatusCode::Corruption, "invalid block restart offset");
+            }
+            previous = Some(offset);
+        }
+        Ok(Block { block: contents, opt })
     }
 }
 
@@ -92,9 +117,19 @@ pub struct BlockIter {
     key: BytesMut,
     /// Offset of the current value within the block.
     val_offset: usize,
+    error: Option<Status>,
 }
 
 impl BlockIter {
+    fn corruption(&mut self) {
+        if self.error.is_none() {
+            self.error = Some(Status::new(StatusCode::Corruption, "invalid block entry"));
+        }
+        self.offset = self.restarts_off;
+        self.val_offset = 0;
+        self.key.clear();
+    }
+
     /// Return the number of restarts in this block.
     fn number_restarts(&self) -> usize {
         u32::decode_fixed(&self.block[self.block.len() - 4..]) as usize
@@ -104,16 +139,25 @@ impl BlockIter {
     /// point.
     fn seek_to_restart_point(&mut self, ix: usize) -> Option<()> {
         let off = self.get_restart_point(ix);
+        if off >= self.restarts_off {
+            if self.restarts_off != 0 { self.corruption(); }
+            return None;
+        }
 
         self.offset = off;
         self.current_entry_offset = off;
         self.current_restart_ix = ix;
         // advances self.offset to point to the next entry
-        let (shared, non_shared, _, head_len) = self.parse_entry_and_advance()?;
-
-        assert_eq!(shared, 0);
+        self.key.clear();
+        let Some((shared, non_shared, _, head_len)) = self.parse_entry_and_advance() else {
+            self.corruption();
+            return None;
+        };
+        if shared != 0 {
+            self.corruption();
+            return None;
+        }
         self.assemble_key(off + head_len, shared, non_shared);
-        assert!(self.valid());
         Some(())
     }
 
@@ -133,17 +177,28 @@ impl BlockIter {
     /// Advances self.offset to the beginning of the next entry.
     fn parse_entry_and_advance(&mut self) -> Option<(usize, usize, usize, usize)> {
         let mut i = 0;
-        let (shared, sharedlen) = usize::decode_var(&self.block[self.offset..])?;
+        let input = self.block.get(self.offset..self.restarts_off)?;
+        let (shared, sharedlen) = u32::decode_var(input)?;
+        if sharedlen > 5 { return None; }
         i += sharedlen;
 
-        let (non_shared, non_sharedlen) = usize::decode_var(&self.block[self.offset + i..])?;
+        let (non_shared, non_sharedlen) = u32::decode_var(input.get(i..)?)?;
+        if non_sharedlen > 5 { return None; }
         i += non_sharedlen;
 
-        let (valsize, valsizelen) = usize::decode_var(&self.block[self.offset + i..])?;
+        let (valsize, valsizelen) = u32::decode_var(input.get(i..)?)?;
+        if valsizelen > 5 { return None; }
         i += valsizelen;
 
-        self.val_offset = self.offset + i + non_shared;
-        self.offset = self.val_offset + valsize;
+        let shared = shared as usize;
+        let non_shared = non_shared as usize;
+        let valsize = valsize as usize;
+        if shared > self.key.len() { return None; }
+        let val_offset = self.offset.checked_add(i)?.checked_add(non_shared)?;
+        let next_offset = val_offset.checked_add(valsize)?;
+        if next_offset > self.restarts_off { return None; }
+        self.val_offset = val_offset;
+        self.offset = next_offset;
 
         Some((shared, non_shared, valsize, i))
     }
@@ -170,6 +225,7 @@ impl BlockIter {
             self.seek_to_restart_point(num_restarts - 1)?;
         } else {
             self.reset();
+            return None;
         }
 
         // Stop at last entry, before the iterator becomes invalid.
@@ -177,10 +233,9 @@ impl BlockIter {
         // We're checking the position before calling advance; if a restart point points to the
         // last entry, calling advance() will directly reset the iterator.
         while self.offset < self.restarts_off {
-            self.advance();
+            if !self.advance() { return None; }
         }
-        assert!(self.valid());
-        Some(())
+        self.valid().then_some(())
     }
 }
 
@@ -208,9 +263,7 @@ impl LdbIterator for BlockIter {
             }
             true
         } else {
-            #[cfg(debug_assertions)]
-            panic!("[debug mode panic] parse_entry_and_advance(): couldn't parse entry head at/after {:?}", self.key);
-            #[allow(unreachable_code)]
+            self.corruption();
             false
         }
     }
@@ -261,6 +314,8 @@ impl LdbIterator for BlockIter {
     fn seek(&mut self, to: &[u8]) {
         self.reset();
 
+        if self.number_restarts() == 0 { return; }
+
         let mut left = 0;
         let mut right = if self.number_restarts() == 0 {
             0
@@ -271,7 +326,7 @@ impl LdbIterator for BlockIter {
         // Do a binary search over the restart points.
         while left < right {
             let middle = (left + right).div_ceil(2);
-            self.seek_to_restart_point(middle);
+            if self.seek_to_restart_point(middle).is_none() { return; }
 
             let c = self.opt.cmp.cmp(&self.key, to);
 
@@ -307,6 +362,9 @@ impl LdbIterator for BlockIter {
         } else {
             None
         }
+    }
+    fn status(&self) -> Result<()> {
+        self.error.clone().map_or(Ok(()), Err)
     }
 }
 

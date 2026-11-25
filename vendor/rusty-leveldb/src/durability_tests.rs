@@ -147,7 +147,7 @@ fn sync_failure_is_returned_and_prevents_further_writes() {
     let mut batch = WriteBatch::new();
     batch.put(b"failed", b"value");
     assert!(db.write(batch, true).is_err());
-    assert!(db.get(b"failed").is_none());
+    assert!(db.get(b"failed").unwrap().is_none());
     assert!(db.put(b"later", b"value").is_err());
 }
 
@@ -183,7 +183,7 @@ fn table_sync_failure_aborts_compaction() {
     db.put(b"key", b"value").unwrap();
     env.trace.borrow_mut().fail_extension = Some("ldb");
     assert!(db.compact_range(b"", b"\xff").is_err());
-    assert_eq!(db.get(b"key").as_deref(), Some(b"value".as_slice()));
+    assert_eq!(db.get(b"key").unwrap().as_deref(), Some(b"value".as_slice()));
     assert!(db.put(b"later", b"value").is_err());
 }
 
@@ -193,7 +193,7 @@ fn manifest_sync_failure_retains_uninstalled_entries_and_stops_writes() {
     db.put(b"key", b"value").unwrap();
     env.trace.borrow_mut().fail_manifest = true;
     assert!(db.compact_range(b"", b"\xff").is_err());
-    assert_eq!(db.get(b"key").as_deref(), Some(b"value".as_slice()));
+    assert_eq!(db.get(b"key").unwrap().as_deref(), Some(b"value".as_slice()));
     assert!(db.put(b"later", b"value").is_err());
 }
 

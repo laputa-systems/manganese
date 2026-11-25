@@ -4,12 +4,12 @@ use crate::error::{err, Result, StatusCode};
 use crate::key_types::{parse_internal_key, InternalKey, UserKey};
 use crate::log::{LogReader, LogWriter};
 use crate::merging_iter::MergingIter;
-use crate::options::Options;
+use crate::options::{Options, ReadOptions};
 use crate::table_cache::TableCache;
 use crate::types::{
     parse_file_name, share, FileMetaData, FileNum, FileType, LdbIterator, Shared, NUM_LEVELS,
 };
-use crate::version::{new_version_iter, total_size, FileMetaHandle, Version};
+use crate::version::{new_version_iter_with_options, total_size, FileMetaHandle, Version};
 use crate::version_edit::VersionEdit;
 
 use bytes::Bytes;
@@ -700,8 +700,9 @@ impl VersionSet {
     }
 
     /// make_input_iterator returns an iterator over the inputs of a compaction.
-    pub fn make_input_iterator(&self, c: &Compaction) -> Box<dyn LdbIterator> {
+    pub fn make_input_iterator(&self, c: &Compaction) -> Result<Box<dyn LdbIterator>> {
         let cap = if c.level == 0 { c.num_inputs(0) + 1 } else { 2 };
+        let options = ReadOptions { verify_checksums: self.opt.paranoid_checks, fill_cache: false };
         let mut iters: Vec<Box<dyn LdbIterator>> = Vec::with_capacity(cap);
         for i in 0..2 {
             if c.num_inputs(i) == 0 {
@@ -711,30 +712,22 @@ impl VersionSet {
                 // Add individual iterators for L0 tables.
                 for fi in 0..c.num_inputs(i) {
                     let f = &c.inputs[i][fi];
-                    let s = self.cache.borrow_mut().get_table(f.borrow().num);
-                    if let Ok(tbl) = s {
-                        iters.push(Box::new(tbl.iter()));
-                    } else {
-                        log!(
-                            self.opt.log,
-                            "error opening table {}: {}",
-                            f.borrow().num,
-                            s.err().unwrap()
-                        );
-                    }
+                    let table = self.cache.borrow_mut().get_table(f.borrow().num)?;
+                    iters.push(Box::new(table.iter_with_options(options)));
                 }
             } else {
                 // Create concatenating iterator higher levels.
-                iters.push(Box::new(new_version_iter(
+                iters.push(Box::new(new_version_iter_with_options(
                     c.inputs[i].clone(),
                     self.cache.clone(),
                     self.opt.cmp.clone(),
+                    options,
                 )));
             }
         }
         assert!(iters.len() <= cap);
         let cmp: Rc<Box<dyn Cmp>> = Rc::new(Box::new(self.cmp.clone()));
-        Box::new(MergingIter::new(cmp, iters))
+        Ok(Box::new(MergingIter::new(cmp, iters)))
     }
 }
 
@@ -1295,7 +1288,7 @@ mod tests {
             assert_eq!(1, c.inputs[1].len());
             assert_eq!(1, c.grandparents.as_ref().unwrap().len());
             iterator_properties(
-                vs.make_input_iterator(&c),
+                vs.make_input_iterator(&c).unwrap(),
                 12,
                 Rc::new(Box::new(vs.cmp.clone())),
             );
@@ -1310,7 +1303,7 @@ mod tests {
             assert_eq!(1, c.inputs[1].len());
             assert_eq!(0, c.grandparents.as_ref().unwrap().len());
             iterator_properties(
-                vs.make_input_iterator(&c),
+                vs.make_input_iterator(&c).unwrap(),
                 12,
                 Rc::new(Box::new(vs.cmp.clone())),
             );

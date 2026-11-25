@@ -8,14 +8,15 @@ use std::iter::FromIterator;
 
 fn get(db: &mut DB, k: &str) {
     match db.get(k.as_bytes()) {
-        Some(v) => {
+        Ok(Some(v)) => {
             if let Ok(s) = String::from_utf8(v.to_vec().into()) {
                 eprintln!("{} => {}", k, s);
             } else {
                 eprintln!("{} => {:?}", k, v);
             }
         }
-        None => eprintln!("{} => <not found>", k),
+        Ok(None) => eprintln!("{} => <not found>", k),
+        Err(e) => eprintln!("{} => {}", k, e),
     }
 }
 
@@ -40,6 +41,7 @@ fn iter(db: &mut DB) {
         out.write_all(&v).unwrap();
         out.write_all(b"\n").unwrap();
     }
+    it.status().unwrap();
 }
 
 fn compact(db: &mut DB, from: &str, to: &str) {

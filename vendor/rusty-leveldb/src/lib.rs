@@ -9,7 +9,7 @@
 //! let mut db = DB::open("mydatabase", opt).unwrap();
 //!
 //! db.put(b"Hello", b"World").unwrap();
-//! assert_eq!(b"World", &*db.get(b"Hello").unwrap());
+//! assert_eq!(b"World", &*db.get(b"Hello").unwrap().unwrap());
 //!
 //! let mut iter = db.new_iter().unwrap();
 //! // Note: For efficiency reasons, it's recommended to use advance() and current() instead of
@@ -113,7 +113,7 @@ pub use disk_env::PosixDiskEnv;
 pub use error::{Result, Status, StatusCode};
 pub use filter::{BloomPolicy, FilterPolicy};
 pub use mem_env::MemEnv;
-pub use options::{in_memory, CompressorList, Options};
+pub use options::{in_memory, CompressorList, Options, ReadOptions};
 pub use repair::repair_db;
 pub use skipmap::SkipMap;
 pub use types::LdbIterator;

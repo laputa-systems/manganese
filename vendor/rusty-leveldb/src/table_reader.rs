@@ -3,11 +3,11 @@ use crate::blockhandle::BlockHandle;
 use crate::cache::{self, Cache};
 use crate::cmp::InternalKeyCmp;
 use crate::env::RandomAccess;
-use crate::error::{self, err, Result};
+use crate::error::{self, err, Result, Status};
 use crate::filter;
 use crate::filter_block::FilterBlockReader;
 use crate::key_types::InternalKey;
-use crate::options::Options;
+use crate::options::{Options, ReadOptions};
 use crate::table_block;
 use crate::table_builder::{self, Footer};
 use crate::types::{current_key_val, LdbIterator, Shared};
@@ -20,8 +20,16 @@ use integer_encoding::FixedIntWriter;
 
 /// Reads the table footer.
 fn read_footer(f: &dyn RandomAccess, size: usize) -> Result<Footer> {
+    if size < table_builder::FULL_FOOTER_LENGTH {
+        return err(error::StatusCode::Corruption, "table footer is truncated");
+    }
     let mut buf = vec![0; table_builder::FULL_FOOTER_LENGTH];
-    f.read_at(size - table_builder::FULL_FOOTER_LENGTH, &mut buf)?;
+    if f.read_at(size - table_builder::FULL_FOOTER_LENGTH, &mut buf)? != buf.len() {
+        return err(error::StatusCode::Corruption, "table footer is truncated");
+    }
+    if buf[table_builder::FOOTER_LENGTH..] != table_builder::MAGIC_FOOTER_ENCODED {
+        return err(error::StatusCode::Corruption, "table footer magic is invalid");
+    }
     match Footer::decode(&buf) {
         Some(ok) => Ok(ok),
         None => err(
@@ -29,6 +37,14 @@ fn read_footer(f: &dyn RandomAccess, size: usize) -> Result<Footer> {
             &format!("Couldn't decode damaged footer {:?}", buf),
         ),
     }
+}
+
+fn validate_location(location: &BlockHandle, file_size: usize) -> Result<()> {
+    let end = location.offset().checked_add(location.size()).and_then(|n| n.checked_add(5));
+    if end.is_none_or(|end| end > file_size) {
+        return err(error::StatusCode::Corruption, "table block is outside the file");
+    }
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -54,13 +70,15 @@ impl Table {
         size: usize,
     ) -> Result<Table> {
         let footer = read_footer(file.as_ref().as_ref(), size)?;
+        validate_location(&footer.index, size)?;
+        validate_location(&footer.meta_index, size)?;
         let indexblock =
             table_block::read_table_block(opt.clone(), file.as_ref().as_ref(), &footer.index)?;
         let metaindexblock =
             table_block::read_table_block(opt.clone(), file.as_ref().as_ref(), &footer.meta_index)?;
 
         let filter_block_reader =
-            Table::read_filter_block(&metaindexblock, file.as_ref().as_ref(), &opt)?;
+            Table::read_filter_block(&metaindexblock, file.as_ref().as_ref(), &opt, size)?;
         let cache_id = block_cache.borrow_mut().new_cache_id();
 
         Ok(Table {
@@ -79,6 +97,7 @@ impl Table {
         metaix: &Block,
         file: &dyn RandomAccess,
         options: &Options,
+        file_size: usize,
     ) -> Result<Option<FilterBlockReader>> {
         // Open filter block for reading
         let filter_name = format!("filter.{}", options.filter_policy.name())
@@ -87,6 +106,7 @@ impl Table {
 
         let mut metaindexiter = metaix.iter();
         metaindexiter.seek(&filter_name);
+        metaindexiter.status()?;
 
         if let Some((_key, val)) = current_key_val(&metaindexiter) {
             let fbl = BlockHandle::decode(&val);
@@ -100,6 +120,7 @@ impl Table {
                 Some(ok) => ok.0,
             };
             if filter_block_location.size() > 0 {
+                validate_location(&filter_block_location, file_size)?;
                 return Ok(Some(table_block::read_filter_block(
                     file,
                     &filter_block_location,
@@ -141,18 +162,22 @@ impl Table {
 
     /// Read a block from the current table at `location`, and cache it in the options' block
     /// cache.
-    fn read_block(&self, location: &BlockHandle) -> Result<Block> {
+    fn read_block(&self, location: &BlockHandle, options: ReadOptions) -> Result<Block> {
+        validate_location(location, self.file_size)?;
         let cachekey = self.block_cache_handle(location.offset());
         if let Some(block) = self.block_cache.borrow_mut().get(&cachekey) {
             return Ok(block.clone());
         }
 
         // Two times as_ref(): First time to get a ref from Rc<>, then one from Box<>.
-        let b =
-            table_block::read_table_block(self.opt.clone(), self.file.as_ref().as_ref(), location)?;
+        let b = table_block::read_table_block_with_checksum(
+            self.opt.clone(), self.file.as_ref().as_ref(), location, options.verify_checksums,
+        )?;
 
         // insert a cheap copy (Rc).
-        self.block_cache.borrow_mut().insert(&cachekey, b.clone());
+        if options.fill_cache {
+            self.block_cache.borrow_mut().insert(&cachekey, b.clone());
+        }
 
         Ok(b)
     }
@@ -173,11 +198,17 @@ impl Table {
 
     /// Iterators read from the file; thus only one iterator can be borrowed (mutably) per scope
     pub fn iter(&self) -> TableIterator {
+        self.iter_with_options(ReadOptions::verified())
+    }
+
+    pub(crate) fn iter_with_options(&self, options: ReadOptions) -> TableIterator {
         TableIterator {
             current_block: None,
             current_block_off: 0,
             index_block: self.indexblock.iter(),
             table: self.clone(),
+            error: None,
+            options,
         }
     }
 
@@ -193,13 +224,19 @@ impl Table {
     /// exact match; it depends on other comparators than the one that the table reader knows
     /// whether a match is acceptable.
     pub fn get(&self, key: InternalKey<'_>) -> Result<Option<(Bytes, Bytes)>> {
+        self.get_with_options(key, ReadOptions::verified())
+    }
+
+    pub(crate) fn get_with_options(&self, key: InternalKey<'_>, options: ReadOptions) -> Result<Option<(Bytes, Bytes)>> {
         let mut index_iter = self.indexblock.iter();
         index_iter.seek(key);
+        index_iter.status()?;
 
         let handle;
         if let Some((last_in_block, h)) = current_key_val(&index_iter) {
-            if self.opt.cmp.cmp(key, &last_in_block) == Ordering::Less {
-                handle = BlockHandle::decode(&h).unwrap().0;
+            if self.opt.cmp.cmp(key, &last_in_block) != Ordering::Greater {
+                handle = BlockHandle::decode(&h)
+                    .ok_or_else(|| Status::new(error::StatusCode::Corruption, "invalid block handle"))?.0;
             } else {
                 return Ok(None);
             }
@@ -217,11 +254,12 @@ impl Table {
         }
 
         // Read block (potentially from cache)
-        let tb = self.read_block(&handle)?;
+        let tb = self.read_block(&handle, options)?;
         let mut iter = tb.iter();
 
         // Go to entry and check if it's the wanted entry.
         iter.seek(key);
+        iter.status()?;
         if let Some((k, v)) = current_key_val(&iter) {
             if self.opt.cmp.cmp(&k, key) >= Ordering::Equal {
                 return Ok(Some((k.into(), v.into())));
@@ -244,9 +282,17 @@ pub struct TableIterator {
     current_block: Option<BlockIter>,
     current_block_off: usize,
     index_block: BlockIter,
+    error: Option<Status>,
+    options: ReadOptions,
 }
 
 impl TableIterator {
+    fn remember(&mut self, error: Status) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+    }
+
     // Skips to the entry referenced by the next entry in the index block.
     // This is called once a block has run out of entries.
     // Err means corruption or I/O error; Ok(true) means a new block was loaded; Ok(false) means
@@ -255,6 +301,7 @@ impl TableIterator {
         if let Some((_key, val)) = self.index_block.next() {
             self.load_block(&val).map(|_| true)
         } else {
+            self.index_block.status()?;
             Ok(false)
         }
     }
@@ -270,7 +317,7 @@ impl TableIterator {
             }
             Some(ok) => ok,
         };
-        let block = self.table.read_block(&new_block_handle)?;
+        let block = self.table.read_block(&new_block_handle, self.options)?;
 
         self.current_block = Some(block.iter());
         self.current_block_off = new_block_handle.offset();
@@ -281,36 +328,24 @@ impl TableIterator {
 
 impl LdbIterator for TableIterator {
     fn advance(&mut self) -> bool {
-        // Uninitialized case.
-        if self.current_block.is_none() {
+        loop {
+            if let Some(ref mut block) = self.current_block {
+                if block.advance() {
+                    return true;
+                }
+            }
+            if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                self.remember(error);
+            }
+            self.current_block = None;
             match self.skip_to_next_entry() {
-                Ok(true) => return self.advance(),
+                Ok(true) => {}
                 Ok(false) => {
                     self.reset();
                     return false;
                 }
-                // try next block from index, this might be corruption
-                Err(_) => return self.advance(),
+                Err(error) => self.remember(error),
             }
-        }
-
-        // Initialized case -- does the current block have more entries?
-        if let Some(ref mut cb) = self.current_block {
-            if cb.advance() {
-                return true;
-            }
-        }
-
-        // If the current block is exhausted, try loading the next block.
-        self.current_block = None;
-        match self.skip_to_next_entry() {
-            Ok(true) => self.advance(),
-            Ok(false) => {
-                self.reset();
-                false
-            }
-            // try next block, this might be corruption
-            Err(_) => self.advance(),
         }
     }
 
@@ -325,17 +360,25 @@ impl LdbIterator for TableIterator {
         if let Some((past_block, handle)) = current_key_val(&self.index_block) {
             if self.table.opt.cmp.cmp(to, &past_block) <= Ordering::Equal {
                 // ok, found right block: continue
-                if let Ok(()) = self.load_block(&handle) {
-                    // current_block is always set if load_block() returned Ok.
-                    let block = self.current_block.as_mut().unwrap();
-                    block.seek(to);
-                    if !block.valid() {
-                        // `to` lies between the block's last key and its index separator: the
-                        // wanted entry is the first one of the next block.
+                match self.load_block(&handle) {
+                    Ok(()) => {
+                        let block = self.current_block.as_mut().unwrap();
+                        block.seek(to);
+                        if !block.valid() {
+                            if let Err(error) = block.status() {
+                                self.remember(error);
+                            }
+                            self.current_block = None;
+                            self.advance();
+                        }
+                        return;
+                    }
+                    Err(error) => {
+                        self.remember(error);
                         self.current_block = None;
                         self.advance();
+                        return;
                     }
-                    return;
                 }
             }
         }
@@ -351,22 +394,30 @@ impl LdbIterator for TableIterator {
             }
         }
 
-        // Go back one block and look for the last entry in the previous block
-        if self.index_block.prev() {
-            if let Some((_, handle)) = current_key_val(&self.index_block) {
-                if self.load_block(&handle).is_ok() {
-                    self.current_block.as_mut().unwrap().seek_to_last();
-                    self.current_block.as_ref().unwrap().valid()
-                } else {
-                    self.reset();
-                    false
-                }
-            } else {
-                false
-            }
-        } else {
-            false
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
         }
+        self.current_block = None;
+        while self.index_block.prev() {
+            if let Some((_, handle)) = current_key_val(&self.index_block) {
+                match self.load_block(&handle) {
+                    Ok(()) => {
+                        self.current_block.as_mut().unwrap().seek_to_last();
+                        if self.current_block.as_ref().unwrap().valid() { return true; }
+                        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                            self.remember(error);
+                        }
+                    }
+                    Err(error) => {
+                        self.remember(error);
+                    }
+                }
+            }
+            self.current_block = None;
+        }
+        if let Err(error) = self.index_block.status() { self.remember(error); }
+        self.reset();
+        false
     }
 
     fn reset(&mut self) {
@@ -386,6 +437,11 @@ impl LdbIterator for TableIterator {
         } else {
             None
         }
+    }
+    fn status(&self) -> Result<()> {
+        self.index_block.status()?;
+        if let Some(block) = &self.current_block { block.status()?; }
+        self.error.clone().map_or(Ok(()), Err)
     }
 }
 
@@ -761,6 +817,22 @@ mod tests {
         assert!(table.get(b"zzy").unwrap().is_none());
         assert!(table.get(b"zz1").unwrap().is_none());
         assert!(table.get("zz{".as_bytes()).unwrap().is_none());
+    }
+
+    #[test]
+    fn get_accepts_a_key_equal_to_the_last_index_separator() {
+        let opt = options::for_test();
+        let mut contents = Vec::new();
+        {
+            let mut builder = TableBuilder::new_raw(opt.clone(), &mut contents);
+            builder.add(&[0xff], b"value").unwrap();
+            builder.finish().unwrap();
+        }
+        let size = contents.len();
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        let result = table.get(&[0xff]).unwrap().unwrap();
+        assert_eq!(result.0.as_ref(), &[0xff]);
+        assert_eq!(result.1.as_ref(), b"value");
     }
 
     // This test verifies that the table and filters work with internal keys. This means:

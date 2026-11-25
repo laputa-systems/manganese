@@ -146,7 +146,7 @@ fn db_get_benchmark(c: &mut Criterion) {
                     (fresh_db, key, fresh_temp_dir)
                 },
                 |(mut db, key_to_get, _temp_dir)| {
-                    assert!(db.get(black_box(&key_to_get)).is_some());
+                    assert!(db.get(black_box(&key_to_get)).unwrap().is_some());
                 },
                 BatchSize::SmallInput,
             );
@@ -167,7 +167,7 @@ fn db_get_benchmark(c: &mut Criterion) {
                     (fresh_db, non_existing_key.clone(), fresh_temp_dir)
                 },
                 |(mut db, key, _temp_dir)| {
-                    assert!(db.get(black_box(&key)).is_none());
+                    assert!(db.get(black_box(&key)).unwrap().is_none());
                 },
                 BatchSize::SmallInput,
             );

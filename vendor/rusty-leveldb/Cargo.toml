@@ -10,7 +10,7 @@ keywords = ["LevelDB", "key-value", "database", "SSTable", "Google"]
 license = "MIT"
 publish = true
 edition = "2021"
-include = ["src/**/*", "src/*", "Cargo.toml", "LICENSE", "README.md"]
+include = ["src/**/*", "src/*", "Cargo.toml", "LICENSE", "LEVELDB-LICENSE", "README.md"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

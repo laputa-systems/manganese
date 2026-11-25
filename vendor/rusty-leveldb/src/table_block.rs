@@ -48,17 +48,27 @@ pub fn read_table_block(
     f: &dyn RandomAccess,
     location: &BlockHandle,
 ) -> Result<Block> {
+    read_table_block_with_checksum(opt, f, location, true)
+}
+
+pub(crate) fn read_table_block_with_checksum(
+    opt: Options,
+    f: &dyn RandomAccess,
+    location: &BlockHandle,
+    verify_checksum: bool,
+) -> Result<Block> {
     let data_size = location.size();
     let trailer_size =
         table_builder::TABLE_BLOCK_COMPRESS_LEN + table_builder::TABLE_BLOCK_CKSUM_LEN;
-    let total_read_size = data_size + trailer_size;
+    let total_read_size = data_size.checked_add(trailer_size)
+        .ok_or_else(|| crate::Status::new(StatusCode::Corruption, "table block size overflow"))?;
 
     let mut combined_buf = vec![0; total_read_size];
     let bytes_read = f.read_at(location.offset(), &mut combined_buf)?;
 
     if bytes_read != total_read_size {
         return err(
-            StatusCode::IOError,
+            StatusCode::Corruption,
             "Failed to read complete block and trailer",
         );
     }
@@ -70,7 +80,7 @@ pub fn read_table_block(
 
     let expected_cksum = unmask_crc(u32::decode_fixed(cksum_slice));
 
-    if !verify_table_block(block_data_slice, compress_type, expected_cksum) {
+    if verify_checksum && !verify_table_block(block_data_slice, compress_type, expected_cksum) {
         return err(
             StatusCode::Corruption,
             &format!(
@@ -87,7 +97,7 @@ pub fn read_table_block(
         .get(compress_type)?
         .decode(block_data_slice.to_vec())?;
 
-    Ok(Block::new(opt, decoded_data.into()))
+    Block::try_new(opt, decoded_data.into())
 }
 
 /// Verify checksum of block

@@ -60,6 +60,11 @@ pub trait LdbIterator {
     /// implementations.
     fn prev(&mut self) -> bool;
 
+    /// Returns the first error encountered by this iterator.
+    fn status(&self) -> Result<()> {
+        Ok(())
+    }
+
     // default implementations.
 
     /// next is like Iterator::next(). It's implemented here because Rust disallows implementing a
@@ -111,6 +116,9 @@ impl LdbIterator for Box<dyn LdbIterator> {
     }
     fn prev(&mut self) -> bool {
         self.as_mut().prev()
+    }
+    fn status(&self) -> Result<()> {
+        self.as_ref().status()
     }
 }
 

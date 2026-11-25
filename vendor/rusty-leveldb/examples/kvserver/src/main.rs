@@ -15,10 +15,10 @@ impl KVService {
         rp.set_status(200);
         rp.set_content_type("text/plain");
 
-        if let Some(val) = val {
-            rp.append(val.to_vec());
-        } else {
-            rp.set_status(404);
+        match val {
+            Ok(Some(val)) => rp.append(val.to_vec()),
+            Ok(None) => rp.set_status(404),
+            Err(_) => rp.set_status(500),
         }
         rp
     }

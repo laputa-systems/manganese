@@ -377,7 +377,7 @@ mod tests {
     use crate::table_block;
     use crate::table_builder::{Footer, FULL_FOOTER_LENGTH};
     use crate::types::LdbIterator;
-    use crate::{in_memory, DB};
+    use crate::{in_memory, ReadOptions, DB};
     use std::io::{Read, Write};
     use std::path::PathBuf;
 
@@ -420,6 +420,22 @@ mod tests {
         bytes[handle.offset() + handle.size() + 1] ^= 1;
     }
 
+    fn corrupt_first_entry_with_valid_checksum(opt: &Options, path: &Path, bytes: &mut [u8]) {
+        let footer = Footer::decode(&bytes[bytes.len() - FULL_FOOTER_LENGTH..]).unwrap();
+        let file = opt.env.open_random_access_file(path).unwrap();
+        let index = table_block::read_table_block(opt.clone(), file.as_ref(), &footer.index).unwrap();
+        let mut iter = index.iter();
+        assert!(iter.advance());
+        let (_, encoded) = iter.current().unwrap();
+        let (handle, _) = BlockHandle::decode(&encoded).unwrap();
+        let start = handle.offset();
+        let end = start + handle.size();
+        bytes[start] = 0x7f;
+        let mut digest = crate::crc::digest();
+        digest.update(&bytes[start..=end]);
+        bytes[end + 1..end + 5].copy_from_slice(&crate::log::mask_crc(digest.finalize()).to_le_bytes());
+    }
+
     #[test]
     fn repairs_logs_and_archives_old_files() {
         let opt = in_memory();
@@ -435,8 +451,8 @@ mod tests {
         assert!(archived.iter().any(|p| p.extension().and_then(|s| s.to_str()) == Some("log")));
         assert!(archived.iter().any(|p| p.file_name().and_then(|s| s.to_str()).is_some_and(|s| s.starts_with("MANIFEST-"))));
         let mut db = DB::open("db", opt).unwrap();
-        assert_eq!(db.get(b"keep").as_deref(), Some(b"value".as_slice()));
-        assert!(db.get(b"deleted").is_none());
+        assert_eq!(db.get(b"keep").unwrap().as_deref(), Some(b"value".as_slice()));
+        assert!(db.get(b"deleted").unwrap().is_none());
     }
 
     #[test]
@@ -447,8 +463,8 @@ mod tests {
         opt.env.delete(Path::new("db/CURRENT")).unwrap();
         repair_db("db", opt.clone()).unwrap();
         let mut db = DB::open("db", opt).unwrap();
-        assert_eq!(db.get(b"key00").as_deref(), Some([0u8; 100].as_slice()));
-        assert_eq!(db.get(b"key39").as_deref(), Some([39u8; 100].as_slice()));
+        assert_eq!(db.get(b"key00").unwrap().as_deref(), Some([0u8; 100].as_slice()));
+        assert_eq!(db.get(b"key39").unwrap().as_deref(), Some([39u8; 100].as_slice()));
     }
 
     #[test]
@@ -462,8 +478,95 @@ mod tests {
         let archived = Path::new("db/lost").join(path.file_name().unwrap());
         assert!(opt.env.exists(&archived).unwrap());
         let mut db = DB::open("db", opt).unwrap();
-        assert!(db.get(b"key00").is_none());
-        assert_eq!(db.get(b"key39").as_deref(), Some([39u8; 100].as_slice()));
+        assert!(db.get(b"key00").unwrap().is_none());
+        assert_eq!(db.get(b"key39").unwrap().as_deref(), Some([39u8; 100].as_slice()));
+    }
+
+    #[test]
+    fn corrupted_table_get_reports_corruption() {
+        let (opt, path, mut bytes) = table_database();
+        corrupt_first_data_checksum(&opt, &path, &mut bytes);
+        overwrite(&opt, &path, &bytes);
+        let mut db = DB::open("db", opt).unwrap();
+        let snapshot = db.get_snapshot();
+        assert_eq!(db.get_at(&snapshot, b"key00").unwrap_err().code, StatusCode::Corruption);
+        assert_eq!(db.get(b"key00").unwrap_err().code, StatusCode::Corruption);
+    }
+
+    #[test]
+    fn corrupted_table_iterator_reports_sticky_status() {
+        let (opt, path, mut bytes) = table_database();
+        corrupt_first_data_checksum(&opt, &path, &mut bytes);
+        overwrite(&opt, &path, &bytes);
+        let mut db = DB::open("db", opt).unwrap();
+        let mut iter = db.new_iter().unwrap();
+        while iter.advance() {}
+        assert_eq!(iter.status().unwrap_err().code, StatusCode::Corruption);
+        iter.reset();
+        assert_eq!(iter.status().unwrap_err().code, StatusCode::Corruption);
+    }
+
+    #[test]
+    fn seek_and_reverse_iteration_preserve_corruption_status() {
+        let (opt, path, mut bytes) = table_database();
+        corrupt_first_data_checksum(&opt, &path, &mut bytes);
+        overwrite(&opt, &path, &bytes);
+        let mut db = DB::open("db", opt).unwrap();
+        let mut sought = db.new_iter().unwrap();
+        sought.seek(b"key00");
+        assert_eq!(sought.status().unwrap_err().code, StatusCode::Corruption);
+        let mut reverse = db.new_iter().unwrap();
+        reverse.seek(b"key39");
+        assert!(reverse.valid());
+        while reverse.prev() {}
+        assert_eq!(reverse.status().unwrap_err().code, StatusCode::Corruption);
+    }
+
+    #[test]
+    fn read_options_control_checksum_verification_and_cache_fill() {
+        let (opt, path, mut bytes) = table_database();
+        corrupt_first_data_checksum(&opt, &path, &mut bytes);
+        overwrite(&opt, &path, &bytes);
+        let mut db = DB::open("db", opt).unwrap();
+        let unchecked = ReadOptions { verify_checksums: false, fill_cache: false };
+        assert_eq!(db.get_with_options(b"key00", unchecked).unwrap().as_deref(), Some([0u8; 100].as_slice()));
+        let checked = ReadOptions { verify_checksums: true, fill_cache: false };
+        assert_eq!(db.get_with_options(b"key00", checked).unwrap_err().code, StatusCode::Corruption);
+        let mut iter = db.new_iter_with_options(unchecked).unwrap();
+        iter.seek(b"key00");
+        assert_eq!(iter.current().unwrap().0.as_ref(), b"key00");
+        assert!(iter.status().is_ok());
+    }
+
+    #[test]
+    fn truncated_table_footer_returns_corruption() {
+        let (opt, path, bytes) = table_database();
+        let mut db = DB::open("db", opt.clone()).unwrap();
+        overwrite(&opt, &path, &bytes[..8]);
+        let snapshot = db.get_snapshot();
+        assert_eq!(db.get_at(&snapshot, b"key00").unwrap_err().code, StatusCode::Corruption);
+    }
+
+    #[test]
+    fn malformed_block_with_valid_checksum_reports_corruption() {
+        let (opt, path, mut bytes) = table_database();
+        corrupt_first_entry_with_valid_checksum(&opt, &path, &mut bytes);
+        overwrite(&opt, &path, &bytes);
+        let mut db = DB::open("db", opt).unwrap();
+        let snapshot = db.get_snapshot();
+        assert_eq!(db.get_at(&snapshot, b"key00").unwrap_err().code, StatusCode::Corruption);
+        let mut iter = db.new_iter().unwrap();
+        while iter.advance() {}
+        assert_eq!(iter.status().unwrap_err().code, StatusCode::Corruption);
+    }
+
+    #[test]
+    fn missing_live_table_is_not_reported_as_a_missing_key() {
+        let (opt, path, _) = table_database();
+        let mut db = DB::open("db", opt.clone()).unwrap();
+        opt.env.delete(&path).unwrap();
+        let snapshot = db.get_snapshot();
+        assert!(db.get_at(&snapshot, b"key00").is_err());
     }
 
     #[test]

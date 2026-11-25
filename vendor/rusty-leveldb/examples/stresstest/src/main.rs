@@ -34,7 +34,7 @@ fn read(db: &mut DB, n: usize) -> usize {
     for _ in 0..n {
         let k = gen_string(KEY_LEN);
 
-        if db.get(k.as_bytes()).is_some() {
+        if db.get(k.as_bytes()).unwrap().is_some() {
             succ += 1;
         }
     }

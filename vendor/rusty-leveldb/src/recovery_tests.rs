@@ -40,9 +40,9 @@ fn nonparanoid_recovery_skips_a_corrupt_block_and_continues() {
     overwrite(&options, &log, &contents);
     options.paranoid_checks = false;
     let mut db = DB::open("db", options).unwrap();
-    assert!(db.get(b"first").is_none());
-    assert!(db.get(b"middle").is_none());
-    assert_eq!(db.get(b"last").as_deref(), Some(b"three".as_slice()));
+    assert!(db.get(b"first").unwrap().is_none());
+    assert!(db.get(b"middle").unwrap().is_none());
+    assert_eq!(db.get(b"last").unwrap().as_deref(), Some(b"three".as_slice()));
 }
 
 #[test]
@@ -66,8 +66,8 @@ fn truncated_log_tail_preserves_complete_commits_in_both_modes() {
             overwrite(&options, &log, &full[..cut]);
             options.paranoid_checks = paranoid;
             let mut db = DB::open("db", options).unwrap();
-            assert_eq!(db.get(b"first").as_deref(), Some(b"one".as_slice()));
-            assert!(db.get(b"last").is_none());
+            assert_eq!(db.get(b"first").unwrap().as_deref(), Some(b"one".as_slice()));
+            assert!(db.get(b"last").unwrap().is_none());
         }
     }
 }
@@ -94,7 +94,7 @@ fn malformed_batch_is_reported_or_skipped_without_panicking() {
             assert_corrupt(options);
         } else {
             let mut db = DB::open("db", options).unwrap();
-            assert_eq!(db.get(b"last").as_deref(), Some(b"three".as_slice()));
+            assert_eq!(db.get(b"last").unwrap().as_deref(), Some(b"three".as_slice()));
         }
     }
 }
@@ -117,8 +117,8 @@ fn nonparanoid_recovery_keeps_entries_parsed_before_a_bad_count() {
     overwrite(&options, &log, &contents);
     options.paranoid_checks = false;
     let mut db = DB::open("db", options).unwrap();
-    assert_eq!(db.get(b"first").as_deref(), Some(b"one".as_slice()));
-    assert_eq!(db.get(b"second").as_deref(), Some(b"two".as_slice()));
+    assert_eq!(db.get(b"first").unwrap().as_deref(), Some(b"one".as_slice()));
+    assert_eq!(db.get(b"second").unwrap().as_deref(), Some(b"two".as_slice()));
 }
 
 #[test]

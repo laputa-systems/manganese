@@ -6,7 +6,7 @@ use crate::block::Block;
 use crate::cache::{self, Cache};
 use crate::error::{err, Result, StatusCode};
 use crate::key_types::InternalKey;
-use crate::options::Options;
+use crate::options::{Options, ReadOptions};
 use crate::table_reader::Table;
 use crate::types::{FileNum, Shared};
 
@@ -58,8 +58,14 @@ impl TableCache {
         file_num: FileNum,
         key: InternalKey<'_>,
     ) -> Result<Option<(Bytes, Bytes)>> {
+        self.get_with_options(file_num, key, ReadOptions::verified())
+    }
+
+    pub(crate) fn get_with_options(
+        &mut self, file_num: FileNum, key: InternalKey<'_>, options: ReadOptions,
+    ) -> Result<Option<(Bytes, Bytes)>> {
         let tbl = self.get_table(file_num)?;
-        tbl.get(key)
+        tbl.get_with_options(key, options)
     }
 
     /// Return a table from cache, or open the backing file, then cache and return it.
