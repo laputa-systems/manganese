@@ -11,14 +11,14 @@ sh scripts/setup-dev
 make check lint
 ```
 
-`scripts/setup-dev` is idempotent. It installs the packages below, starts Docker (through OpenRC when the host runs it, otherwise `dockerd` directly), installs the pinned Rust toolchain from `rust-toolchain.toml` through rustup, and installs kache from a pinned release after checking its SHA-256. It refuses any distribution other than Alpine. Add `~/.cargo/bin` to `PATH` afterwards.
+`scripts/setup-dev` is idempotent. It installs the packages below, starts Docker (through OpenRC when the host runs it, otherwise `dockerd` directly), installs the pinned Rust toolchain from `rust-toolchain.toml` through rustup, and installs kache from a pinned release after checking its SHA-256. It refuses any distribution other than Alpine. When it starts `dockerd` itself on an overlay-backed root, as inside a container, it uses the `vfs` storage driver, which is correct but slow and disk-hungry for the oracle builder image. Add `~/.cargo/bin` to `PATH` afterwards.
 
 | Package | Consumer |
 |---|---|
 | `bash`, `python3` | The frozen build driver `oracle/build/chromium-build` and the frozen verifier `oracle/build/scripts/install-runtime.py` |
 | `llvm` | `llvm-readelf`, used by the frozen verifier and by `scripts/check` |
 | `docker`, `docker-cli-buildx` | The oracle builder image, the launch harness and container workloads |
-| `build-base`, `mold` | Linking Rust executables as musl-dynamic PIEs (`.cargo/config.toml`) |
+| `build-base`, `mold` | Linking Rust executables as musl-dynamic PIEs (`.cargo/config.toml`); GCC's static `libgcc_eh.a` supplies the unwinder through the alias `scripts/setup-dev` installs in `/usr/local/lib/manganese/static-unwind` |
 | `rustup` | The pinned nightly toolchain and its musl targets |
 | `curl`, `ca-certificates`, `git`, `tar`, `xz` | Fetching pinned inputs and artifacts |
 | `make`, `shellcheck` | `make check lint` |

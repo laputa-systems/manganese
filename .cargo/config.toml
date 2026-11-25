@@ -1,7 +1,8 @@
-# Manganese links its executables as musl-dynamic PIEs (docs/requirements.md T05),
-# with mold on Linux campaign hosts.
+# Manganese executables are musl-dynamic PIEs (docs/requirements.md T05), linked
+# with mold. scripts/setup-dev provides the static unwinder alias below, so the
+# only DT_NEEDED entry is musl libc.
 [target.x86_64-unknown-linux-musl]
-rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold", "-L", "native=/usr/local/lib/manganese/static-unwind"]
 
 [target.aarch64-unknown-linux-musl]
-rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold"]
+rustflags = ["-C", "target-feature=-crt-static", "-C", "link-arg=-fuse-ld=mold", "-L", "native=/usr/local/lib/manganese/static-unwind"]

@@ -39,7 +39,13 @@ if ! docker_ready; then
         as_root rc-update add docker default >/dev/null 2>&1 || true
         as_root rc-service docker start
     else
-        as_root sh -c 'dockerd >/var/log/dockerd.log 2>&1 &'
+        # dockerd cannot stack overlay storage on an overlay root, as inside a container.
+        as_root mkdir -p /var/lib/docker
+        driver=
+        if [ "$(stat -f -c %T /var/lib/docker 2>/dev/null)" = overlayfs ]; then
+            driver=--storage-driver=vfs
+        fi
+        as_root sh -c "dockerd $driver >/var/log/dockerd.log 2>&1 &"
     fi
     tries=0
     until docker_ready; do
@@ -49,6 +55,12 @@ if ! docker_ready; then
     done
 fi
 docker_ready || fail "docker is not usable by $(id -un); add the user to the docker group or run as root"
+
+# Rust links libgcc_s for unwinding when musl is dynamic, and the appliance has
+# no libgcc_s. An alias makes the link use GCC's static unwinder (.cargo/config.toml).
+unwind_dir=/usr/local/lib/manganese/static-unwind
+as_root mkdir -p "$unwind_dir"
+as_root ln -sf "$(gcc -print-file-name=libgcc_eh.a)" "$unwind_dir/libgcc_s.a"
 
 cargo_bin=${CARGO_HOME:-$HOME/.cargo}/bin
 if [ ! -x "$cargo_bin/rustup" ]; then

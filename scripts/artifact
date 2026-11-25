@@ -2,7 +2,8 @@
 # Fetch and publish frozen artifacts by digest.
 #   artifact fetch NAME     download NAME from oracle/frozen/artifacts.lock into the store and print its path
 #   artifact path NAME      print the store path of NAME if it is already present and verified
-#   artifact publish REPOSITORY:TAG FILE...   publish files as one OCI layout through stuff (needs oras and stuff credentials)
+#   artifact publish REPOSITORY:TAG FILE...   publish files as one OCI layout through stuff (needs oras and stuff credentials;
+#                                              ARTIFACT_DRY_RUN=1 shows the plan without uploading)
 set -eu
 
 fail() { printf 'artifact: %s\n' "$*" >&2; exit 1; }
@@ -65,7 +66,11 @@ case $cmd in
             [ "$(dirname "$file")" = "$dir" ] || fail "publish files from one directory at a time"
         done
         (cd "$dir" && for file in "$@"; do basename "$file"; done | xargs oras push --oci-layout "$layout:$tag")
-        stuff publish oci --layout "$layout" --repository "$repository" --tag "$tag"
+        if [ -n "${ARTIFACT_DRY_RUN:-}" ]; then
+            stuff publish oci --layout "$layout" --repository "$repository" --tag "$tag" --dry-run
+        else
+            stuff publish oci --layout "$layout" --repository "$repository" --tag "$tag"
+        fi
         ;;
     *)
         fail "usage: artifact fetch NAME | path NAME | publish REPOSITORY:TAG FILE..."
