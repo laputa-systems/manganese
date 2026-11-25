@@ -687,4 +687,15 @@ mod streaming_tests {
         assert_eq!(decoder.read(&mut output).unwrap(), 3);
         assert_eq!(&output, b"def");
     }
+
+    #[test]
+    fn empty_compressed_block_is_accepted() {
+        let frame = [0x28, 0xb5, 0x2f, 0xfd, 0x24, 0x00, 0x05, 0x00, 0x00, 0x99, 0xe9, 0xd8, 0x51];
+        let mut input = &frame[..];
+        let mut decoder = FrameDecoder::new();
+        decoder.init(&mut input).unwrap();
+        decoder.decode_blocks(&mut input, BlockDecodingStrategy::All).unwrap();
+        assert!(decoder.is_finished());
+        assert_eq!(decoder.can_collect(), 0);
+    }
 }

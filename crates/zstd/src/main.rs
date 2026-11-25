@@ -71,6 +71,7 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
                 decoder.append_raw_content(&pending[..count]).ok()?;
                 pending.drain(..count);
                 let mut buffer = vec![0; output_size];
+                let before = produced.len();
                 while decoder.can_collect() != 0 {
                     let count = decoder.read(&mut buffer).ok()?;
                     if count == 0 { return None; }
@@ -85,6 +86,7 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
                 if last {
                     if (validate_frame_size || last_nonempty) && expected_size.is_some_and(|size| size != frame_size) {
                         status = 1;
+                        produced.truncate(before);
                         break;
                     }
                     if checksum { awaiting_checksum = true; } else { active = false; delivered_frames = produced.len(); fresh = true; }
@@ -121,10 +123,17 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
                 let header_len = 5 + usize::from(!single) + dict_len + content_len;
                 if pending.len() < header_len { break; }
                 let dict_offset = 5 + usize::from(!single);
-                if desc & 8 != 0 || pending[dict_offset..dict_offset + dict_len].iter().any(|&b| b != 0) {
-                    status = 1;
-                    break;
-                }
+                if desc & 8 != 0 { status = 1; break; }
+                if !single && (pending[5] >> 3) + 10 > 31 { status = 2; break; }
+                if pending[dict_offset..dict_offset + dict_len].iter().any(|&b| b != 0) { status = 1; break; }
+                let fcs_at = dict_offset + dict_len;
+                let fcs = match content_len {
+                    0 => None,
+                    n => Some(pending[fcs_at..fcs_at + n].iter().rev().fold(0u64, |a, &b| a << 8 | u64::from(b)) + if n == 2 { 256 } else { 0 }),
+                };
+                let shortcut = fresh && fcs.is_some_and(|size| size <= output_size as u64)
+                    && complete_frame(&pending, header_len, desc & 4 != 0);
+                decoder.set_max_window_size(if shortcut { 1 << 32 } else { 1 << window_log });
                 let mut header = &pending[..header_len];
                 match decoder.init(&mut header) {
                     Ok(()) => {}
@@ -133,8 +142,7 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
                 }
                 if !dictionary.is_empty() { decoder.force_raw_dictionary(dictionary).ok()?; }
                 expected_size = if content_len == 0 { None } else { Some(decoder.content_size()) };
-                validate_frame_size = fresh && expected_size.is_some_and(|size| size <= output_size as u64)
-                    && complete_frame(&pending, header_len, desc & 4 != 0);
+                validate_frame_size = shortcut;
                 frame_size = 0;
                 let window = if single {
                     decoder.content_size()
@@ -152,12 +160,20 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
             let block = u32::from_le_bytes([pending[0], pending[1], pending[2], 0]);
             let kind = (block >> 1) & 3;
             if kind == 3 { status = 1; break; }
-            if kind == 1 && block_limit == 0 { status = 1; break; }
+            if kind == 1 && block_limit == 0 && !validate_frame_size { status = 1; break; }
+            if kind == 2 && block >> 3 == 0 && validate_frame_size { status = 1; break; }
             if kind == 1 && pending.len() < 4 { break; }
-            if (block >> 3) as usize > block_limit { status = 1; break; }
+            if (block >> 3) as usize > block_limit && !(validate_frame_size && kind < 2) { status = 1; break; }
             let block_size = if kind == 1 { 1 } else { (block >> 3) as usize };
             let last = block & 1 != 0;
             if last { last_nonempty = block_size != 0; }
+            if kind == 1 && validate_frame_size {
+                let size = (block >> 3) as usize;
+                let mut raw = ((block & 1) | ((size as u32) << 3)).to_le_bytes()[..3].to_vec();
+                raw.resize(3 + size, pending[3]);
+                pending.splice(..4, raw);
+                continue;
+            }
             if kind == 0 {
                 pending.drain(..3);
                 raw_block = Some((block_size, last));
@@ -173,6 +189,7 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
                 break;
             }
             let mut buffer = vec![0; output_size];
+            let before = produced.len();
             while decoder.can_collect() != 0 {
                 let count = decoder.read(&mut buffer).ok()?;
                 if count == 0 { return None; }
@@ -183,13 +200,15 @@ fn decode(request: &[u8]) -> Option<Vec<u8>> {
             if last {
                 if (validate_frame_size || last_nonempty) && expected_size.is_some_and(|size| size != frame_size) {
                     status = 1;
+                    produced.truncate(before);
                     break;
                 }
                 if checksum { awaiting_checksum = true; } else { active = false; delivered_frames = produced.len(); fresh = true; }
             }
         }
         if status != 0 {
-            let delivered = delivered_frames + (produced.len() - delivered_frames).saturating_sub(1) / output_size * output_size;
+            let whole = if active && validate_frame_size { 0 } else { produced.len() - delivered_frames };
+            let delivered = delivered_frames + whole.saturating_sub(1) / output_size * output_size;
             produced.truncate(delivered);
         }
         response.extend_from_slice(&(produced.len() as u32).to_be_bytes());

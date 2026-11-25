@@ -90,6 +90,11 @@ impl BlockDecoder {
                 panic!("How did you even get this. The decoder should error out if it detects a reserved-type block");
             }
 
+            BlockType::Compressed if header.content_size == 0 => {
+                self.internal_state = DecoderState::ReadyToDecodeNextHeader;
+                Ok(0)
+            }
+
             BlockType::Compressed => {
                 self.decompress_block(header, workspace, source, max_block_len)?;
 
