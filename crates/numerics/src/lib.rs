@@ -81,7 +81,16 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{shortest, ShortestStyle};
+    use super::{fixed, shortest, ShortestStyle};
+
+    #[test]
+    fn fixed_rounds_exact_values_away_from_zero() {
+        assert_eq!(fixed(1.25, 1).as_deref(), Some("1.3"));
+        assert_eq!(fixed(-1.25, 1).as_deref(), Some("-1.3"));
+        assert_eq!(fixed(-0.0, 2).as_deref(), Some("-0.00"));
+        assert_eq!(fixed(0.1, 17).as_deref(), Some("0.10000000000000001"));
+        assert_eq!(fixed(1e60, 2), None);
+    }
 
     #[test]
     fn shortest_rounds_decimal_halfway_to_even() {
@@ -99,4 +108,51 @@ mod tests {
         assert_eq!(shortest(f64::INFINITY, ShortestStyle::Base), None);
         assert_eq!(shortest(f64::INFINITY, ShortestStyle::EcmaScript).as_deref(), Some("Infinity"));
     }
+}
+
+pub fn fixed(value: f64, places: usize) -> Option<String> {
+    if !value.is_finite() || value.abs() >= 1e60 || places > 100 { return None; }
+    let bits = value.to_bits();
+    let encoded = ((bits >> 52) & 0x7ff) as i32;
+    let mut significand = bits & ((1 << 52) - 1);
+    let exponent = if encoded == 0 { -1074 } else {
+        significand |= 1 << 52;
+        encoded - 1075
+    };
+    let mut digits: Vec<u8> = significand.to_string().bytes().rev().map(|b| b - b'0').collect();
+    let (factor, count, scale) = if exponent < 0 { (5, -exponent, -exponent as usize) } else { (2, exponent, 0) };
+    for _ in 0..count {
+        let mut carry = 0;
+        for digit in &mut digits {
+            let next = *digit * factor + carry;
+            *digit = next % 10;
+            carry = next / 10;
+        }
+        if carry > 0 { digits.push(carry); }
+    }
+    if scale > places {
+        let drop = scale - places;
+        let round_up = digits.get(drop - 1).is_some_and(|&digit| digit >= 5);
+        if drop >= digits.len() { digits.clear(); } else { digits.drain(..drop); }
+        if round_up {
+            let mut carry = 1;
+            for digit in &mut digits {
+                let next = *digit + carry;
+                *digit = next % 10;
+                carry = next / 10;
+                if carry == 0 { break; }
+            }
+            if carry != 0 { digits.push(carry); }
+        }
+    } else {
+        digits.splice(0..0, std::iter::repeat_n(0, places - scale));
+    }
+    digits.resize(digits.len().max(places + 1), 0);
+    let mut result = String::new();
+    if value.is_sign_negative() { result.push('-'); }
+    for (index, digit) in digits.iter().enumerate().rev() {
+        result.push(char::from(b'0' + *digit));
+        if index == places && places > 0 { result.push('.'); }
+    }
+    Some(result)
 }
