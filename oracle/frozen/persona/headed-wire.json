@@ -1,0 +1,514 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "wire"
+  },
+  "mode": "headed",
+  "result": {
+    "http": {
+      "GET / HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "Upgrade-Insecure-Requests",
+            "1"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Accept",
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/jxl,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "GET /fetch HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Accept",
+            "*/*"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ],
+          [
+            "Cookie",
+            {
+              "structure": "fixture-name-and-value"
+            }
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "GET /image HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Accept",
+            "image/jxl,image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ],
+          [
+            "Cookie",
+            {
+              "structure": "fixture-name-and-value"
+            }
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "GET /script HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Accept",
+            "*/*"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ],
+          [
+            "Cookie",
+            {
+              "structure": "fixture-name-and-value"
+            }
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "GET /websocket HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "Upgrade"
+          ],
+          [
+            "Pragma",
+            "no-cache"
+          ],
+          [
+            "Cache-Control",
+            "no-cache"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Upgrade",
+            "websocket"
+          ],
+          [
+            "Origin",
+            "http://nav.persona.test"
+          ],
+          [
+            "Sec-WebSocket-Version",
+            "13"
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ],
+          [
+            "Cookie",
+            {
+              "structure": "fixture-name-and-value"
+            }
+          ],
+          [
+            "Sec-WebSocket-Key",
+            "<base64-16-bytes>"
+          ],
+          [
+            "Sec-WebSocket-Extensions",
+            "permessage-deflate; client_max_window_bits"
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "GET /xhr HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "nav.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Accept",
+            "*/*"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ],
+          [
+            "Cookie",
+            {
+              "structure": "fixture-name-and-value"
+            }
+          ]
+        ],
+        "host": "nav.persona.test"
+      },
+      "OPTIONS /cors HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "cross.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "Accept",
+            "*/*"
+          ],
+          [
+            "Access-Control-Request-Method",
+            "POST"
+          ],
+          [
+            "Access-Control-Request-Headers",
+            "x-persona"
+          ],
+          [
+            "Origin",
+            "http://nav.persona.test"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Sec-Fetch-Mode",
+            "cors"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ]
+        ],
+        "host": "cross.persona.test"
+      },
+      "POST /cors HTTP/1.1": {
+        "headers": [
+          [
+            "Host",
+            "cross.persona.test"
+          ],
+          [
+            "Connection",
+            "keep-alive"
+          ],
+          [
+            "Content-Length",
+            "4"
+          ],
+          [
+            "User-Agent",
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+          ],
+          [
+            "Content-Type",
+            "text/plain;charset=UTF-8"
+          ],
+          [
+            "X-Persona",
+            "test"
+          ],
+          [
+            "Accept",
+            "*/*"
+          ],
+          [
+            "Origin",
+            "http://nav.persona.test"
+          ],
+          [
+            "Referer",
+            {
+              "structure": "fixture-origin-and-root-path"
+            }
+          ],
+          [
+            "Accept-Encoding",
+            "gzip, deflate"
+          ],
+          [
+            "Accept-Language",
+            "en-US,en;q=0.9"
+          ]
+        ],
+        "host": "cross.persona.test"
+      }
+    },
+    "http2": {
+      "reason": "The fixture closes after ClientHello and cannot complete TLS with a trusted certificate; no HTTP/2 frames are observable.",
+      "status": "unobservable-without-trust"
+    },
+    "tls": {
+      "exact": {
+        "cipherSuites": [
+          "GREASE",
+          4865,
+          4866,
+          4867,
+          49195,
+          49199,
+          49196,
+          49200,
+          52393,
+          52392,
+          49171,
+          49172,
+          156,
+          157,
+          47,
+          53
+        ],
+        "extensionSet": [
+          0,
+          10,
+          11,
+          13,
+          16,
+          17613,
+          18,
+          23,
+          27,
+          35,
+          43,
+          45,
+          5,
+          51,
+          51764,
+          65037,
+          65281,
+          "GREASE",
+          "GREASE"
+        ],
+        "legacyVersion": 771,
+        "values": {
+          "10": [
+            "GREASE",
+            4588,
+            29,
+            23,
+            24
+          ],
+          "13": [
+            "GREASE",
+            2308,
+            2309,
+            2310,
+            1027,
+            2052,
+            1025,
+            1283,
+            2053,
+            1281,
+            2054,
+            1537
+          ],
+          "16": [
+            "h2",
+            "http/1.1"
+          ],
+          "17613": [
+            "h2"
+          ],
+          "27": [
+            2
+          ],
+          "35": {
+            "length": 0
+          },
+          "43": [
+            "GREASE",
+            772,
+            771
+          ],
+          "45": [
+            1
+          ],
+          "51": [
+            {
+              "group": "GREASE",
+              "keyLength": 1
+            },
+            {
+              "group": 4588,
+              "keyLength": 1216
+            },
+            {
+              "group": 29,
+              "keyLength": 32
+            }
+          ],
+          "65037": {
+            "lengths": [
+              186,
+              218,
+              250,
+              282
+            ],
+            "type": 0
+          }
+        }
+      },
+      "varying": {
+        "bound": "at least 12 connections and at least 2 distinct extension permutations; ECH length is one of 186, 218, 250, 282 bytes",
+        "comparator": "tolerance",
+        "relationships": [
+          "extension set and non-GREASE values are identical",
+          "GREASE extensions occupy first and last positions",
+          "GREASE values follow the 0x?a?a pattern with equal bytes",
+          "ECH outer type is zero"
+        ]
+      }
+    }
+  },
+  "varying": {
+    "http": {
+      "bound": "WebSocket key decodes to exactly 16 bytes; fixture cookie and referer match their declared structure",
+      "class": "tolerance"
+    },
+    "tls": {
+      "bound": "at least 12 connections and at least 2 distinct extension permutations; ECH length is one of 186, 218, 250, 282 bytes",
+      "comparator": "tolerance",
+      "relationships": [
+        "extension set and non-GREASE values are identical",
+        "GREASE extensions occupy first and last positions",
+        "GREASE values follow the 0x?a?a pattern with equal bytes",
+        "ECH outer type is zero"
+      ]
+    }
+  }
+}

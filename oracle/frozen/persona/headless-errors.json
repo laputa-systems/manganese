@@ -1,0 +1,43 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "errors"
+  },
+  "mode": "headless",
+  "result": {
+    "array": {
+      "message": "Invalid array length",
+      "name": "RangeError",
+      "stack": "RangeError: Invalid array length\n    at array (<fixture>)\n    at <fixture>"
+    },
+    "json": {
+      "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)",
+      "name": "SyntaxError",
+      "stack": "SyntaxError: Expected property name or '}' in JSON at position 1 (line 1 column 2)\n    at JSON.parse (<anonymous>)\n    at json (<fixture>)\n    at <fixture>"
+    },
+    "nullProperty": {
+      "message": "Cannot read properties of null (reading 'foo')",
+      "name": "TypeError",
+      "stack": "TypeError: Cannot read properties of null (reading 'foo')\n    at nullProperty (<fixture>)\n    at <fixture>"
+    },
+    "regexp": {
+      "message": "Invalid regular expression: /[/: Unterminated character class",
+      "name": "SyntaxError",
+      "stack": "SyntaxError: Invalid regular expression: /[/: Unterminated character class\n    at new RegExp (<anonymous>)\n    at regexp (<fixture>)\n    at <fixture>"
+    },
+    "type": {
+      "message": "Cannot convert undefined or null to object",
+      "name": "TypeError",
+      "stack": "TypeError: Cannot convert undefined or null to object\n    at Object.keys (<anonymous>)\n    at type (<fixture>)\n    at <fixture>"
+    },
+    "uri": {
+      "message": "URI malformed",
+      "name": "URIError",
+      "stack": "URIError: URI malformed\n    at decodeURIComponent (<anonymous>)\n    at uri (<fixture>)\n    at <fixture>"
+    }
+  }
+}

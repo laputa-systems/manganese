@@ -55,3 +55,6 @@ assembly:
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
 .PHONY: setup check lint test artifact-selftest oracle-launch oracle-gate-a census box assembly
+.PHONY: persona-inventory
+persona-inventory:
+	python3 -B oracle/probes/persona/run.py
