@@ -8,6 +8,7 @@ import checks
 import client_sdk
 import durability
 import launch
+import trace
 
 
 def copy_extension(image: str, destination: Path) -> None:
@@ -18,12 +19,13 @@ def copy_extension(image: str, destination: Path) -> None:
         launch.run(['docker', 'rm', '-f', container])
 
 
-def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[Path, bool], object]) -> dict[str, dict[str, object]]:
+def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[Path, bool], object], endpoint: str = "http://127.0.0.1:9221") -> dict[str, dict[str, object]]:
     directory.mkdir(parents=True)
     switch_dir = directory / 'switch'
     switch_dir.mkdir()
     session = launch.Session(switch_dir, browser_root, f'manganese-extension-switch-{directory.parent.name}')
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         copy_extension(image, session.profile / 'extension')
         manifest = json.loads((session.profile / 'extension/manifest.json').read_text())
@@ -35,8 +37,8 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
         ready = session.probe()
         if not ready['readiness']['ok']:
             raise RuntimeError(f'headed browser not ready: {ready}')
-        basic = json.loads(session.sidecar(['python3', '-B', '/launch/contract/extension_client.py'], timeout=90))
-        live = json.loads(session.sidecar(['python3', '-B', '/launch/contract/extension_live.py'], timeout=90))
+        basic = json.loads(session.sidecar(trace.command(endpoint, ['python3', '-B', '/launch/contract/extension_client.py']), timeout=90))
+        live = json.loads(session.sidecar(trace.command(endpoint, ['python3', '-B', '/launch/contract/extension_live.py']), timeout=90))
         download_info = basic['features']['downloads.download'].get('value', {})
         if download_info.get('state') == 'in_progress':
             raise RuntimeError(f'extension download did not finish: {download_info}')
@@ -56,6 +58,7 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
     cdp_dir.mkdir()
     session = launch.Session(cdp_dir, browser_root, f'manganese-extension-cdp-{directory.parent.name}')
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         copy_extension(image, session.profile / 'extension')
         session.sidecar(['python3', '-B', '/launch/contract/fixture.py'], {cdp_dir:'/evidence'}, detach=True)
@@ -63,7 +66,7 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
         ready = session.probe()
         if not ready['readiness']['ok']:
             raise RuntimeError(f'headed browser not ready: {ready}')
-        control = json.loads(session.sidecar(['python3', '-B', '/launch/contract/extension_control.py'], timeout=90))
+        control = json.loads(session.sidecar(trace.command(endpoint, ['python3', '-B', '/launch/contract/extension_control.py']), timeout=90))
         durability.close(session, browser)
     finally:
         session.close()

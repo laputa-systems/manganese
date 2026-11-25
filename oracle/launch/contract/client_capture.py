@@ -6,6 +6,7 @@ import checks
 import client_sdk
 import durability
 import launch
+import trace
 
 
 REASONS = {
@@ -27,12 +28,13 @@ def sockets(session: launch.Session) -> list[str]:
 
 
 def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[Path, bool], object],
-        client: str) -> dict[str, dict[str, object]]:
+        client: str, endpoint: str = "http://127.0.0.1:9221") -> dict[str, dict[str, object]]:
     if client not in ('extension-cli', 'shadowdriver-crawler'):
         raise ValueError(client)
     directory.mkdir(parents=True)
     session = launch.Session(directory, browser_root, f'manganese-{client}-{directory.parent.name}')
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         session.sidecar(['python3', '-B', '/launch/contract/fixture.py'], {directory:'/evidence'}, detach=True)
         browser = durability.start(session)
@@ -42,10 +44,10 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
             output = f'/evidence/capture-{cycle}'
             if client == 'extension-cli':
                 command = ['node', '/src/onefile-cli/src/cli.ts', 'save', 'http://forms.test/workload',
-                           '--backend', 'helium', '--cdp-url', 'http://127.0.0.1:9221', '--out', output]
+                           '--backend', 'helium', '--cdp-url', endpoint, '--out', output]
             else:
                 command = ['env', 'ALL_PROXY=socks5h://127.0.0.1:1080', 'grab', '--control-url',
-                           'http://127.0.0.1:9221', '--single', '--no-sitemap', '--no-ublock', '--no-stealth',
+                           endpoint, '--single', '--no-sitemap', '--no-ublock', '--no-stealth',
                            '--out', output, 'http://forms.test/workload']
             outputs.append(session.sidecar(command, {directory:'/evidence'}, image=image, timeout=150))
             files = list((directory / f'capture-{cycle}').rglob('*.html'))

@@ -3,26 +3,28 @@ import json
 import checks
 import durability
 import launch
+import trace
 
 
 def outcome(ok, evidence):
     return {'status':'ok' if ok else 'oracle-differs', 'evidence':evidence}
 
 
-def run(directory, browser_root, image, preferences):
+def run(directory, browser_root, image, preferences, endpoint="http://127.0.0.1:9221"):
     directory.mkdir(parents=True)
     session = launch.Session(directory, browser_root, f'manganese-client-sdk-{directory.parent.name}')
     workload = launch.ROOT / 'oracle/workloads/clients/shadowdriver'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         session.sidecar(['python3', '-B', '/launch/contract/fixture.py'], {directory:'/evidence'}, detach=True)
         browser = durability.start(session)
-        observed = json.loads(session.sidecar(['python', '-B', '/workload/workload.py'], mounts, image=image, timeout=120))
-        seed = json.loads(session.sidecar(['python', '-B', '/workload/profile.py', 'seed'], mounts, image=image, timeout=60))
+        observed = json.loads(session.sidecar(trace.command(endpoint, ['python', '-B', '/workload/workload.py']), mounts, image=image, timeout=120))
+        seed = json.loads(session.sidecar(trace.command(endpoint, ['python', '-B', '/workload/profile.py', 'seed']), mounts, image=image, timeout=60))
         durability.close(session, browser)
         browser = durability.start(session)
-        read = json.loads(session.sidecar(['python', '-B', '/workload/profile.py', 'read'], mounts, image=image, timeout=60))
+        read = json.loads(session.sidecar(trace.command(endpoint, ['python', '-B', '/workload/profile.py', 'read']), mounts, image=image, timeout=60))
         durability.close(session, browser)
     finally:
         session.close()

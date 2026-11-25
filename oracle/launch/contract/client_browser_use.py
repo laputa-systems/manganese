@@ -5,9 +5,10 @@ import checks
 import client_sdk
 import durability
 import launch
+import trace
 
 
-def run(directory, browser_root, image, preferences, mode):
+def run(directory, browser_root, image, preferences, mode, endpoint="http://127.0.0.1:9221"):
     if mode not in ('cli', 'library'):
         raise ValueError(f'unknown browser-use mode: {mode}')
     directory.mkdir(parents=True)
@@ -15,26 +16,27 @@ def run(directory, browser_root, image, preferences, mode):
     workload = launch.ROOT / 'oracle/workloads/clients/browser-use'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         session.sidecar(['python3', '-B', '/launch/contract/fixture.py'], {directory:'/evidence'}, detach=True)
         browser = durability.start(session)
         if mode == 'cli':
             for script in ('workload.sh', 'extra.sh', 'cycles.sh'):
-                session.sidecar(['sh', f'/workload/{script}'], mounts, image=image, timeout=180)
+                session.sidecar(trace.command(endpoint, ['sh', f'/workload/{script}']), mounts, image=image, timeout=180)
             sockets = {'before':(directory / 'browser-use-sockets-before').read_text(),
                        'after':(directory / 'browser-use-sockets-after').read_text(), 'cycles':10}
         else:
-            sockets = json.loads(session.sidecar(['python', '-B', '/workload/library.py'], mounts, image=image, timeout=180))
+            sockets = json.loads(session.sidecar(trace.command(endpoint, ['python', '-B', '/workload/library.py']), mounts, image=image, timeout=180))
         for _ in range(100):
             if (session.downloads / 'client-download.txt').is_file():
                 break
             time.sleep(0.1)
         command = (lambda phase: ['sh', '/workload/profile.sh', phase]) if mode == 'cli' else (
             lambda phase: ['env', f'PROFILE_MODE={phase}', 'python', '-B', '/workload/library.py'])
-        session.sidecar(command('seed'), mounts, image=image, timeout=60)
+        session.sidecar(trace.command(endpoint, command('seed')), mounts, image=image, timeout=60)
         durability.close(session, browser)
         browser = durability.start(session)
-        session.sidecar(command('read'), mounts, image=image, timeout=60)
+        session.sidecar(trace.command(endpoint, command('read')), mounts, image=image, timeout=60)
         durability.close(session, browser)
     finally:
         session.close()

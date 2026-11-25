@@ -1,10 +1,11 @@
+import os
 import json
 import sys
 import time
 sys.path.insert(0, '/launch')
 from cdp import Cdp
 
-c = Cdp.connect()
+c = Cdp.connect(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
 methods = set()
 events = set()
 def send(method, params=None, session=None):

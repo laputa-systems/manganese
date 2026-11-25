@@ -5,6 +5,7 @@ import checks
 import client_sdk
 import durability
 import launch
+import trace
 
 
 def read(directory, name):
@@ -14,28 +15,29 @@ def read(directory, name):
     return value['data']
 
 
-def run(directory, browser_root, image, preferences):
+def run(directory, browser_root, image, preferences, endpoint="http://127.0.0.1:9221"):
     directory.mkdir(parents=True)
     session = launch.Session(directory, browser_root, f'manganese-client-agent-{directory.parent.name}')
     workload = launch.ROOT / 'oracle/workloads/clients/agent-browser'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:
+        trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
         session.sidecar(['python3', '-B', '/launch/contract/fixture.py'], {directory:'/evidence'}, detach=True)
         browser = durability.start(session)
-        session.sidecar(['sh', '/workload/workload.sh'], mounts, image=image, timeout=180)
+        session.sidecar(trace.command(endpoint, ['sh', '/workload/workload.sh']), mounts, image=image, timeout=180)
         session.sidecar(['python3', '-B', '/launch/contract/client_ax.py'], {directory:'/evidence'}, detach=True)
-        session.sidecar(['sh', '/workload/extra.sh'], mounts, image=image, timeout=120)
+        session.sidecar(trace.command(endpoint, ['sh', '/workload/extra.sh']), mounts, image=image, timeout=120)
         for _ in range(100):
             if (directory / 'full-ax.json').is_file():
                 break
             time.sleep(0.1)
         else:
             raise RuntimeError('full AX observer did not finish')
-        session.sidecar(['sh', '/workload/profile.sh', 'seed'], mounts, image=image, timeout=60)
+        session.sidecar(trace.command(endpoint, ['sh', '/workload/profile.sh', 'seed']), mounts, image=image, timeout=60)
         durability.close(session, browser)
         browser = durability.start(session)
-        session.sidecar(['sh', '/workload/profile.sh', 'read'], mounts, image=image, timeout=60)
+        session.sidecar(trace.command(endpoint, ['sh', '/workload/profile.sh', 'read']), mounts, image=image, timeout=60)
         durability.close(session, browser)
     finally:
         session.close()

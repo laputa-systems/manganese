@@ -1,3 +1,4 @@
+import os
 import json
 import sys
 import time
@@ -6,7 +7,7 @@ sys.path.insert(0, '/launch')
 from cdp import Cdp
 
 
-c = Cdp.connect()
+c = Cdp.connect(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
 extension = next(x for x in c.send('Extensions.getExtensions')['extensions'] if x['name'] == 'Browser Extensions' and x['enabled'])
 extension_id = extension['id']
 options = c.page(f'chrome-extension://{extension_id}/options.html')

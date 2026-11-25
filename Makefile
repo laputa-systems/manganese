@@ -77,3 +77,7 @@ zlib-harness:
 .PHONY: zlib-anchor
 zlib-anchor:
 	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/anchor.py
+
+.PHONY: cdp-trace
+cdp-trace:
+	python3 -B oracle/probes/cdp/run.py
