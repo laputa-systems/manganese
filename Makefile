@@ -52,3 +52,7 @@ assembly:
 .PHONY: capability-probes
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
+
+.PHONY: abi-census
+abi-census:
+	python3 -B oracle/probes/abi/census.py

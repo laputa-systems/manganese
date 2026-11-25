@@ -107,6 +107,14 @@ def ensure_probe_image() -> None:
              "-f", str(LAUNCH / "probe.Dockerfile"), str(LAUNCH)])
 
 
+def ensure_abi_image() -> None:
+    if run(["docker", "image", "inspect", "manganese-abi:1"]).returncode == 0:
+        return
+    directory = ROOT / "oracle/probes/abi"
+    checked(["docker", "build", "-q", "--build-arg", f"BASE_IMAGE={BASE_IMAGE}", "-t", "manganese-abi:1",
+             "-f", str(directory / "Dockerfile"), str(directory)])
+
+
 def ensure_compositor() -> Path:
     binary = COMPOSITOR / "tinyland"
     host = COMPOSITOR / "remote-host"
@@ -142,6 +150,8 @@ class Session:
         self.name = name
         self.run_dir = run_dir
         self.sidecars: list[str] = []
+        self.tracers: list[str] = []
+        self.trace_dirs: list[Path] = []
         self.profile = run_dir / "profile"
         self.downloads = run_dir / "downloads"
         for directory in (self.profile, self.downloads):
@@ -183,6 +193,12 @@ class Session:
                       ) -> tuple[list[str], subprocess.Popen[bytes]]:
         """Start the browser as the supervisor does; stdout and stderr append to the run's browser.log (2.5)."""
         command = appliance.argv(self.resolve_launcher(), mode, start_url, extra)
+        trace = os.environ.get("MANGANESE_ABI_TRACE")
+        if trace:
+            ensure_abi_image()
+            (self.downloads / ".abi-pid").unlink(missing_ok=True)
+        actual = (["sh", "-c", 'echo $$ > /home/browser/Downloads/.abi-pid; kill -STOP $$; unset SHLVL PWD; exec "$@"', "sh", *command]
+                  if trace else command)
         with (self.run_dir / "browser.log").open("ab") as log:
             if mode == "headed":
                 if not XKB.is_dir():
@@ -191,12 +207,29 @@ class Session:
                 environment = {**appliance.ENVIRONMENT, "XDG_RUNTIME_DIR": "/run/user/1000",
                                "XKB_CONFIG_ROOT": "/opt/xkb", "TINYLAND_XKB_ROOT": "/opt/xkb"}
                 compositor = ["/opt/compositor/tinyland", "--remote", "--width", "1024", "--height", "768",
-                              "--socket", "wayland-1", "--", *command]
+                              "--socket", "wayland-1", "--", *actual]
                 browser = subprocess.Popen([str(host), str(self.run_dir), *self.as_browser(compositor, environment)],
                                            stdin=subprocess.DEVNULL, stdout=log, stderr=log)
             else:
-                browser = subprocess.Popen(self.as_browser(command, appliance.ENVIRONMENT), stdin=subprocess.DEVNULL,
+                browser = subprocess.Popen(self.as_browser(actual, appliance.ENVIRONMENT), stdin=subprocess.DEVNULL,
                                            stdout=log, stderr=log)
+        if trace:
+            directory = Path(trace).resolve() / f"{self.name}-{time.time_ns()}"
+            directory.mkdir(parents=True)
+            self.sidecar(["sh", "-c", 'while [ ! -s /downloads/.abi-pid ]; do sleep .1; done; '
+                          'p=$(cat /downloads/.abi-pid); strace -f -qq -y --decode-pids=pidns -s 256 -ff -o /trace/trace -p "$p" & '
+                          't=$!; echo "$t" > /trace/tracer-pid; while [ "$(awk \'/TracerPid/ {print $2}\' /proc/$p/status)" = 0 ]; do '
+                          'kill -0 "$t" || exit 1; sleep .1; done; '
+                          'kill -CONT "$p"; echo ready > /trace/ready; wait "$t"; '
+                          'status=$?; echo "$status" > /trace/status; exit "$status"'],
+                         {self.downloads: "/downloads", directory: "/trace"}, image="manganese-abi:1", detach=True)
+            self.tracers.append(self.sidecars[-1])
+            self.trace_dirs.append(directory)
+            deadline = time.monotonic() + 30
+            while not (directory / "ready").is_file():
+                if time.monotonic() >= deadline or browser.poll() is not None:
+                    raise LaunchError("ABI tracer did not attach to the browser")
+                time.sleep(0.05)
         return command, browser
 
     def sidecar(self, command: list[str], mounts: dict[Path, str] | None = None, image: str = PROBE_IMAGE,
@@ -215,9 +248,24 @@ class Session:
         ], timeout=timeout)
 
     def probe(self, *args: str) -> dict[str, object]:
-        return json.loads(self.sidecar(["python3", "-B", "/launch/probe.py", *args]))
+        result = json.loads(self.sidecar(["python3", "-B", "/launch/probe.py", *args]))
+        if os.environ.get("MANGANESE_ABI_TRACE") and "--close" in args:
+            (self.run_dir / "abi-shutdown.json").write_text(json.dumps(result))
+        return result
 
     def close(self) -> None:
+        if self.tracers:
+            for tracer, directory in zip(self.tracers, self.trace_dirs):
+                pidfile = directory / "tracer-pid"
+                if pidfile.is_file() and not (directory / "status").is_file():
+                    pid = int(pidfile.read_text())
+                    self.root('for p in /proc/[0-9]*; do '
+                              f'[ "$(awk \'/TracerPid/ {{print $2}}\' "$p/status" 2>/dev/null)" = "{pid}" ] '
+                              '&& kill -KILL "${p##*/}" 2>/dev/null || true; done')
+                try:
+                    run(["docker", "wait", tracer], timeout=15)
+                except subprocess.TimeoutExpired:
+                    raise LaunchError(f"ABI tracer did not finish: {tracer}")
         run(["docker", "rm", "-f", *self.sidecars, self.name])
 
 
