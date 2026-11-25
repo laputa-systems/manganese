@@ -4,11 +4,11 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** active. Accepted: `p0-ground`, `p0-artifacts`.
+- **State:** active. Accepted: `p0-ground`, `p0-artifacts`, `p0-launch`.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Last accepted revision:** the scaffold on `main` (local, not pushed); `make check lint` is green in pristine Alpine capsules on x86_64 and aarch64 (see Baseline).
 - **Red or parked:** none.
-- **Next:** `p0-launch`.
+- **Next:** M0 and M1 lanes: `m0-workloads`, `m0-probes`, `m1-kache-oracle`, `m1-workspace`.
 - **First command:** `sh scripts/setup-dev && make check lint`, then "resume the roadmap".
 - **Frozen archives:** both architectures' package revision 2 archives and sidecars are published by digest (`oracle/frozen/artifacts.lock`).
 
