@@ -2,6 +2,9 @@
 set -eu
 export AGENT_BROWSER_CDP=http://127.0.0.1:9221
 agent-browser --json open http://forms.test/workload > /evidence/open.json
+agent-browser --json get cdp-url > /evidence/cdp-url.json
+agent-browser --json tab list > /evidence/tabs.json
+curl -fsS http://127.0.0.1:9221/json/version > /evidence/version.json
 agent-browser --json fill '#text' 'agent-browser submission' > /evidence/fill.json
 agent-browser --json click '#submit' > /evidence/submit.json
 attempt=0
