@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import struct
 import subprocess
@@ -42,7 +43,7 @@ oracle = peer('.work/tmp/url/oracle')
 candidate = peer('.work/tmp/target/x86_64-unknown-linux-musl/debug/url')
 cases = json.loads(pathlib.Path('.work/tmp/url/urltestdata.json').read_text())
 for index, case in enumerate(cases):
-    if not isinstance(case, dict) or index % 3 == 0: continue
+    if not isinstance(case, dict) or (index % 3 == 0) != (os.environ.get('URL_COMPARE_HOLDOUT') == '1'): continue
     data = request(case['input'], case.get('base'), None, index % 2)
     expected = decode(ask(oracle, data))
     actual = decode(ask(candidate, data))

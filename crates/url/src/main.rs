@@ -3,6 +3,8 @@ use std::io::{self, Read, Write};
 use std::sync::OnceLock;
 use url_parser::{Origin, Url};
 
+mod file_url;
+
 const SUFFIX_DATA: &[u8] = include_bytes!("effective_tld_names.dat");
 
 struct SuffixLists {
@@ -80,6 +82,32 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid registry policy"));
     }
     let include_private = request[0] == 1;
+    let trimmed = input.trim_matches(|c: char| c <= ' ');
+    let file_scheme = trimmed.get(..5).is_some_and(|s| s.eq_ignore_ascii_case("file:"));
+    let input_scheme = trimmed.find(':').is_some_and(|i| {
+        i > 0 && trimmed.as_bytes()[0].is_ascii_alphabetic() &&
+        trimmed.as_bytes()[..i].iter().all(|b| b.is_ascii_alphanumeric() || b"+-.".contains(b))
+    });
+    let file_base = base.is_some_and(|s| s.trim_matches(|c: char| c <= ' ').get(..5).is_some_and(|p| p.eq_ignore_ascii_case("file:")));
+    if file_scheme || (file_base && !input_scheme) {
+        let file = match file_url::parse(input, if file_base { base } else { None }) {
+            Some(file) => file,
+            None => return Ok(vec![0]),
+        };
+        let domain = file.host.as_deref().and_then(|host| registrable_domain(host, include_private));
+        let same = other.and_then(|value| Url::parse(value).ok()).and_then(|value| {
+            let other_host = value.host_str()?;
+            let host = file.host.as_deref()?;
+            Some(domain.unwrap_or(host) == registrable_domain(other_host, include_private).unwrap_or(other_host))
+        });
+        let mut output = vec![1, 0];
+        for field in [Some(file.spec.as_str()), Some("file"), Some(""), None, file.host.as_deref(), None,
+                      Some(file.path.as_str()), file.query.as_deref(), file.fragment.as_deref(), Some("file://"), domain] {
+            put_field(&mut output, field);
+        }
+        output.push(match same { Some(true) => 1, Some(false) => 0, None => 2 });
+        return Ok(output);
+    }
     let parsed = match parse(input, base) {
         Ok(parsed) => parsed,
         Err(_) => return Ok(vec![0]),
