@@ -21,15 +21,29 @@ def lines(path):
 
 
 def set_differences(name, expected, actual, tolerated, result):
-    """Items present on one side only, except items a side recorded as not seen in every run."""
+    """Items present on one side only, except items the frozen evidence recorded as not seen in every run."""
     for item in sorted(expected - actual - tolerated):
         result.append({'field':name, 'expected':item, 'actual':'<missing>'})
     for item in sorted(actual - expected - tolerated):
         result.append({'field':name, 'expected':'<missing>', 'actual':item})
 
 
+def unresolved_instability(name, frozen, rebuilt, result):
+    """Rebuild-only variability is evidence to classify, never a tolerance the rebuild grants itself."""
+    for item in sorted(rebuilt - frozen):
+        result.append({'field':name, 'expected':'<stable in every frozen run>', 'actual':item})
+
+
 def key(line):
     return '\t'.join(line.split('\t')[:2])
+
+
+def abi_differences(frozen_dir, rebuilt_dir, result):
+    frozen, rebuilt = lines(frozen_dir / 'x86_64.txt'), lines(rebuilt_dir / 'x86_64.txt')
+    frozen_unstable = {key(line) for line in lines(frozen_dir / 'x86_64-unstable.txt')}
+    rebuilt_unstable = {key(line) for line in lines(rebuilt_dir / 'x86_64-unstable.txt')}
+    set_differences('abi', {key(line) for line in frozen}, {key(line) for line in rebuilt}, frozen_unstable, result)
+    unresolved_instability('abi.unstable', frozen_unstable, rebuilt_unstable, result)
 
 
 def compare_abi(rebuild, run_dir, result):
@@ -37,15 +51,33 @@ def compare_abi(rebuild, run_dir, result):
     completed = run_python(['oracle/probes/abi/census.py', '--archive', str(rebuild), '--output', str(output)], run_dir / 'abi.log')
     if completed.returncode:
         raise RuntimeError('abi census failed: ' + str(completed.returncode))
-    frozen, rebuilt = lines(FROZEN / 'abi/x86_64.txt'), lines(output / 'x86_64.txt')
-    tolerated = {key(line) for line in lines(FROZEN / 'abi/x86_64-unstable.txt') | lines(output / 'x86_64-unstable.txt')}
-    set_differences('abi', {key(line) for line in frozen}, {key(line) for line in rebuilt}, tolerated, result)
+    abi_differences(FROZEN / 'abi', output, result)
 
 
 def shape_items(path):
+    """Each observed field keyed by method or event, message section and path, with its JSON type set."""
     data = read(path)
-    return {(kind, name, section, field) for kind in ('methods', 'events') for name, sections in data[kind].items()
-            for section, fields in sections.items() for field in fields}
+    return {(kind, name, section, field):tuple(sorted(types)) for kind in ('methods', 'events')
+            for name, sections in data[kind].items() for section, fields in sections.items()
+            for field, types in fields.items()}
+
+
+def cdp_differences(frozen_dir, rebuilt_dir, result):
+    frozen_unstable = {tuple(line.split('\t')) for line in lines(frozen_dir / 'unstable.tsv')}
+    rebuilt_unstable = {tuple(line.split('\t')) for line in lines(rebuilt_dir / 'unstable.tsv')}
+    names = {item[1] for item in frozen_unstable if item[0] in ('method', 'event')}
+    for name in ('methods.tsv', 'events.tsv', 'errors.tsv'):
+        expected, actual = lines(frozen_dir / name), lines(rebuilt_dir / name)
+        tolerated = {line for line in expected | actual if line.split('\t')[0] in names}
+        set_differences('cdp.' + name, expected, actual, tolerated, result)
+    shapes_tolerated = {item[1:] for item in frozen_unstable if item[0] == 'shape'}
+    expected, actual = shape_items(frozen_dir / 'shapes.json'), shape_items(rebuilt_dir / 'shapes.json')
+    for item in sorted(expected.keys() | actual.keys()):
+        if item[1:] in shapes_tolerated or expected.get(item) == actual.get(item):
+            continue
+        result.append({'field':'cdp.shapes.json', 'item':list(item),
+                       'expected':list(expected.get(item, ['<missing>'])), 'actual':list(actual.get(item, ['<missing>']))})
+    unresolved_instability('cdp.unstable', {repr(item) for item in frozen_unstable}, {repr(item) for item in rebuilt_unstable}, result)
 
 
 def compare_cdp(rebuild, run_dir, result):
@@ -53,16 +85,7 @@ def compare_cdp(rebuild, run_dir, result):
     completed = run_python(['oracle/probes/cdp/run.py', '--archive', str(rebuild), '--output', str(output)], run_dir / 'cdp.log')
     if completed.returncode:
         raise RuntimeError('cdp trace failed: ' + str(completed.returncode))
-    unstable = {tuple(line.split('\t')) for line in lines(FROZEN / 'cdp/unstable.tsv') | lines(output / 'unstable.tsv')}
-    names = {item[1] for item in unstable if item[0] in ('method', 'event')}
-    for name in ('methods.tsv', 'events.tsv', 'errors.tsv'):
-        expected, actual = lines(FROZEN / 'cdp' / name), lines(output / name)
-        tolerated = {line for line in expected | actual if line.split('\t')[0] in names}
-        set_differences('cdp.' + name, expected, actual, tolerated, result)
-    shapes_tolerated = {repr(item[1:]) for item in unstable if item[0] == 'shape'}
-    expected = {repr(item[1:]) for item in shape_items(FROZEN / 'cdp/shapes.json')}
-    actual = {repr(item[1:]) for item in shape_items(output / 'shapes.json')}
-    set_differences('cdp.shapes.json', expected, actual, shapes_tolerated, result)
+    cdp_differences(FROZEN / 'cdp', output, result)
 
 
 INVENTORY_COMPARERS = [('abi-census', compare_abi), ('cdp-trace', compare_cdp)]

@@ -140,6 +140,9 @@ fn selftest() -> Result<(), String> {
             original.replace("wire_version = 1", "wire_version = \"1\""),
             original.replace("holdout_percent = 40", "holdout_percent = 040"),
             original.replace("anchor = \"none: the synthetic reference is not a browser\"", "anchor = \"none\""),
+            original.replace("anchor = \"none: the synthetic reference is not a browser\"", "anchor = \"make selftest\""),
+            original.replace("anchor = \"none: the synthetic reference is not a browser\"", "anchor = \"not established\""),
+            original.replace("acceptance_cases = 1000", "acceptance_cases = 0"),
             original.replace("arm64_evidence = \"harness:", "arm64_evidence = \"invalid:"),
             original.replace("varying_relationships = \"none: every output byte is deterministic\"", "varying_relationships = \"timestamp varies\""),
             original.replace("improvements = \"none: no synthetic improvement is required\"", "improvements = \"improvement without an assertion\""),
@@ -171,6 +174,15 @@ fn main() -> ExitCode {
     let result = match args.next().as_deref().and_then(|s| s.to_str()) {
         Some("run") => run_args(args.collect()),
         Some("selftest") => selftest(),
+        Some("spec") => (|| {
+            let id = args.next().ok_or("missing box id")?.into_string().map_err(|_| "non-UTF8 box id")?;
+            if args.next().is_some() || id.is_empty() || !id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_') {
+                return Err("usage: goldens spec BOX".into());
+            }
+            let spec = Spec::parse(&fs::read_to_string(Path::new("boxes").join(&id).join("box.toml")).map_err(|e| format!("box spec: {e}"))?)?;
+            print!("{}", spec.acceptance_facts());
+            Ok(())
+        })(),
         Some("fuzz") => (|| {
             let id = args.next().ok_or("missing box id")?.into_string().map_err(|_| "non-UTF8 box id")?;
             let candidate = match args.next() {
@@ -181,7 +193,7 @@ fn main() -> ExitCode {
             if args.next().is_some() { return Err("extra fuzz arguments".into()); }
             goldens::fuzz(&id, &default_store()?, candidate)
         })(),
-        _ => Err("usage: goldens selftest | run BOX seen|holdout [options]".into()),
+        _ => Err("usage: goldens selftest | spec BOX | run BOX seen|holdout [options] | fuzz BOX [--candidate PATH]".into()),
     };
     match result { Ok(()) => ExitCode::SUCCESS, Err(e) => { eprintln!("{e}"); ExitCode::FAILURE } }
 }

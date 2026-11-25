@@ -16,7 +16,7 @@ check:
 
 .PHONY: lint
 lint:
-	shellcheck -s sh scripts/setup-dev scripts/check scripts/artifact scripts/artifact-selftest scripts/box scripts/assembly oracle/source-oracle
+	shellcheck -s sh scripts/setup-dev scripts/check scripts/artifact scripts/artifact-selftest scripts/box scripts/accept scripts/assembly oracle/source-oracle
 
 .PHONY: test
 test: check
@@ -49,6 +49,10 @@ census:
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
 
+.PHONY: accept
+accept:
+	sh scripts/accept "$(BOX)"
+
 .PHONY: box-fuzz
 box-fuzz:
 	SEED="$(SEED)" CASES="$(CASES)" INJECT="$(INJECT)" sh scripts/box "$(BOX)" fuzz
@@ -78,6 +82,15 @@ zlib-harness:
 checksums-harness:
 	mkdir -p .work/tmp/checksums
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/checksums $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/checksums/build.py
+.PHONY: zstd-harness
+zstd-harness:
+	mkdir -p .work/tmp/zstd
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zstd $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/zstd/build.py
+
+.PHONY: png-harness
+png-harness:
+	mkdir -p .work/tmp/png
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/png $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/png/build.py
 
 .PHONY: zlib-anchor
 zlib-anchor:
@@ -98,3 +111,12 @@ devtools-endpoint-oracle:
 devtools-endpoint-record:
 	CARGO_TARGET_DIR=$(CURDIR)/.work/tmp/target RUSTC_WRAPPER=kache cargo build --locked --offline --target x86_64-unknown-linux-musl -p devtools-endpoint
 	python3 -B oracle/harness/devtools-endpoint/record.py
+
+.PHONY: brotli-harness
+brotli-harness:
+	mkdir -p .work/tmp/brotli
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/brotli $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/brotli/build.py
+
+.PHONY: brotli-anchor
+brotli-anchor:
+	PYTHONPATH=oracle/harness/brotli python3 -B oracle/harness/brotli/anchor.py

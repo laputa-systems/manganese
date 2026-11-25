@@ -17,7 +17,7 @@ if [ "$box" = selftest ]; then
     if [ "$mode" != fuzz ]; then CARGO_TARGET_DIR=$root/.work/tmp/target-oracle cargo build --locked --offline --target x86_64-unknown-linux-musl --manifest-path boxes/selftest/Cargo.toml; fi
     if [ "$mode" = seen ]; then exec "$runner" selftest; fi
 else
-    cargo build --locked --offline --target x86_64-unknown-linux-musl -p "$box"
+    cargo build --locked --offline --target x86_64-unknown-linux-musl --manifest-path "crates/$box/Cargo.toml"
 fi
 case $mode in
     seen|holdout) exec "$runner" run "$box" "$mode" ;;

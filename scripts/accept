@@ -1,0 +1,91 @@
+#!/bin/sh
+# Promote a box: run its seen, holdout and fuzz lanes at its declared acceptance budget and its
+# frozen-browser anchor, then write boxes/BOX/acceptance.txt binding the outcome to the tree, the
+# spec, the corpus, both binaries and the dependency graph. Each qualification level is recorded on
+# its own: source-harness parity, frozen-browser agreement, and architecture and integration.
+# Exits 0 only when source-harness parity is met and no anchor failed; a failed run's receipt stays
+# in .work/tmp/accept-BOX.
+set -u
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root" || exit 1
+box=${1:?usage: scripts/accept BOX}
+case $box in *[!a-z0-9_-]*|'') echo "invalid box id" >&2; exit 2 ;; esac
+[ -f "boxes/$box/box.toml" ] || { echo "no boxes/$box/box.toml" >&2; exit 2; }
+dirty=$(git status --porcelain -- . ":(exclude)boxes/$box/acceptance.txt")
+[ -z "$dirty" ] || { printf 'accept: a receipt binds to a committed tree; commit first:\n%s\n' "$dirty" >&2; exit 2; }
+work=$root/.work/tmp/accept-$box
+rm -rf "$work"
+mkdir -p "$work"
+
+sh scripts/box "$box" seen > "$work/seen.log" 2>&1
+seen_status=$?
+runner=$root/.work/tmp/target/x86_64-unknown-linux-musl/debug/goldens
+"$runner" spec "$box" > "$work/facts" || exit 1
+fact() { awk -v key="$1" '$1 == key { sub(/^[^ ]+ /, ""); print; exit }' "$work/facts"; }
+cases=$(fact acceptance_cases)
+sh scripts/box "$box" holdout > "$work/holdout.log" 2>&1
+holdout_status=$?
+CASES=$cases sh scripts/box "$box" fuzz > "$work/fuzz.log" 2>&1
+fuzz_status=$?
+
+items() { sed -n "s/^lane=$1 items=\([0-9]*\) passed=\([0-9]*\)$/\1 \2/p" "$work/$1.log" | tail -1; }
+seen_items=$(items seen)
+holdout_items=$(items holdout)
+fuzz_seed=$(sed -n 's/^fuzz box=[^ ]* seed=\([0-9]*\) .*/\1/p' "$work/fuzz.log" | head -1)
+fuzz_completed=$(sed -n -e 's/^fuzz passed \([0-9]*\) cases.*/\1/p' -e 's/^fuzz driver completed \([0-9]*\) cases.*/\1/p' "$work/fuzz.log" | tail -1)
+
+anchor=$(fact anchor)
+anchor_kind=${anchor%% *}
+anchor_detail=${anchor#* }
+anchor_status=-
+if [ "$anchor_kind" = check ]; then
+    make "$anchor_detail" > "$work/anchor.log" 2>&1
+    anchor_status=$?
+fi
+
+source_level="not met"
+if [ "$seen_status" = 0 ] && [ "$holdout_status" = 0 ] && [ "$fuzz_status" = 0 ] && [ "${fuzz_completed:-0}" = "$cases" ]; then
+    source_level=met
+fi
+case $anchor_kind in
+    check) [ "$anchor_status" = 0 ] && browser_level="met: make $anchor_detail" || browser_level="failed: make $anchor_detail exited $anchor_status" ;;
+    pending) browser_level="pending: $anchor_detail" ;;
+    *) browser_level="not applicable: $anchor_detail" ;;
+esac
+
+digest() { if [ -f "$1" ]; then sha256sum "$1" | cut -d' ' -f1; else echo missing; fi; }
+oracle=$(fact oracle)
+candidate=$(fact candidate)
+cargo tree --locked --offline -p "$box" -e normal --prefix none > "$work/dependencies" 2>/dev/null || echo unavailable > "$work/dependencies"
+{
+    echo "version 1"
+    echo "box $box"
+    echo "revision $(git rev-parse HEAD)"
+    echo "arch $(uname -m)"
+    echo "spec sha256:$(digest "boxes/$box/box.toml")"
+    echo "corpus sha256:$(awk -v box="$box" '$1 == box' goldens.lock | sha256sum | cut -d' ' -f1) seen $(awk -v box="$box" '$1 == box && $2 == "seen"' goldens.lock | wc -l) holdout $(awk -v box="$box" '$1 == box && $2 == "holdout"' goldens.lock | wc -l)"
+    echo "oracle $oracle sha256:$(digest "$oracle")"
+    echo "oracle-builder $(sh oracle/source-oracle image-tag)"
+    echo "candidate $candidate sha256:$(digest "$candidate")"
+    echo "dependencies cargo-lock sha256:$(digest Cargo.lock) tree sha256:$(sha256sum < "$work/dependencies" | cut -d' ' -f1)"
+    sed -n 's|.*(\('"$root"'/\)\{0,1\}\(vendor/[^)/]*\)[^)]*).*|\2|p' "$work/dependencies" | sort -u | while read -r snapshot; do
+        echo "snapshot $snapshot tree $(git rev-parse "HEAD:$snapshot")"
+    done
+    echo "run seen exit $seen_status items ${seen_items:-unreported}"
+    echo "run holdout exit $holdout_status items ${holdout_items:-unreported}"
+    echo "run fuzz exit $fuzz_status seed ${fuzz_seed:-unreported} requested $cases completed ${fuzz_completed:-unreported}"
+    if [ "$anchor_kind" = check ]; then echo "run anchor make $anchor_detail exit $anchor_status"; fi
+    echo "level source-harness $source_level"
+    echo "level frozen-browser $browser_level"
+    echo "level integration pending: arm64 evidence ($(fact arm64_evidence)) and make closure have not run"
+} > "$work/acceptance.txt"
+cat "$work/acceptance.txt"
+accepted=yes
+[ "$source_level" = met ] || accepted=no
+if [ "$anchor_kind" = check ] && [ "$anchor_status" != 0 ]; then accepted=no; fi
+if [ "$accepted" != yes ]; then
+    echo "accept: $box not accepted; logs in $work" >&2
+    exit 1
+fi
+cp "$work/acceptance.txt" "boxes/$box/acceptance.txt"
+echo "accept: wrote boxes/$box/acceptance.txt"

@@ -12,6 +12,17 @@ pub enum Comparator {
     Tolerance { bound: f64, surface: String },
 }
 
+/// How a box's harness is tied to the frozen archive through a public surface.
+#[derive(Debug)]
+pub enum Anchor {
+    /// `make <target>` runs the frozen-browser comparison.
+    Check { target: String, description: String },
+    /// The comparison applies but has not been established yet.
+    Pending { reason: String },
+    /// No frozen-browser surface exists, as for a synthetic reference.
+    None { reason: String },
+}
+
 #[derive(Debug)]
 pub enum Arm64Evidence {
     Captures(String),
@@ -38,12 +49,13 @@ pub struct Spec {
     pub(crate) ordering: Declaration,
     pub(crate) defects: Declaration,
     pub(crate) improvements: Declaration,
-    pub(crate) anchor: Declaration,
+    pub(crate) anchor: Anchor,
     pub(crate) arm64: Arm64Evidence,
     pub(crate) holdout_percent: u8,
     pub(crate) oracle: String,
     pub(crate) candidate: String,
     pub(crate) fuzz: Fuzz,
+    pub(crate) acceptance_cases: u64,
 }
 
 fn nonempty(value: &str, key: &str) -> Result<String, String> {
@@ -59,6 +71,19 @@ fn declaration(value: &str, key: &str) -> Result<Declaration, String> {
     } else {
         Ok(Declaration::Present(nonempty(value, key)?))
     }
+}
+
+fn anchor(value: &str) -> Result<Anchor, String> {
+    if let Some(command) = value.strip_prefix("make ") {
+        let (target, description) = command.split_once(' ').ok_or("anchor: make requires a target and a description")?;
+        if target.is_empty() || !target.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+            return Err("anchor: invalid make target".into());
+        }
+        return Ok(Anchor::Check { target: target.to_owned(), description: nonempty(description, "anchor")? });
+    }
+    if let Some(reason) = value.strip_prefix("pending: ") { return Ok(Anchor::Pending { reason: nonempty(reason, "anchor")? }); }
+    if let Some(reason) = value.strip_prefix("none: ") { return Ok(Anchor::None { reason: nonempty(reason, "anchor")? }); }
+    Err("anchor must be `make <target> <description>`, `pending: <reason>` or `none: <reason>`".into())
 }
 
 enum RawValue { String(String), Integer(String) }
@@ -77,7 +102,23 @@ impl Spec {
     pub fn ordering(&self) -> &Declaration { &self.ordering }
     pub fn oracle_defects(&self) -> &Declaration { &self.defects }
     pub fn improvements(&self) -> &Declaration { &self.improvements }
-    pub fn anchor(&self) -> &Declaration { &self.anchor }
+    pub fn anchor(&self) -> &Anchor { &self.anchor }
+
+    /// The facts `scripts/accept` needs, one `key value` line each.
+    pub fn acceptance_facts(&self) -> String {
+        let anchor = match &self.anchor {
+            Anchor::Check { target, .. } => format!("check {target}"),
+            Anchor::Pending { reason } => format!("pending {reason}"),
+            Anchor::None { reason } => format!("none {reason}"),
+        };
+        let arm64 = match &self.arm64 {
+            Arm64Evidence::Captures(d) => format!("captures: {d}"),
+            Arm64Evidence::PublicApi(d) => format!("public_api: {d}"),
+            Arm64Evidence::Harness(d) => format!("harness: {d}"),
+            Arm64Evidence::Assembly(d) => format!("assembly: {d}"),
+        };
+        format!("oracle {}\ncandidate {}\nacceptance_cases {}\nanchor {anchor}\narm64_evidence {arm64}\n", self.oracle, self.candidate, self.acceptance_cases)
+    }
     pub fn arm64_evidence(&self) -> &Arm64Evidence { &self.arm64 }
     pub fn holdout_percent(&self) -> u8 { self.holdout_percent }
     pub fn oracle(&self) -> &str { &self.oracle }
@@ -147,7 +188,7 @@ impl Spec {
                 if assertion.is_empty() { return Err(format!("{key} requires an absolute assertion")); }
             }
         }
-        let anchor = declaration(&take(&mut values, "anchor")?, "anchor")?;
+        let anchor = anchor(&take(&mut values, "anchor")?)?;
         let arm = take(&mut values, "arm64_evidence")?;
         let (kind, detail) = arm.split_once(": ").ok_or("arm64_evidence needs kind and detail")?;
         let detail = nonempty(detail, "arm64_evidence")?;
@@ -179,7 +220,9 @@ impl Spec {
             "driver" => Fuzz::Driver { program: take(&mut values, "fuzz_driver")? },
             _ => return Err("invalid fuzz generator".into()),
         };
+        let acceptance_cases = integer(&mut values, "acceptance_cases")?.parse::<u64>().map_err(|_| "invalid acceptance_cases")?;
+        if acceptance_cases == 0 { return Err("acceptance_cases must be positive".into()); }
         if !values.is_empty() { return Err(format!("unknown keys: {:?}", values.keys())); }
-        Ok(Self { seam, streaming, reentrancy, callbacks, threading, wire, corpus, environment, comparator, varying, ordering, defects, improvements, anchor, arm64, holdout_percent, oracle, candidate, fuzz })
+        Ok(Self { seam, streaming, reentrancy, callbacks, threading, wire, corpus, environment, comparator, varying, ordering, defects, improvements, anchor, arm64, holdout_percent, oracle, candidate, fuzz, acceptance_cases })
     }
 }

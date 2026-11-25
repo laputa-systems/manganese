@@ -1,59 +1,11 @@
-use crate::{Fuzz, Lane, Spec, compare, load_blob, lock_items, name};
+use crate::process::{Limits, Peer, env_number, parse_positive};
+use crate::{Fuzz, Lane, Spec, compare, load_blob, lock_items, name, sha256};
 use std::fs;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::Command;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-struct Peer {
-    child: Child,
-    input: Option<ChildStdin>,
-    output: ChildStdout,
-    header: bool,
-}
-
-impl Peer {
-    fn start(path: &Path) -> Result<Self, String> {
-        let mut child = Command::new(path).stdin(Stdio::piped()).stdout(Stdio::piped()).spawn().map_err(|e| format!("{}: {e}", path.display()))?;
-        let input = child.stdin.take().ok_or("missing stdin")?;
-        let output = child.stdout.take().ok_or("missing stdout")?;
-        Ok(Self { child, input: Some(input), output, header: false })
-    }
-
-    fn record(&mut self, record: &[u8]) -> Result<Vec<u8>, String> {
-        let input = self.input.as_mut().ok_or("closed adapter")?;
-        if !self.header { input.write_all(b"MGB1").map_err(|e| format!("write header: {e}"))?; }
-        let len = u32::try_from(record.len()).map_err(|_| "record too large")?;
-        input.write_all(&len.to_be_bytes()).and_then(|_| input.write_all(record)).and_then(|_| input.flush()).map_err(|e| format!("write record: {e}"))?;
-        if !self.header {
-            let mut header = [0; 4];
-            self.output.read_exact(&mut header).map_err(|e| format!("read header: {e}"))?;
-            if &header != b"MGB1" { return Err("invalid adapter protocol header".into()); }
-            self.header = true;
-        }
-        let mut length = [0; 4];
-        self.output.read_exact(&mut length).map_err(|e| format!("read length: {e}"))?;
-        let mut result = vec![0; u32::from_be_bytes(length) as usize];
-        self.output.read_exact(&mut result).map_err(|e| format!("read record: {e}"))?;
-        Ok(result)
-    }
-
-    fn finish(&mut self) -> Result<(), String> {
-        drop(self.input.take());
-        let status = self.child.wait().map_err(|e| format!("wait adapter: {e}"))?;
-        if !status.success() { return Err(format!("adapter exited {status}")); }
-        Ok(())
-    }
-}
-
-impl Drop for Peer {
-    fn drop(&mut self) {
-        if matches!(self.child.try_wait(), Ok(None)) {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
-        }
-    }
-}
+const DEFAULT_DRIVER_TIMEOUT_SECS: u64 = 24 * 60 * 60;
 
 struct Random(u64);
 impl Random {
@@ -98,7 +50,50 @@ fn generate(random: &mut Random, seeds: &[Vec<u8>], max: usize) -> Vec<u8> {
 }
 
 fn outputs(oracle: &mut Peer, candidate: &mut Peer, input: &[u8]) -> Result<(Vec<u8>, Vec<u8>), String> {
-    Ok((oracle.record(input).map_err(|e| format!("oracle: {e}"))?, candidate.record(input).map_err(|e| format!("candidate: {e}"))?))
+    Ok((oracle.record(input)?, candidate.record(input)?))
+}
+
+/// The case budget every fuzz kind runs under, validated before any driver starts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Budget {
+    seed: u64,
+    cases: u64,
+}
+
+impl Budget {
+    fn parse(seed: Option<&str>, cases: Option<&str>, default_seed: u64) -> Result<Self, String> {
+        let seed = match seed.filter(|s| !s.is_empty()) {
+            Some(s) => s.parse().map_err(|_| format!("SEED must be an unsigned integer, got {s:?}"))?,
+            None => default_seed,
+        };
+        let cases = match cases.filter(|s| !s.is_empty()) { Some(s) => parse_positive("CASES", s)?, None => 10000 };
+        Ok(Self { seed, cases })
+    }
+
+    fn from_env() -> Result<Self, String> {
+        let var = |key: &str| match std::env::var(key) {
+            Ok(value) => Ok(Some(value)),
+            Err(std::env::VarError::NotPresent) => Ok(None),
+            Err(e) => Err(format!("{key}: {e}")),
+        };
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos() as u64;
+        Self::parse(var("SEED")?.as_deref(), var("CASES")?.as_deref(), now)
+    }
+}
+
+/// Keep the request that was in flight when a case failed, with what identifies its run.
+fn preserved(id: &str, budget: Budget, index: u64, input: &[u8], identities: &str, failure: &str) -> String {
+    let path = format!(".work/tmp/fuzz-{id}-{}-case{index}.bin", budget.seed);
+    let saved = fs::create_dir_all(".work/tmp").and_then(|_| fs::write(&path, input));
+    let saved = match saved { Ok(()) => format!("saved {path}"), Err(e) => format!("could not save {path}: {e}") };
+    format!("{failure}\nseed={} case={index} input hex={}\n{identities}\n{saved}", budget.seed, hex(input))
+}
+
+fn identity(role: &str, path: &Path) -> String {
+    match fs::read(path) {
+        Ok(bytes) => format!("{role} {} sha256:{}", path.display(), sha256(&bytes)),
+        Err(e) => format!("{role} {} unreadable: {e}", path.display()),
+    }
 }
 
 fn display(bytes: &[u8]) -> String { bytes.iter().flat_map(|b| std::ascii::escape_default(*b)).map(char::from).collect() }
@@ -107,8 +102,11 @@ fn hex(bytes: &[u8]) -> String { bytes.iter().map(|b| format!("{b:02x}")).collec
 pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Result<(), String> {
     if !name(id) { return Err("invalid box id".into()); }
     let spec = Spec::parse(&fs::read_to_string(Path::new("boxes").join(id).join("box.toml")).map_err(|e| format!("box spec: {e}"))?)?;
+    let budget = Budget::from_env()?;
+    let candidate_path = candidate_override.unwrap_or_else(|| PathBuf::from(&spec.candidate));
+    let identities = format!("{}\n{}", identity("oracle", Path::new(&spec.oracle)), identity("candidate", &candidate_path));
     if let Fuzz::Driver { program } = &spec.fuzz {
-        return drive(program, &spec, candidate_override);
+        return drive(id, program, &spec, &candidate_path, budget, &identities);
     }
     let (seeds, max) = match &spec.fuzz {
         Fuzz::Bytes { max_len } => (Vec::new(), *max_len),
@@ -125,19 +123,15 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
             (loaded, *max_len)
         }
     };
-    let number = |key: &str, default: u64| -> Result<u64, String> {
-        match std::env::var(key) { Ok(s) if !s.is_empty() => s.parse().map_err(|_| format!("invalid {key}")), Ok(_) | Err(std::env::VarError::NotPresent) => Ok(default), Err(e) => Err(format!("{key}: {e}")) }
-    };
-    let seed = number("SEED", SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos() as u64)?;
-    let cases = number("CASES", 10000)?;
-    if cases == 0 { return Err("CASES must be positive".into()); }
+    let Budget { seed, cases } = budget;
     println!("fuzz box={id} seed={seed} cases={cases}");
+    let limits = Limits::from_env()?;
     let mut random = Random(seed);
-    let mut oracle = Peer::start(Path::new(&spec.oracle))?;
-    let mut candidate = Peer::start(candidate_override.as_deref().unwrap_or_else(|| Path::new(&spec.candidate)))?;
+    let mut oracle = Peer::start(Path::new(&spec.oracle), &[], "oracle", limits)?;
+    let mut candidate = Peer::start(&candidate_path, &[], "candidate", limits)?;
     for index in 0..cases {
         let mut input = generate(&mut random, &seeds, max);
-        let (a, b) = outputs(&mut oracle, &mut candidate, &input)?;
+        let (a, b) = outputs(&mut oracle, &mut candidate, &input).map_err(|e| preserved(id, budget, index, &input, &identities, &e))?;
         if compare(&spec.comparator, &a, &b) { continue; }
         let mut size = input.len();
         while size > 0 {
@@ -145,17 +139,17 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
             while offset + size <= input.len() {
                 let mut trial = input.clone();
                 trial.drain(offset..offset + size);
-                let (a, b) = outputs(&mut oracle, &mut candidate, &trial)?;
+                let (a, b) = outputs(&mut oracle, &mut candidate, &trial).map_err(|e| preserved(id, budget, index, &trial, &identities, &e))?;
                 if !compare(&spec.comparator, &a, &b) { input = trial; offset = 0; } else { offset += 1; }
             }
             size /= 2;
         }
-        let (a, b) = outputs(&mut oracle, &mut candidate, &input)?;
-        if compare(&spec.comparator, &a, &b) { return Err("divergence did not reproduce during shrinking".into()); }
+        let (a, b) = outputs(&mut oracle, &mut candidate, &input).map_err(|e| preserved(id, budget, index, &input, &identities, &e))?;
+        if compare(&spec.comparator, &a, &b) { return Err(preserved(id, budget, index, &input, &identities, "divergence did not reproduce during shrinking")); }
         fs::create_dir_all(".work/tmp").map_err(|e| e.to_string())?;
         let path = format!(".work/tmp/fuzz-{id}-{seed}.bin");
         fs::write(&path, &input).map_err(|e| format!("write {path}: {e}"))?;
-        return Err(format!("divergence seed={seed} case={index}\nminimized input hex={} escaped=\"{}\"\noracle hex={} escaped=\"{}\"\ncandidate hex={} escaped=\"{}\"\nsaved {path}", hex(&input), display(&input), hex(&a), display(&a), hex(&b), display(&b)));
+        return Err(format!("divergence seed={seed} case={index}\nminimized input hex={} escaped=\"{}\"\noracle hex={} escaped=\"{}\"\ncandidate hex={} escaped=\"{}\"\n{identities}\nsaved {path}", hex(&input), display(&input), hex(&a), display(&a), hex(&b), display(&b)));
     }
     oracle.finish()?;
     candidate.finish()?;
@@ -163,14 +157,78 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     Ok(())
 }
 
-/// A box whose inputs are structured records generates and compares them in its own driver, which
-/// receives the box's oracle and candidate paths and the SEED and CASES the lane was given.
-fn drive(program: &str, spec: &Spec, candidate_override: Option<PathBuf>) -> Result<(), String> {
-    let candidate = candidate_override.unwrap_or_else(|| PathBuf::from(&spec.candidate));
-    let status = Command::new(program)
+/// A box whose inputs are structured records generates and compares them in its own driver. The
+/// driver receives the oracle and candidate paths and the validated SEED and CASES, and must write
+/// `seed=`, `requested=` and `completed=` lines to FUZZ_RESULT; an exit status alone proves nothing.
+fn drive(id: &str, program: &str, spec: &Spec, candidate: &Path, budget: Budget, identities: &str) -> Result<(), String> {
+    let deadline = Duration::from_secs(env_number("FUZZ_TIMEOUT_SECS", DEFAULT_DRIVER_TIMEOUT_SECS)?);
+    let result = PathBuf::from(format!(".work/tmp/fuzz-{id}-{}-{}.result", budget.seed, std::process::id()));
+    fs::create_dir_all(".work/tmp").map_err(|e| format!("create .work/tmp: {e}"))?;
+    match fs::remove_file(&result) { Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(format!("clear {}: {e}", result.display())), _ => {} }
+    let mut child = Command::new(program)
         .env("FUZZ_ORACLE", &spec.oracle)
         .env("FUZZ_CANDIDATE", candidate)
-        .status()
+        .env("SEED", budget.seed.to_string())
+        .env("CASES", budget.cases.to_string())
+        .env("FUZZ_RESULT", &result)
+        .spawn()
         .map_err(|e| format!("fuzz driver {program}: {e}"))?;
-    if status.success() { Ok(()) } else { Err(format!("fuzz driver {program} reported a divergence or failed ({status})")) }
+    let started = Instant::now();
+    let status = loop {
+        match child.try_wait().map_err(|e| format!("wait fuzz driver: {e}"))? {
+            Some(status) => break status,
+            None if started.elapsed() < deadline => std::thread::sleep(Duration::from_millis(100)),
+            None => {
+                // The driver is being abandoned for exceeding its deadline; its exit status adds nothing.
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(format!("fuzz driver {program} exceeded FUZZ_TIMEOUT_SECS={}\n{identities}", deadline.as_secs()));
+            }
+        }
+    };
+    let report = fs::read_to_string(&result).map_err(|e| format!("fuzz driver {program} wrote no result ({e}); exit {status}\n{identities}"))?;
+    let completed = driver_completed(&report, budget)?;
+    if !status.success() { return Err(format!("fuzz driver {program} reported a divergence or failed ({status}) after {completed} of {} cases\n{identities}", budget.cases)); }
+    if completed != budget.cases { return Err(format!("fuzz driver {program} completed {completed} of {} cases", budget.cases)); }
+    println!("fuzz driver completed {completed} cases seed={}", budget.seed);
+    Ok(())
+}
+
+fn driver_completed(report: &str, budget: Budget) -> Result<u64, String> {
+    let field = |key: &str| -> Result<u64, String> {
+        let mut values = report.lines().filter_map(|line| line.strip_prefix(key)?.strip_prefix('='));
+        let value = values.next().ok_or_else(|| format!("fuzz result has no {key}"))?;
+        if values.next().is_some() { return Err(format!("fuzz result repeats {key}")); }
+        value.parse().map_err(|_| format!("fuzz result {key} is not an unsigned integer"))
+    };
+    if field("seed")? != budget.seed { return Err("fuzz result is for another seed".into()); }
+    if field("requested")? != budget.cases { return Err("fuzz result requested another case count".into()); }
+    let completed = field("completed")?;
+    if completed > budget.cases { return Err("fuzz result completed more cases than requested".into()); }
+    Ok(completed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn budgets_need_a_positive_case_count_and_an_unsigned_seed() {
+        assert_eq!(Budget::parse(Some("5"), Some("12"), 9), Ok(Budget { seed: 5, cases: 12 }));
+        assert_eq!(Budget::parse(None, None, 9), Ok(Budget { seed: 9, cases: 10000 }));
+        for (seed, cases) in [(None, Some("0")), (None, Some("-1")), (None, Some("x")), (Some("-3"), None), (Some("1e3"), None)] {
+            assert!(Budget::parse(seed, cases, 9).is_err(), "{seed:?} {cases:?}");
+        }
+    }
+
+    #[test]
+    fn a_driver_result_must_match_its_budget() {
+        let budget = Budget { seed: 7, cases: 3 };
+        assert_eq!(driver_completed("seed=7\nrequested=3\ncompleted=3\n", budget), Ok(3));
+        assert_eq!(driver_completed("seed=7\nrequested=3\ncompleted=1\n", budget), Ok(1));
+        for report in ["", "seed=8\nrequested=3\ncompleted=3", "seed=7\nrequested=0\ncompleted=0", "seed=7\nrequested=3\ncompleted=4",
+                       "seed=7\nrequested=3\ncompleted=-1", "seed=7\nrequested=3\ncompleted=3\ncompleted=3", "seed=7\nrequested=3"] {
+            assert!(driver_completed(report, budget).is_err(), "{report:?}");
+        }
+    }
 }

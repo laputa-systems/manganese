@@ -105,4 +105,5 @@ step doc-links doc_links
 step frozen-verifier frozen_verifier
 step builder-base builder_base
 step musl-link-mode musl_link_mode
+step equivalence-selftest python3 -B oracle/probes/equivalence/selftest.py
 exit $failed
