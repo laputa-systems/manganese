@@ -3,6 +3,7 @@ import time
 
 goto_url('http://forms.test/workload')
 wait_for_load()
+activate_tab(current_tab())
 for _ in range(100):
     if js('window.crossReady === true'):
         break
@@ -31,5 +32,8 @@ for target in targets:
     if target.get('url') == 'http://forms.test/popup':
         cdp('Target.closeTarget', targetId=target['targetId'])
 cdp('Browser.setDownloadBehavior', behavior='allow', downloadPath='/home/browser/Downloads', eventsEnabled=True)
+js("window.downloadClicks=0;document.querySelector('#blob').addEventListener('click',()=>window.downloadClicks++)")
 button = js("(()=>{let r=document.querySelector('#blob').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}})()")
+hit = js(f"document.elementFromPoint({button['x']},{button['y']})?.id")
 click_at_xy(button['x'], button['y'])
+print(json.dumps({'download_hit':hit, 'download_clicks':js('window.downloadClicks')}))

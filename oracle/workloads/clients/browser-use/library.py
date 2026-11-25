@@ -16,14 +16,20 @@ def cdp_sockets():
 async def main():
     before = cdp_sockets()
     connections = []
-    for _ in range(10):
+    mode = os.environ.get('PROFILE_MODE')
+    for _ in range(1 if mode else 10):
         browser = Browser(cdp_url='http://127.0.0.1:9221')
         try:
             environment = await browser.start()
             connections.append(environment)
-            if len(connections) == 1:
-                await asyncio.to_thread(subprocess.run, ['sh', '/workload/workload.sh'],
-                                        env={**os.environ, **environment}, check=True, timeout=60)
+            if mode:
+                commands = [['sh', '/workload/profile.sh', mode]]
+            elif len(connections) == 1:
+                commands = [['sh', '/workload/workload.sh'], ['sh', '/workload/extra.sh']]
+            else:
+                commands = []
+            for command in commands:
+                await asyncio.to_thread(subprocess.run, command, env={**os.environ, **environment}, check=True, timeout=60)
         finally:
             await browser.stop()
     immediate = cdp_sockets()
