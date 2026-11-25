@@ -19,7 +19,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 C_FAMILY = re.compile(r"\.(c|cc|cpp|cxx|C|m|mm|s|S)$")
-CACHED = {"miss", "local_hit"}
+CACHED = {"miss", "dup", "local_hit"}
 
 
 def events(cache: Path) -> Iterator[str]:
