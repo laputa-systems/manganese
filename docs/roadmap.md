@@ -4,7 +4,7 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** active, M0 and M1 in progress.
+- **State:** active; P0, M0 and M1 done, M2 next.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m1-zlib`, `m0-workloads`, `m1-source-oracle`, `m0-abi`, `m0-cdp-trace`, `m1-oracle-equivalence`. M0 and M1 are complete.
 - **In progress:** none.
