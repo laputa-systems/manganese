@@ -86,9 +86,17 @@ make_tree() {
     if [ "$(cat "$tree/.capture-series" 2>/dev/null || true)" = "$image_digest" ]; then
         return 0
     fi
+    # The fetched build inputs are verified against their locks on use, so they survive a new tree.
+    inputs=$tree.inputs
+    rm -rf "$inputs"
+    [ -d "$tree/.work/cache" ] && mv "$tree/.work/cache" "$inputs"
     rm -rf "$tree"
     mkdir -p "$(dirname -- "$tree")"
     cp -a "$root/oracle/build" "$tree"
+    if [ -d "$inputs" ]; then
+        mkdir -p "$tree/.work"
+        mv "$inputs" "$tree/.work/cache"
+    fi
     while IFS= read -r patch; do
         [ -n "$patch" ] || continue
         patch --batch --fuzz=0 -p1 -d "$tree" -i "$capture/$patch" >/dev/null || fail "cannot apply $patch"
