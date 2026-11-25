@@ -1,0 +1,174 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "canvas"
+  },
+  "mode": "headless",
+  "result": {
+    "dataURL": "0accb2a074684e799130b3aa9c329924b95cb1cedd9378909ed2f1b60abffe38",
+    "metrics": {
+      "Arial": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "Courier New": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "Helvetica": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "Noto Sans": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "Noto Sans Math": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.4784240722656,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 8,
+        "width": 260.2783508300781
+      },
+      "Noto Sans Mono": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 284.5341491699219,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 285.3340759277344
+      },
+      "Noto Sans Symbols": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.28045654296875,
+        "fontBoundingBoxAscent": 27,
+        "fontBoundingBoxDescent": 10,
+        "width": 260.08038330078125
+      },
+      "Noto Sans Symbols 2": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 297.47625732421875,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 11,
+        "width": 298.27618408203125
+      },
+      "Noto Serif": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": 0,
+        "actualBoundingBoxRight": 258.9024658203125,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 259.702392578125
+      },
+      "Noto Serif Display": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": 0,
+        "actualBoundingBoxRight": 255.3824462890625,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 257.182373046875
+      },
+      "Times New Roman": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "monospace": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 284.5341491699219,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 285.3340759277344
+      },
+      "nonexistent-persona-font": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "sans-serif": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": -1,
+        "actualBoundingBoxRight": 259.3164367675781,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 260.1163635253906
+      },
+      "serif": {
+        "actualBoundingBoxAscent": 14,
+        "actualBoundingBoxDescent": 5,
+        "actualBoundingBoxLeft": 0,
+        "actualBoundingBoxRight": 258.9024658203125,
+        "fontBoundingBoxAscent": 19,
+        "fontBoundingBoxDescent": 5,
+        "width": 259.702392578125
+      }
+    },
+    "pixels": "cb93d7b7c83566f8a6e9318fae598086af86ae80626d35dd6735840516900fea",
+    "scenes": {
+      "destination-in": {
+        "dataURL": "6c0a367b118dc49432ce0b457eb058f6f3e7d1cad19250be1509cadf8bd56f38",
+        "pixels": "b5b90667c7cc3f679aa2531ac19c0fbf43fdc81d5408bfeb92b87f833298e4ed"
+      },
+      "multiply": {
+        "dataURL": "618c2dc92a982d51d7cc880b9085b6037ed5996b5adc3e6dbab2c6cf7acb667a",
+        "pixels": "b931fb388886cbf8f038ff7a8f02d771356d57c2741efd98058bbad4f868cf17"
+      },
+      "screen": {
+        "dataURL": "5b8a8f872c57bd2e7e8cedf2b235e4c384eb3eca90be1f09e2b06daba0207dc2",
+        "pixels": "44ed30585ac26834da05756f9481a593c3ee3060df63f50b8f1fdde34fea47af"
+      },
+      "source-over": {
+        "dataURL": "e837baa8d2c535dd9489ab532643ce210a0abe163ae28a56d94837054b101069",
+        "pixels": "1ae7b1fe61bf1c0849d71c6132d63cf500fbd3434ada675d614d692ad88aba3b"
+      },
+      "xor": {
+        "dataURL": "24e72e1f3dcf4ae139d7fe56e469074a13f8c678894410731f8b814a6e91c289",
+        "pixels": "4964913ede8bce96536204c019cc35112add219dde47554403e0e087fce9fd2d"
+      }
+    }
+  }
+}

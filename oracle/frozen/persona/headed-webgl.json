@@ -1,0 +1,19 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "comparator": {
+    "class": "exact",
+    "surface": "webgl"
+  },
+  "mode": "headed",
+  "result": {
+    "available": true,
+    "capabilityReference": {
+      "path": "oracle/frozen/capability/headed-webgl.json",
+      "sha256": "40d01e195b6a9e78bb9005b8efc2d569d1633ff8f3c409364be095799f6f8051"
+    },
+    "pixels": "802f40f8e975bd90e9ead35452bd78fdb91deb685662cbac15cfcca7b56ca5e2"
+  }
+}

@@ -52,3 +52,7 @@ assembly:
 .PHONY: capability-probes
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
+
+.PHONY: persona-inventory
+persona-inventory:
+	python3 -B oracle/probes/persona/run.py
