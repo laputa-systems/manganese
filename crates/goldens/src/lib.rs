@@ -49,8 +49,8 @@ fn lock_items(text: &str, id: &str) -> Result<Vec<Item>, String> {
     }
     if items.is_empty() { return Err(format!("no items for {id}")); }
     let seen: BTreeSet<_> = items.iter().filter(|i| i.lane == Lane::Seen).flat_map(|i| [&i.input_digest, &i.output_digest]).collect();
-    if items.iter().filter(|i| i.lane == Lane::Holdout).any(|i| seen.contains(&i.input_digest) || seen.contains(&i.output_digest)) {
-        return Err("seen and holdout blobs overlap".into());
+    if items.iter().filter(|i| i.lane == Lane::Holdout).any(|i| seen.contains(&i.input_digest)) {
+        return Err("a holdout input is a seen blob".into());
     }
     Ok(items)
 }
@@ -177,4 +177,26 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
     }
     if !failing.is_empty() { return Err(format!("golden mismatch: {}", failing.join(", "))); }
     Ok(())
+}
+
+#[cfg(test)]
+mod lock_tests {
+    use super::lock_items;
+
+    fn row(lane: &str, item: &str, input: char, output: char) -> String {
+        format!("b {lane} {item} {} 1 {} 1\n", input.to_string().repeat(64), output.to_string().repeat(64))
+    }
+
+    #[test]
+    fn holdout_outputs_may_equal_seen_outputs() {
+        let text = row("seen", "s", 'a', 'c') + &row("holdout", "h", 'b', 'c');
+        assert_eq!(lock_items(&text, "b").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn holdout_inputs_never_appear_among_seen_blobs() {
+        for text in [row("seen", "s", 'a', 'c') + &row("holdout", "h", 'a', 'd'), row("seen", "s", 'a', 'c') + &row("holdout", "h", 'c', 'd')] {
+            assert_eq!(lock_items(&text, "b").unwrap_err(), "a holdout input is a seen blob");
+        }
+    }
 }

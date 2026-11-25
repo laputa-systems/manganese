@@ -137,8 +137,10 @@ complete example.
 (`seen` or `holdout`), item ID, input SHA-256, input byte count, output SHA-256
 and output byte count. The runner reads the blobs from `sha256/<digest>` under
 `MANGANESE_STORE`, defaulting to `~/.local/share/manganese/store`. It validates
-each loaded blob's length and digest and refuses a digest shared across the
-seen and holdout sets. The actual holdout share must meet the spec. The
+each loaded blob's length and digest and refuses a holdout input that is also a
+seen input or output. Outputs may coincide across the sets: small output spaces
+(an empty checksum, a shared error response) make that unavoidable, and an
+unseen input still tests the candidate. The actual holdout share must meet the spec. The
 synthetic selftest generates its blobs in a temporary store under `.work/tmp`.
 
 Protocol version 1 begins with the four bytes `MGB1` on both stdin and stdout.
