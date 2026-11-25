@@ -48,8 +48,6 @@ box:
 .PHONY: assembly
 assembly:
 	sh scripts/assembly "$(A)"
-||||||| b208f51
-.PHONY: setup check lint test artifact-selftest oracle-launch
 
 .PHONY: capability-probes
 capability-probes:
