@@ -97,7 +97,9 @@ impl Version {
                         && self.user_cmp.cmp(foundkey, ukey) == Ordering::Equal
                     {
                         return Ok(Some((v, stats)));
-                    } else if typ == ValueType::TypeDeletion {
+                    } else if typ == ValueType::TypeDeletion
+                        && self.user_cmp.cmp(foundkey, ukey) == Ordering::Equal
+                    {
                         // Skip looking once we have found a deletion.
                         return Ok(None);
                     }
@@ -881,6 +883,25 @@ mod tests {
                 Ok(None) => assert!(c.2.as_ref().unwrap().as_ref().is_none()),
                 Err(_) => assert!(c.2.is_err()),
             });
+    }
+
+    #[test]
+    fn unrelated_tombstone_does_not_hide_an_older_table_value() {
+        use crate::types::share;
+
+        let (mut version, mut opt) = make_version();
+        let newer = write_table(opt.env.as_ref().as_ref(), &[
+            (b"aaa", b"new", ValueType::TypeValue),
+            (b"aac", b"", ValueType::TypeDeletion),
+            (b"aaz", b"new", ValueType::TypeValue),
+        ], 31, 10);
+        version.files[0].push(newer);
+        opt.filter_policy = Rc::new(Box::new(crate::filter::NoFilterPolicy::new()));
+        version.table_cache = share(crate::table_cache::TableCache::new(
+            "db", opt, share(crate::cache::Cache::new(128)), 100));
+        let key = LookupKey::new(b"aab", 100);
+        let value = version.get(key.internal_key()).unwrap().unwrap().0;
+        assert_eq!(value.as_ref(), b"val2");
     }
 
     #[test]
