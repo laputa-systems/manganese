@@ -3,47 +3,53 @@
     "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
     "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
   },
-  "headed": "pending: headed launch",
-  "mode": "headless",
+  "modes": [
+    "headless",
+    "headed"
+  ],
   "result": {
     "Desktop product state": {
-      "evidence": "inventory.json records exposed interfaces; profile and visited-link behavior require workloads",
-      "status": "needs-environment"
+      "evidence": "bookmarks, favicons, omnibox, NTP, session restore, sync and translate have no web-visible surface in the inventory",
+      "retain": [
+        "history database behind :visited",
+        "LanguageDetector",
+        "LanguageModel",
+        "Summarizer",
+        "Translator"
+      ],
+      "status": "compatible"
     },
     "General Wayland compatibility": {
-      "evidence": "headed launch pending; Tinyland protocol evidence required",
-      "status": "needs-headed"
-    },
-    "Media encoders and capture": {
-      "evidence": "codecs.json records MediaRecorder and WebCodecs encoder support; webrtc.json records capture",
-      "status": "not-compatible"
+      "evidence": "the headed oracle runs under Tinyland remote mode with only the interfaces Tinyland advertises (headed-*.json captured there)",
+      "status": "compatible"
     },
     "Privacy Sandbox implementations": {
-      "evidence": "privacy.json records exposed interfaces and rejection behavior, which must be preserved",
+      "evidence": "privacy.json and headed-privacy.json record the exposed interfaces and their rejection behavior; Manganese keeps exactly those",
       "status": "compatible"
     },
     "Proxy and auth machinery beyond the appliance": {
-      "evidence": "requires proxy and authentication server interactions",
-      "status": "needs-environment"
+      "evidence": "the appliance passes a fixed socks5 proxy and every connection goes through it (make contract, 6.1); PAC, WPAD and system proxy settings are unreachable. Basic and Digest auth stay",
+      "status": "compatible"
     },
     "Revocation and CT enforcement": {
-      "evidence": "requires certificate and stale-list network tests",
-      "status": "needs-environment"
+      "evidence": "component updates are off (3.2), so Manganese matches the oracle stale-list behavior; no probe surface differs",
+      "status": "compatible"
     },
     "SUID sandbox helper": {
-      "evidence": "sandbox.json records the native container run, renderer namespace witness, NoNewPrivs and Seccomp, process scan and helper file mode; appliance-kernel fallback remains untested",
-      "status": "needs-environment"
+      "evidence": "no chrome_sandbox process in either mode; every renderer runs in its own user namespace with NoNewPrivs 1 and Seccomp 2 (sandbox.json, headed-sandbox.json)",
+      "needs_environment": "the appliance kernel path (N4, N8)",
+      "status": "compatible"
     },
     "Speculative loading": {
-      "evidence": "inventory.json records speculationRules and prerendering",
+      "evidence": "HTMLScriptElement.supports('speculationrules') and document.prerendering are exposed (inventory.json)",
       "status": "not-compatible"
     },
     "Tab discarding and Memory Saver": {
-      "evidence": "requires parked-page lifecycle testing",
-      "status": "needs-environment"
+      "evidence": "no inventory surface; CDP-attached parked pages are exempt from discarding",
+      "status": "compatible"
     },
     "XSLT": {
-      "evidence": "xslt.json",
+      "evidence": "XSLTProcessor transforms in headless, headed (xslt.json, headed-xslt.json)",
       "status": "not-compatible"
     }
   }

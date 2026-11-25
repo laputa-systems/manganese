@@ -1,0 +1,13 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "mode": "headed",
+  "result": {
+    "presence": "function",
+    "transform": {
+      "result": "<out>ok</out>"
+    }
+  }
+}
