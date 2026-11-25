@@ -31,7 +31,7 @@ class Handler(BaseHTTPRequestHandler):
 
 server = ThreadingHTTPServer(('127.0.0.1', 18765), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-client = Cdp.connect()
+client = Cdp.connect_when_ready()
 try:
     page = client.page()
     client.send('Page.enable', session=page)

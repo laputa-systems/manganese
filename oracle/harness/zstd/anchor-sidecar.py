@@ -36,7 +36,7 @@ thread = threading.Thread(target=server.serve_forever)
 thread.start()
 client = None
 try:
-    client = Cdp.connect()
+    client = Cdp.connect_when_ready()
     page = client.page()
     client.send('Page.enable', session=page)
     client.send('Page.navigate', {'url': 'http://localhost:18765/'}, session=page)

@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, '/launch')
 from cdp import Cdp
 
-client = Cdp.connect()
+client = Cdp.connect_when_ready()
 try:
     page = client.page()
     client.send('Fetch.enable', {'patterns': [{'urlPattern': 'https://png.test/*'}]}, session=page)

@@ -8,6 +8,7 @@ import os
 import socket
 import struct
 import time
+import urllib.error
 import urllib.request
 from collections import deque
 
@@ -100,6 +101,21 @@ class Cdp:
     def connect(cls, endpoint: str = "http://127.0.0.1:9221") -> Cdp:
         with urllib.request.urlopen(f"{endpoint}/json/version", timeout=5) as response:
             return cls(json.load(response)["webSocketDebuggerUrl"])
+
+    @classmethod
+    def connect_when_ready(cls, endpoint: str = "http://127.0.0.1:9221", deadline_seconds: float = 60.0) -> Cdp:
+        """Connect once the browser's DevTools socket accepts, waiting up to the appliance readiness deadline (4.1).
+
+        Only a refused connection is retried: a browser that is still starting has not bound its port yet.
+        """
+        deadline = time.monotonic() + deadline_seconds
+        while True:
+            try:
+                return cls.connect(endpoint)
+            except urllib.error.URLError as error:
+                if not isinstance(error.reason, ConnectionRefusedError) or time.monotonic() >= deadline:
+                    raise
+            time.sleep(0.05)
 
     def send(self, method: str, params: dict[str, object] | None = None, session: str | None = None,
              timeout: float = 30.0) -> dict[str, object]:
