@@ -240,7 +240,14 @@ impl DB {
         ve: &mut VersionEdit,
     ) -> Result<(bool, SequenceNumber)> {
         let filename = log_file_name(&self.path, log_num);
-        let logfile = self.opt.env.open_sequential_file(Path::new(&filename))?;
+        let logfile = match self.opt.env.open_sequential_file(Path::new(&filename)) {
+            Ok(file) => file,
+            Err(error) if !self.opt.paranoid_checks => {
+                log!(self.opt.log, "ignoring log open error: {}", error);
+                return Ok((false, 0));
+            }
+            Err(error) => return Err(error),
+        };
         // Use the user-supplied comparator; it will be wrapped inside a MemtableKeyCmp.
         let cmp: Rc<Box<dyn Cmp>> = self.opt.cmp.clone();
 
@@ -257,23 +264,37 @@ impl DB {
         let mut max_seq = 0;
         let mut save_manifest = false;
 
-        while let Ok(len) = logreader.read(&mut scratch) {
-            if len == 0 {
-                break;
-            }
+        loop {
+            let len = match logreader.read_record(&mut scratch) {
+                Ok(Some(len)) => len,
+                Ok(None) => break,
+                Err(error) if !self.opt.paranoid_checks => {
+                    log!(self.opt.log, "ignoring log corruption: {}", error);
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             if len < 12 {
                 log!(
                     self.opt.log,
                     "corruption in log file {:06}: record shorter than 12B",
                     log_num
                 );
+                if self.opt.paranoid_checks {
+                    return err(StatusCode::Corruption, "log record shorter than 12 bytes");
+                }
                 continue;
             }
 
             batch.set_contents(&scratch);
-            batch.insert_into_memtable(batch.sequence(), &mut mem);
+            if let Err(error) = batch.insert_recovered(batch.sequence(), &mut mem) {
+                if self.opt.paranoid_checks {
+                    return Err(error);
+                }
+                log!(self.opt.log, "ignoring invalid write batch: {}", error);
+            }
 
-            let last_seq = batch.sequence() + batch.count() as u64 - 1;
+            let last_seq = batch.sequence().wrapping_add(batch.count() as u64).wrapping_sub(1);
             if last_seq > max_seq {
                 max_seq = last_seq
             }

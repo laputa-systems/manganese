@@ -586,10 +586,7 @@ impl VersionSet {
             let mut last_seq = None;
 
             let mut buf = Vec::new();
-            while let Ok(size) = logreader.read(&mut buf) {
-                if size == 0 {
-                    break;
-                }
+            while logreader.read_record(&mut buf)?.is_some() {
                 let edit = VersionEdit::decode_from(&buf)?;
                 builder.apply(&edit, &mut self.compaction_ptrs);
                 if let Some(ln) = edit.log_number {

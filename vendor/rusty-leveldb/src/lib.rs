@@ -91,6 +91,8 @@ mod db_iter;
 
 #[cfg(test)]
 mod durability_tests;
+#[cfg(test)]
+mod recovery_tests;
 
 pub mod compressor;
 pub mod env;

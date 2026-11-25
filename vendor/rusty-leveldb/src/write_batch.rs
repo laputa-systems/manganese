@@ -1,4 +1,5 @@
 use crate::integer_encoding::{FixedInt, VarInt, VarIntWriter};
+use crate::error::{err, Result, StatusCode};
 use crate::key_types::ValueType;
 use crate::memtable::MemTable;
 use crate::types::SequenceNumber;
@@ -107,10 +108,62 @@ impl WriteBatch {
         }
     }
 
+    pub(crate) fn insert_recovered(&self, mut seq: SequenceNumber, mt: &mut MemTable) -> Result<()> {
+        if self.entries.len() < HEADER_SIZE {
+            return err(StatusCode::Corruption, "short write batch");
+        }
+        let mut input = &self.entries[HEADER_SIZE..];
+        let mut found = 0u32;
+        while let Some((&tag, rest)) = input.split_first() {
+            input = rest;
+            if tag != 0 && tag != 1 {
+                return err(StatusCode::Corruption, "unknown write batch tag");
+            }
+            let Some(key) = take_length_prefixed(&mut input) else {
+                return err(StatusCode::Corruption, "bad write batch key");
+            };
+            match tag {
+                0 => mt.add(seq, ValueType::TypeDeletion, key, b""),
+                1 => {
+                    let Some(value) = take_length_prefixed(&mut input) else {
+                        return err(StatusCode::Corruption, "bad write batch value");
+                    };
+                    mt.add(seq, ValueType::TypeValue, key, value);
+                }
+                _ => unreachable!(),
+            }
+            found = found.wrapping_add(1);
+            seq = seq.wrapping_add(1);
+        }
+        if found != self.count() {
+            return err(StatusCode::Corruption, "write batch has wrong count");
+        }
+        Ok(())
+    }
+
     pub fn encode(mut self, seq: SequenceNumber) -> Vec<u8> {
         self.set_sequence(seq);
         self.entries
     }
+}
+
+fn take_length_prefixed<'a>(input: &mut &'a [u8]) -> Option<&'a [u8]> {
+    let mut length = 0u32;
+    for shift in (0..=28).step_by(7) {
+        let (&byte, rest) = input.split_first()?;
+        *input = rest;
+        length |= u32::from(byte & 0x7f) << shift;
+        if byte & 0x80 == 0 {
+            let length = length as usize;
+            if length > input.len() {
+                return None;
+            }
+            let (field, rest) = input.split_at(length);
+            *input = rest;
+            return Some(field);
+        }
+    }
+    None
 }
 
 impl Default for WriteBatch {

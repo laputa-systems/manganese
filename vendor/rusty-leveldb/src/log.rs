@@ -116,82 +116,133 @@ impl<W: WritableFile> LogWriter<W> {
 }
 
 pub struct LogReader<R: Read> {
-    // TODO: Wrap src in a buffer to enhance read performance.
     src: R,
-    blk_off: usize,
     blocksize: usize,
-    head_scratch: [u8; 7],
+    block: Vec<u8>,
+    offset: usize,
+    eof: bool,
     checksums: bool,
+    pending: Option<(u8, Vec<u8>)>,
 }
 
 impl<R: Read> LogReader<R> {
     pub fn new(src: R, chksum: bool) -> LogReader<R> {
         LogReader {
             src,
-            blk_off: 0,
             blocksize: BLOCK_SIZE,
+            block: Vec::new(),
+            offset: 0,
+            eof: false,
             checksums: chksum,
-            head_scratch: [0; 7],
+            pending: None,
         }
     }
 
     /// EOF is signalled by Ok(0)
     pub fn read(&mut self, dst: &mut Vec<u8>) -> Result<usize> {
-        let mut checksum: u32;
-        let mut length: u16;
-        let mut typ: u8;
-        let mut dst_offset: usize = 0;
+        Ok(self.read_record(dst)?.unwrap_or(0))
+    }
 
+    pub fn read_record(&mut self, dst: &mut Vec<u8>) -> Result<Option<usize>> {
         dst.clear();
+        let mut fragmented = false;
 
         loop {
-            if self.blocksize - self.blk_off < HEADER_SIZE {
-                // skip to next block
-                self.src
-                    .read_exact(&mut self.head_scratch[0..self.blocksize - self.blk_off])?;
-                self.blk_off = 0;
-            }
-
-            let mut bytes_read = self.src.read(&mut self.head_scratch)?;
-
-            // EOF
-            if bytes_read == 0 {
-                return Ok(0);
-            }
-
-            self.blk_off += bytes_read;
-
-            checksum = u32::decode_fixed(&self.head_scratch[0..4]);
-            length = u16::decode_fixed(&self.head_scratch[4..6]);
-            typ = self.head_scratch[6];
-
-            dst.resize(dst_offset + length as usize, 0);
-            bytes_read = self
-                .src
-                .read(&mut dst[dst_offset..dst_offset + length as usize])?;
-            self.blk_off += bytes_read;
-
-            if self.checksums
-                && !self.check_integrity(typ, &dst[dst_offset..dst_offset + bytes_read], checksum)
-            {
-                return err(StatusCode::Corruption, "Invalid Checksum");
-            }
-
-            dst_offset += length as usize;
-
-            if typ == RecordType::Full as u8 || typ == RecordType::Last as u8 {
-                return Ok(dst_offset);
-            } else if typ == RecordType::First as u8 || typ == RecordType::Middle as u8 {
-                continue;
+            let fragment = match self.pending.take() {
+                Some(fragment) => Some(fragment),
+                None => self.read_fragment()?,
+            };
+            let Some((typ, data)) = fragment else {
+                dst.clear();
+                return Ok(None);
+            };
+            match typ {
+                1 | 2 => {
+                    if fragmented && !dst.is_empty() {
+                        self.pending = Some((typ, data));
+                        return err(StatusCode::Corruption, "partial record without end");
+                    }
+                    dst.clear();
+                    dst.extend_from_slice(&data);
+                    if typ == RecordType::Full as u8 {
+                        return Ok(Some(dst.len()));
+                    }
+                    fragmented = true;
+                }
+                3 | 4 => {
+                    if !fragmented {
+                        return err(StatusCode::Corruption, "missing start of fragmented record");
+                    }
+                    dst.extend_from_slice(&data);
+                    if typ == RecordType::Last as u8 {
+                        return Ok(Some(dst.len()));
+                    }
+                }
+                0 if data.is_empty() => {
+                    if fragmented {
+                        return err(StatusCode::Corruption, "error in middle of record");
+                    }
+                }
+                _ => return err(StatusCode::Corruption, "unknown record type"),
             }
         }
     }
 
-    fn check_integrity(&mut self, typ: u8, data: &[u8], expected: u32) -> bool {
-        let mut digest = crc::digest();
-        digest.update(&[typ]);
-        digest.update(data);
-        unmask_crc(expected) == digest.finalize()
+    fn read_fragment(&mut self) -> Result<Option<(u8, Vec<u8>)>> {
+        loop {
+            if self.block.len() - self.offset < HEADER_SIZE {
+                if self.eof {
+                    return Ok(None);
+                }
+                self.block.resize(self.blocksize, 0);
+                let mut filled = 0;
+                while filled < self.blocksize {
+                    match self.src.read(&mut self.block[filled..]) {
+                        Ok(0) => { self.eof = true; break; }
+                        Ok(n) => filled += n,
+                        Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                        Err(e) => {
+                            self.eof = true;
+                            self.block.clear();
+                            self.offset = 0;
+                            return Err(e.into());
+                        }
+                    }
+                }
+                self.block.truncate(filled);
+                self.offset = 0;
+                continue;
+            }
+
+            let header = &self.block[self.offset..self.offset + HEADER_SIZE];
+            let checksum = u32::decode_fixed(&header[..4]);
+            let length = u16::decode_fixed(&header[4..6]) as usize;
+            let typ = header[6];
+            if HEADER_SIZE + length > self.block.len() - self.offset {
+                self.offset = self.block.len();
+                if self.eof {
+                    return Ok(None);
+                }
+                return err(StatusCode::Corruption, "bad record length");
+            }
+            if typ == 0 && length == 0 {
+                self.offset = self.block.len();
+                return Ok(Some((0, Vec::new())));
+            }
+            let start = self.offset + HEADER_SIZE;
+            let data = self.block[start..start + length].to_vec();
+            self.offset = start + length;
+            if self.checksums {
+                let mut digest = crc::digest();
+                digest.update(&[typ]);
+                digest.update(&data);
+                if unmask_crc(checksum) != digest.finalize() {
+                    self.offset = self.block.len();
+                    return err(StatusCode::Corruption, "Invalid Checksum");
+                }
+            }
+            return Ok(Some((typ, data)));
+        }
     }
 }
 
