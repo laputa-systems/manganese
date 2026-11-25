@@ -10,9 +10,24 @@ for _ in range(100):
     time.sleep(0.1)
 else:
     raise RuntimeError('cross-origin frame did not become ready')
-print(json.dumps({'targets':cdp('Target.getTargets'), 'same':js("document.querySelector('#same').contentDocument.querySelector('#same-text').textContent")}))
+targets = cdp('Target.getTargets')
 frame = js("(()=>{let r=document.querySelector('#cross').getBoundingClientRect();return {x:r.x+30,y:r.y+15}})()")
+hit = cdp('DOM.getNodeForLocation', x=int(frame['x']), y=int(frame['y']))
+node = cdp('DOM.describeNode', backendNodeId=hit['backendNodeId'])
+for attempt in range(100):
+    cdp('Input.dispatchMouseEvent', type='mouseMoved', x=frame['x'] + attempt % 2, y=frame['y'])
+    time.sleep(0.1)
+    if any(event['type'] == 'pointermove' and event['target'] == 'cross-click' for event in js('window.crossEvents')):
+        break
+else:
+    raise RuntimeError('cross-origin button did not receive pointer movement')
 click_at_xy(frame['x'], frame['y'])
+for _ in range(100):
+    events = js('window.crossEvents')
+    if any(event['type'] == 'click' for event in events):
+        break
+    time.sleep(0.1)
+print(json.dumps({'targets':targets, 'same':js("document.querySelector('#same').contentDocument.querySelector('#same-text').textContent"), 'frame':frame, 'hit':hit, 'node':node, 'events':events}))
 document = cdp('DOM.getDocument')
 node = cdp('DOM.querySelector', nodeId=document['root']['nodeId'], selector='#upload')
 cdp('DOM.setFileInputFiles', nodeId=node['nodeId'], files=['/profile/browser-use-upload.bin'])

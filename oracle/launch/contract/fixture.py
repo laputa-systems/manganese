@@ -4,6 +4,7 @@ import json
 import select
 import socket
 import socketserver
+import ssl
 import struct
 import threading
 import time
@@ -26,7 +27,7 @@ class HTTP(http.server.BaseHTTPRequestHandler):
         elif self.path == '/workload':
             body = b'''<!doctype html><title>Client workload</title><h1>Client workload</h1>
 <form action="/submit" method="post"><label>Text <input name="text" id="text"></label><button id="submit">Submit</button></form>
-<script>window.addEventListener('message',e=>{if(e.data==='cross-ready')window.crossReady=true})</script>
+<script>window.crossEvents=[];window.addEventListener('message',e=>{if(e.data==='cross-ready')window.crossReady=true;else if(e.data&&e.data.crossEvent)window.crossEvents.push(e.data.crossEvent)})</script>
 <iframe id="same" src="/same"></iframe><iframe id="cross" src="http://frame.test/cross"></iframe>
 <input id="upload" type="file"><button id="send-upload" onclick="fetch('/upload',{method:'POST',body:document.querySelector('#upload').files[0]})">Upload</button>
 <button id="confirm" onclick="document.body.dataset.confirm=confirm('Confirm workload')">Confirm</button>
@@ -37,7 +38,7 @@ class HTTP(http.server.BaseHTTPRequestHandler):
             body = b'<!doctype html><p id="same-text">same-origin frame</p>'
             content_type = 'text/html'
         elif self.path == '/cross':
-            body = b'<!doctype html><button id="cross-click" onclick="fetch(\'/frame-click\',{method:\'POST\',body:\'clicked\'})">Cross-origin click</button><script>parent.postMessage("cross-ready","*")</script>'
+            body = b'<!doctype html><button id="cross-click" onclick="fetch(\'/frame-click\',{method:\'POST\',body:\'clicked\'})">Cross-origin click</button><script>for(const type of ["pointermove","pointerdown","pointerup","click"])document.addEventListener(type,e=>parent.postMessage({crossEvent:{type,target:e.target.id,trusted:e.isTrusted}},"*"));parent.postMessage("cross-ready","*")</script>'
             content_type = 'text/html'
         else:
             body = b'<!doctype html><title>fixture</title><input id="field"><iframe src="http://frame.test/"></iframe>' if self.headers.get('Host', '').startswith('forms.test') else b'<!doctype html><title>frame</title>'
@@ -101,10 +102,13 @@ class Socks(socketserver.BaseRequestHandler):
                      'seconds_after_readiness': now - float(READY.read_text()) if READY.exists() else None}
             with LOG.open('a') as log:
                 log.write(json.dumps(entry) + '\n')
-            if version != 5 or command != 1 or kind != 3 or host not in ('forms.test', 'frame.test', 'localhost') or port != 80:
+            tls = (LOG.parent / 'tls-cert.pem').is_file()
+            plain = host in ('forms.test', 'frame.test', 'localhost') and port == 80
+            secure = tls and host in ('www.youtube.com', 'x.com') and port == 443
+            if version != 5 or command != 1 or kind != 3 or not (plain or secure):
                 self.request.sendall(b'\x05\x02\x00\x01\x00\x00\x00\x00\x00\x00')
                 return
-            with socket.create_connection(('127.0.0.1', 18080), timeout=5) as upstream:
+            with socket.create_connection(('127.0.0.1', 18443 if secure else 18080), timeout=5) as upstream:
                 self.request.sendall(b'\x05\x00\x00\x01\x7f\x00\x00\x01\x00\x00')
                 self.request.settimeout(None)
                 upstream.settimeout(None)
@@ -122,4 +126,10 @@ class Socks(socketserver.BaseRequestHandler):
 
 http = Server(('127.0.0.1', 18080), HTTP)
 threading.Thread(target=http.serve_forever, daemon=True).start()
+if (LOG.parent / 'tls-cert.pem').is_file():
+    secure_http = Server(('127.0.0.1', 18443), HTTP)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(LOG.parent / 'tls-cert.pem', LOG.parent / 'tls-key.pem')
+    secure_http.socket = context.wrap_socket(secure_http.socket, server_side=True)
+    threading.Thread(target=secure_http.serve_forever, daemon=True).start()
 Server(('127.0.0.1', 1080), Socks).serve_forever()

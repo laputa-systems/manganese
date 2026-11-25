@@ -47,7 +47,7 @@ def run(directory, browser_root, image, preferences, mode):
     records = [json.loads(line) for line in (directory / 'requests.jsonl').read_text().splitlines()]
     uploads = [item for item in records if item['path'] == '/upload']
     if not uploads or not any(item['path'] == '/frame-click' for item in records):
-        raise RuntimeError('the fixture did not record the cross-origin click or upload')
+        raise RuntimeError(f'the fixture did not record the cross-origin click or upload: {frame}')
     expected = (directory / 'browser-use-upload.sha256').read_text().split()[0]
     download = session.downloads / 'client-download.txt'
     download_ok = download.is_file() and download.read_bytes() == b'client download'

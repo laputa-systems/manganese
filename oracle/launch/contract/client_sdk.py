@@ -33,7 +33,7 @@ def run(directory, browser_root, image, preferences):
             or observed['download_click_detail']['errors']):
         raise RuntimeError(f'blob download fixture failed: {observed["download_click_detail"]}')
     if not observed['cross_clicked'] or not upload:
-        raise RuntimeError('the fixture did not record the cross-origin click or upload')
+        raise RuntimeError(f'the fixture did not record the cross-origin click or upload: {observed["frame_hit"]}')
     cookies = [seed['cookies']['cookies'], read['cookies']['cookies']]
     cookie_ok = all(any(item['name'] == 'contract_profile' and item['value'] == 'persisted' and item['httpOnly']
                         for item in items) for items in cookies)

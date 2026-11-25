@@ -49,8 +49,19 @@ async def main():
         await browser.command('Target.setDiscoverTargets', {'discover':True})
         frame_targets = await browser.command('Target.getTargets')
         frame = await tab.evaluate("(()=>{let r=document.querySelector('#cross').getBoundingClientRect();return {x:r.x+30,y:r.y+15}})()")
+        hit = await tab.command('DOM.getNodeForLocation', {'x':int(frame['x']), 'y':int(frame['y'])})
+        hit_node = await tab.command('DOM.describeNode', {'backendNodeId':hit['backendNodeId']})
+        for attempt in range(100):
+            await tab.command('Input.dispatchMouseEvent', {'type':'mouseMoved', 'x':frame['x'] + attempt % 2, 'y':frame['y']})
+            await asyncio.sleep(0.1)
+            events = await tab.evaluate('window.crossEvents')
+            if any(event['type'] == 'pointermove' and event['target'] == 'cross-click' for event in events):
+                break
+        else:
+            raise RuntimeError('cross-origin button did not receive pointer movement')
         await tab.human_click(frame['x'], frame['y'])
         await asyncio.sleep(1)
+        cross_events = await tab.evaluate('window.crossEvents')
         requests = [json.loads(line) for line in records.read_text().splitlines()] if records.exists() else []
         cross_clicked = any(item['path'] == '/frame-click' and item['body'] == 'clicked' for item in requests)
         before_popup = await browser.command('Target.getTargets')
@@ -109,7 +120,7 @@ async def main():
         result = {'version':version, 'targets':targets, 'user_agent':user_agent,
                           'ax_nodes':len(ax['nodes']), 'png_bytes':len(png), 'png_signature':png[:8].hex(),
                           'form_submission':submitted, 'same_frame':same_frame, 'frame_targets':frame_targets,
-                          'cross_clicked':cross_clicked, 'before_popup':before_popup, 'after_popup':after_popup,
+                          'cross_clicked':cross_clicked, 'frame_hit':{'frame':frame, 'node':hit_node, 'events':cross_events}, 'before_popup':before_popup, 'after_popup':after_popup,
                           'upload_expected_sha256':hashlib.sha256(payload).hexdigest(), 'uploads':uploaded,
                           'dialogs':dialogs, 'confirm':confirm, 'download':downloaded,
                           'download_clicks':clicks, 'download_url_api_initial':url_api_initial,

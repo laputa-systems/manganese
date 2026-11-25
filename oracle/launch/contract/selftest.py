@@ -33,7 +33,7 @@ class NegativeControls(unittest.TestCase):
         for change in ('client', 'workload', 'failure', 'missing-evidence', 'missing-reason'):
             bad = copy.deepcopy(good)
             if change == 'client':
-                del bad['browser-use']
+                del bad['browser-use-cli']
             elif change == 'workload':
                 del bad['agent-browser']['forms']
             elif change == 'failure':
@@ -45,14 +45,16 @@ class NegativeControls(unittest.TestCase):
             self.assertFalse(checks.client_workloads(bad), change)
 
     def test_extension_features(self):
-        good = {name:{'ok':True, 'evidence':{'observed':True}} for name in checks.EXTENSION_FEATURES}
+        good = {name:{'status':'ok', 'evidence':{'observed':True}} for name in checks.EXTENSION_FEATURES}
+        self.assertTrue(checks.extension_features(good))
+        good['badge'] = {'status':'oracle-differs', 'evidence':{'observed':''}}
         self.assertTrue(checks.extension_features(good))
         for change in ('missing', 'failed', 'no-evidence'):
             bad = copy.deepcopy(good)
             if change == 'missing':
                 del bad['clipboardWrite']
             elif change == 'failed':
-                bad['clipboardWrite']['ok'] = False
+                bad['clipboardWrite']['status'] = 'FAIL'
             else:
                 del bad['clipboardWrite']['evidence']
             self.assertFalse(checks.extension_features(bad), change)
