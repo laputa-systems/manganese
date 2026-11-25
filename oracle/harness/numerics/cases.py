@@ -46,8 +46,25 @@ def generate_json(rng: random.Random) -> bytes:
     return b'\x0c' + rng.choice((b'', b' ', b'\t')) + number + rng.choice((b'', b'', b' ', b'!'))
 
 
+def generate_json_writer(rng: random.Random) -> bytes:
+    bits = rng.choice((rng.getrandbits(64), rng.choice((0, 1, 0x8000000000000000, 0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000000000, 0x7fefffffffffffff))))
+    return struct.pack('>BQBB', 13, bits, rng.randrange(2), 0)
+
+
+def generate_blink_wide(rng: random.Random) -> bytes:
+    alphabet = b'0123456789+-.eE x\t\n'
+    if rng.randrange(2):
+        units = list(str(rng.randrange(-(1 << 60), 1 << 60)).encode())
+        units += [rng.randrange(128, 65536)] if rng.randrange(2) else [ord('e'), ord('-'), ord('4')]
+    else:
+        units = [rng.choice(alphabet) if rng.randrange(4) else rng.randrange(128, 65536) for _ in range(rng.randrange(130))]
+    return b'\x0e' + b''.join(struct.pack('>H', unit) for unit in units)
+
+
 def generate(rng: random.Random) -> bytes:
-    selected = rng.randrange(7)
+    selected = rng.randrange(9)
     if selected == 0: return generate_blink(rng)
     if selected == 1: return generate_json(rng)
+    if selected == 2: return generate_json_writer(rng)
+    if selected == 3: return generate_blink_wide(rng)
     return generate_base(rng)

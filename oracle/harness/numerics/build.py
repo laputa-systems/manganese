@@ -2,6 +2,7 @@ import os
 import pathlib
 import shlex
 import subprocess
+import sys
 
 out = pathlib.Path('/work/out/chromium-wayland-release')
 source = pathlib.Path('/work/src/base/third_party/double_conversion/double-conversion')
@@ -29,6 +30,12 @@ for path in sorted(source.glob('*.cc')):
     obj = scratch / (path.name + '.o')
     subprocess.run([compiler, *args, '-c', str(path), '-o', str(obj)], cwd=out, env=env, check=True)
     objects.append(str(obj))
+for path in ('base/json/json_writer.cc', 'base/strings/string_number_conversions.cc'):
+    target = scratch / (path.replace('/', '_') + '.o')
+    subprocess.run([compiler, *harness_args, '-c', '/work/src/' + path, '-o', str(target)], cwd=out, env=env, check=True)
+    objects.append(str(target))
+subprocess.run([sys.executable, '-B', '/lane/oracle/harness/numerics/build_allocator.py'], cwd=out, env=env, check=True)
+objects.extend(str(scratch / name) for name in ('allocator-bounds_checks.cc.o', 'allocator-partition_address_space.cc.o', 'allocator-reservation_offset_table.cc.o', 'allocator-slot_address_and_size.cc.o', 'allocator-partition_alloc_base_debug_alias.cc.o', 'stack_only.o'))
 blink_flags = {}
 for line in (out / 'obj/third_party/blink/renderer/platform/wtf/wtf.ninja').read_text().splitlines():
     for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc'):

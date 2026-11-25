@@ -81,7 +81,15 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn json_writer_preserves_or_omits_double_type() {
+        assert_eq!(write_json_double(1.0, JsonDoubleStyle::PreserveType), "1.0");
+        assert_eq!(write_json_double(1.0, JsonDoubleStyle::OmitType), "1");
+        assert_eq!(write_json_double(-0.0, JsonDoubleStyle::PreserveType), "-0.0");
+        assert_eq!(write_json_double(-0.0, JsonDoubleStyle::OmitType), "0");
+    }
 
     #[test]
     fn json_numbers_preserve_integer_type_and_reject_invalid_grammar() {
@@ -464,4 +472,20 @@ pub fn parse_json_number(input: &[u8]) -> JsonNumber {
         Ok(number) if number.is_finite() => JsonNumber::Double(number),
         _ => JsonNumber::Invalid,
     }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum JsonDoubleStyle { PreserveType, OmitType }
+
+pub fn write_json_double(value: f64, style: JsonDoubleStyle) -> String {
+    if matches!(style, JsonDoubleStyle::OmitType)
+        && value.is_finite() && value >= -9223372036854775808.0 && value < 9223372036854775808.0
+        && value.fract() == 0.0 {
+        return (value as i64).to_string();
+    }
+    let mut result = shortest(value, ShortestStyle::Base).unwrap_or_default();
+    if !result.contains(['.', 'e', 'E']) { result.push_str(".0"); }
+    if result.starts_with('.') { result.insert(0, '0'); }
+    else if result.starts_with("-.") { result.insert(1, '0'); }
+    result
 }

@@ -4,7 +4,7 @@ import pathlib
 import random
 import struct
 import subprocess
-from cases import generate_base, generate_blink, generate_json
+from cases import generate_base, generate_blink, generate_json, generate_json_writer, generate_blink_wide
 
 root = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(root)
@@ -77,6 +77,22 @@ for lane, seed in [('seen', 66101), ('holdout', 66102)]:
     count = 0
     while count < 500:
         count += add(lane, generate_json(rng))
+for lane, seed in [('seen', 77101), ('holdout', 77102)]:
+    rng = random.Random(seed)
+    for bits in (0, 1, 0x3ff0000000000000, 0x43e0000000000000, 0x7fefffffffffffff, 0x7ff0000000000000, 0x7ff8000000000000):
+        bits ^= (1 << 63) if lane == 'holdout' else 0
+        for option in range(2): add(lane, struct.pack('>BQBB', 13, bits, option, 0))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_json_writer(rng))
+for lane, seed in [('seen', 88101), ('holdout', 88102)]:
+    rng = random.Random(seed)
+    for length in (0, 1, 63, 64, 65, 127, 128):
+        units = [ord('1')] * length + ([0x00a0] if lane == 'seen' else [0x2000])
+        add(lane, b'\x0e' + b''.join(struct.pack('>H', unit) for unit in units))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_blink_wide(rng))
 proc.stdin.close()
 if proc.wait(): raise SystemExit('oracle failed')
 lock = pathlib.Path('goldens.lock')

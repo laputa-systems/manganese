@@ -8,6 +8,14 @@
 #include "base/strings/string_util_impl_helpers.h"
 #include "base/strings/utf_string_conversion_utils.h"
 #include "third_party/blink/renderer/platform/wtf/dtoa.h"
+#include <optional>
+#include <string>
+#include <variant>
+#include "base/json/json_common.h"
+#include "base/values.h"
+#define private public
+#include "base/json/json_writer.h"
+#undef private
 
 struct JsonNumber { unsigned char tag; unsigned char size; unsigned char data[8]; };
 extern "C" JsonNumber json_number(const unsigned char* input, uint32_t len);
@@ -66,6 +74,31 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 14 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      size_t consumed = 0;
+      double value = blink::ParseDouble(base::span<const char16_t>(units, count), consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      write_u32(output, consumed);
+      for (int i = 0; i < 8; ++i) output[4 + i] = bits >> (56 - 8 * i);
+      out_len = 12;
+      free(units);
+    } else if (input[0] == 13 && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      if (input[9] > 1 || input[10] != 0) return 1;
+      std::string text;
+      base::JSONWriter writer(input[9] ? base::OPTIONS_OMIT_DOUBLE_TYPE_PRESERVATION : 0, &text, 0);
+      bool success = writer.BuildJSONString(value, 0);
+      output[0] = success;
+      out_len = 1 + text.size();
+      memcpy(output + 1, text.data(), text.size());
     } else if (input[0] == 12) {
       unsigned char buffer[65536] = {};
       memcpy(buffer, input + 1, length - 1);
