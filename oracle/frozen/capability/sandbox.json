@@ -1,0 +1,80 @@
+{
+  "archive": {
+    "oci_tag": "manganese/oracle-inputs:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "headed": "pending: headed launch",
+  "mode": "headless",
+  "result": {
+    "helper_file": {
+      "gid": "1000",
+      "mode": "755",
+      "uid": "1000"
+    },
+    "processes": [
+      {
+        "executable": "/opt/browser/chrome",
+        "gid": [
+          "27",
+          "27",
+          "27",
+          "27"
+        ],
+        "kind": "--type=renderer",
+        "no_new_privs": "1",
+        "seccomp": "2",
+        "uid": [
+          "1000",
+          "1000",
+          "1000",
+          "1000"
+        ],
+        "user_namespace_distinct_from_browser": true
+      },
+      {
+        "executable": "/opt/browser/chrome",
+        "gid": [
+          "27",
+          "27",
+          "27",
+          "27"
+        ],
+        "kind": "--type=zygote",
+        "no_new_privs": "1",
+        "seccomp": "0",
+        "uid": [
+          "1000",
+          "1000",
+          "1000",
+          "1000"
+        ],
+        "user_namespace_distinct_from_browser": false
+      },
+      {
+        "executable": "/opt/browser/chrome",
+        "gid": [
+          "27",
+          "27",
+          "27",
+          "27"
+        ],
+        "kind": "--type=zygote",
+        "no_new_privs": "1",
+        "seccomp": "0",
+        "uid": [
+          "1000",
+          "1000",
+          "1000",
+          "1000"
+        ],
+        "user_namespace_distinct_from_browser": true
+      }
+    ],
+    "witness": {
+      "nested_pid_namespace": true,
+      "no_new_privs": "1",
+      "ok": true,
+      "seccomp": "2"
+    }
+  }
+}
