@@ -17,13 +17,13 @@ entry() {
         || fail "$1 is not in oracle/frozen/artifacts.lock"
 }
 
+# POSIX sh has no local variables, so verify must not assign names its callers use.
 verify() {
-    file=$1 sha=$2 size=$3
-    [ -f "$file" ] || return 1
-    if [ "$size" != - ] && [ "$(wc -c < "$file" | tr -d ' ')" != "$size" ]; then
+    [ -f "$1" ] || return 1
+    if [ "$3" != - ] && [ "$(wc -c < "$1" | tr -d ' ')" != "$3" ]; then
         return 1
     fi
-    printf '%s  %s\n' "$sha" "$file" | sha256sum -c -s
+    printf '%s  %s\n' "$2" "$1" | sha256sum -c -s
 }
 
 cmd=${1:-}

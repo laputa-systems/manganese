@@ -1,0 +1,76 @@
+#!/bin/sh
+# Exercise scripts/artifact fetch against a file:// blob base built from a lock
+# entry whose bytes are also checked in (the x86_64 checksum sidecar).
+set -u
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+artifact=$root/scripts/artifact
+name=chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz.sha256
+source=$root/oracle/frozen/amd64-r2/$name
+sha=$(awk -v name="$name" '$0 !~ /^#/ && $3 == name { print $1 }' "$root/oracle/frozen/artifacts.lock")
+[ -n "$sha" ] || { echo "artifact-selftest: $name is not in the lock" >&2; exit 1; }
+
+mkdir -p "$root/.work/tmp"
+work=$(mktemp -d "$root/.work/tmp/artifact-selftest.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+failed=0
+pass() { printf 'ok   %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1" >&2; failed=1; }
+
+# fetch NAME STORE BLOBDIR: run scripts/artifact with an isolated store and blob base.
+fetch() {
+    MANGANESE_STORE=$2 MANGANESE_BLOB_BASE=file://$3 sh "$artifact" fetch "$1"
+}
+
+mkdir -p "$work/good" "$work/corrupt" "$work/short"
+cp "$source" "$work/good/$sha"
+# Same size, one byte changed.
+{ head -c 116 "$source"; printf 'X'; } > "$work/corrupt/$sha"
+head -c 100 "$source" > "$work/short/$sha"
+
+if path=$(fetch "$name" "$work/store-good" "$work/good" 2>/dev/null) \
+    && [ "$path" = "$work/store-good/sha256/$sha" ] && cmp -s "$path" "$source"; then
+    pass "fetch verifies digest and size and prints the stored path"
+else
+    fail "fetch of a good blob (got '${path:-}')"
+fi
+
+if path=$(MANGANESE_STORE=$work/store-good sh "$artifact" path "$name" 2>/dev/null) \
+    && [ "$path" = "$work/store-good/sha256/$sha" ]; then
+    pass "path finds the verified blob"
+else
+    fail "path after fetch"
+fi
+
+if fetch "$name" "$work/store-corrupt" "$work/corrupt" >/dev/null 2>&1; then
+    fail "fetch accepted a blob with a changed byte"
+elif [ -e "$work/store-corrupt/sha256/$sha" ] || [ -e "$work/store-corrupt/sha256/$sha.partial" ]; then
+    fail "fetch left a corrupted blob in the store"
+else
+    pass "fetch rejects a blob with a changed byte and stores nothing"
+fi
+
+if fetch "$name" "$work/store-short" "$work/short" >/dev/null 2>&1; then
+    fail "fetch accepted a truncated blob"
+else
+    pass "fetch rejects a blob of the wrong size"
+fi
+
+mkdir -p "$work/store-stale/sha256"
+cp "$work/corrupt/$sha" "$work/store-stale/sha256/$sha"
+if path=$(fetch "$name" "$work/store-stale" "$work/good" 2>/dev/null) && cmp -s "$path" "$source"; then
+    pass "fetch replaces a corrupted store entry"
+else
+    fail "fetch trusted a corrupted store entry"
+fi
+
+if err=$(fetch no-such-artifact "$work/store-missing" "$work/good" 2>&1); then
+    fail "fetch accepted a name missing from the lock"
+else
+    case $err in
+        *"not in oracle/frozen/artifacts.lock"*) pass "fetch rejects a name missing from the lock" ;;
+        *) fail "fetch of a missing name failed for the wrong reason: $err" ;;
+    esac
+fi
+
+exit $failed

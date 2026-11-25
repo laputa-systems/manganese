@@ -29,7 +29,7 @@ make check lint
 
 ## Artifacts
 
-`scripts/artifact fetch NAME` downloads a frozen artifact listed in `oracle/frozen/artifacts.lock` by digest into `$MANGANESE_STORE` (default `~/.local/share/manganese/store`) and verifies it. Publishing (`scripts/artifact publish REPOSITORY:TAG FILE...`) needs `oras`, the `stuff` CLI and its credentials, and access to the registry's private endpoint; a host without them keeps new artifacts in the local store.
+`scripts/artifact fetch NAME` downloads a frozen artifact listed in `oracle/frozen/artifacts.lock` by digest into `$MANGANESE_STORE` (default `~/.local/share/manganese/store`) and verifies it, then prints its store path. `make artifact-selftest` exercises fetch against a `file://` blob base: a good blob is stored, a corrupted or truncated blob and a name missing from the lock are rejected, and a corrupted store entry is replaced. Publishing (`scripts/artifact publish REPOSITORY:TAG FILE...`) needs `oras`, the `stuff` CLI and its credentials, and access to the registry's private endpoint; a host without them keeps new artifacts in the local store.
 
 ## Optional access
 
