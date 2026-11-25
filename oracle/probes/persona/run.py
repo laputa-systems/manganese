@@ -35,11 +35,7 @@ def capture(mode, iteration, archive_path):
         result['wire'] = wire([json.loads(line) for line in (run_dir / 'wire.jsonl').read_text().splitlines()])
         shutdown = session.probe('--close')
         status = browser.wait(timeout=15)
-        log = (run_dir / 'browser.log').read_text(errors='replace')
-        wrapper_pipe_after_clean_child = (mode == 'headed' and status == 1
-            and 'TINYLAND_CHILD_EXIT status=exit status: 0' in log
-            and 'kind: BrokenPipe' in log)
-        if not shutdown.get('shutdown', {}).get('ok') or (status != 0 and not wrapper_pipe_after_clean_child):
+        if not shutdown.get('shutdown', {}).get('ok') or status != 0:
             raise RuntimeError('browser shutdown failed: ' + json.dumps(shutdown.get('shutdown')) + ', wrapper status ' + str(status))
         return result
     finally:

@@ -30,8 +30,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             CompositorMessage::Cursor { .. } => continue,
         };
-        write_host(&mut output, &HostMessage::Presented { serial })?;
-        output.flush()?;
+        match write_host(&mut output, &HostMessage::Presented { serial }).and_then(|()| output.flush()) {
+            Err(error) if error.kind() == io::ErrorKind::BrokenPipe => break,
+            result => result?,
+        }
         let s = size.ok_or("frame before ready")?;
         let mut rgba = frame.clone();
         for pixel in rgba.chunks_exact_mut(4) { pixel.swap(0, 2); pixel[3] = 255; }
@@ -41,6 +43,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     drop(output);
     let status = child.wait()?;
-    if !status.success() { return Err(io::Error::other(format!("compositor exited {status}")).into()); }
-    Ok(())
+    std::process::exit(status.code().unwrap_or(1));
 }
