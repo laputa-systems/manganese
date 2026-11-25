@@ -4,6 +4,8 @@
 
 #include "components/leveldb_proto/internal/proto/shared_db_metadata.pb.h"
 #include "components/origin_trials/proto/db_trial_token.pb.h"
+#include "content/browser/background_sync/background_sync.pb.h"
+#include "content/browser/payments/payment_app.pb.h"
 
 static uint32_t read32(const unsigned char* p) {
   return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
@@ -35,6 +37,8 @@ int main() {
       const std::string bytes = input.substr(1);
       if (input[0] == 0) output = process<leveldb_proto::SharedDBMetadataProto>(bytes);
       if (input[0] == 1) output = process<origin_trials_pb::TrialTokenDbEntries>(bytes);
+      if (input[0] == 2) output = process<content::BackgroundSyncRegistrationsProto>(bytes);
+      if (input[0] == 3) output = process<content::StoredPaymentInstrumentProto>(bytes);
     }
     write32(header, output.size());
     if (fwrite(header, 1, 4, stdout) != 4 || fwrite(output.data(), 1, output.size(), stdout) != output.size() || fflush(stdout)) return 1;

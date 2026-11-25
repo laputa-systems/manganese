@@ -1,42 +1,16 @@
 use prost::Message;
-use prost::encoding::{DecodeContext, WireType, decode_key, decode_varint, encode_key, encode_varint};
+use prost::encoding::{DecodeContext, WireType, decode_varint, encode_key, encode_varint};
 use std::io::{self, Read, Write};
 
-#[derive(Clone, PartialEq, Message)]
-struct Metadata {
-    #[prost(uint64, optional, tag = "1")]
-    corruptions: Option<u64>,
-    #[prost(int32, optional, tag = "3")]
-    migration_status: Option<i32>,
-    #[prost(uint32, optional, tag = "4")]
-    failure_count: Option<u32>,
-}
+#[path = "generated/leveldb_proto.rs"]
+mod leveldb_proto;
+#[path = "generated/origin_trials_pb.rs"]
+mod origin_trials_pb;
+#[path = "generated/content.rs"]
+mod content;
 
-#[derive(Clone, PartialEq, Message)]
-struct Origin {
-    #[prost(bytes = "vec", optional, tag = "1")]
-    scheme: Option<Vec<u8>>,
-    #[prost(bytes = "vec", optional, tag = "2")]
-    host: Option<Vec<u8>>,
-    #[prost(uint32, optional, tag = "3")]
-    port: Option<u32>,
-}
-
-#[derive(Clone, PartialEq, Message)]
-struct Token {
-    #[prost(bytes = "vec", optional, tag = "1")]
-    trial_name: Option<Vec<u8>>,
-    #[prost(uint64, optional, tag = "2")]
-    token_expiry: Option<u64>,
-    #[prost(uint32, optional, tag = "3")]
-    usage_restriction: Option<u32>,
-    #[prost(bytes = "vec", optional, tag = "4")]
-    token_signature: Option<Vec<u8>>,
-    #[prost(bytes = "vec", repeated, tag = "5")]
-    partition_sites: Vec<Vec<u8>>,
-    #[prost(bool, optional, tag = "6")]
-    match_subdomains: Option<bool>,
-}
+use leveldb_proto::SharedDbMetadataProto as Metadata;
+use origin_trials_pb::{OriginMessage as Origin, TrialTokenDbEntry as Token};
 
 #[derive(Default)]
 struct Retained<T> {
@@ -51,12 +25,26 @@ struct Field {
     raw: Vec<u8>,
 }
 
+fn read_varint(input: &mut &[u8], limit: usize) -> Result<u64, ()> {
+    let mut value = 0u64;
+    for index in 0..limit {
+        let (&byte, rest) = input.split_first().ok_or(())?;
+        *input = rest;
+        value |= u64::from(byte & 0x7f) << (index * 7);
+        if byte < 0x80 { return Ok(value); }
+    }
+    Err(())
+}
+
 fn fields(mut input: &[u8], depth: usize, end: Option<u32>) -> Result<(Vec<Field>, usize), ()> {
     if depth > 100 { return Err(()); }
     let start = input.len();
     let mut result = Vec::new();
     while !input.is_empty() {
-        let (tag, wire) = decode_key(&mut input).map_err(|_| ())?;
+        let key = read_varint(&mut input, 5)? as u32;
+        let tag = key >> 3;
+        if tag == 0 { return Err(()); }
+        let wire = WireType::try_from(u64::from(key & 7)).map_err(|_| ())?;
         if wire == WireType::EndGroup {
             return if end == Some(tag) { Ok((result, start - input.len())) } else { Err(()) };
         }
@@ -65,7 +53,7 @@ fn fields(mut input: &[u8], depth: usize, end: Option<u32>) -> Result<(Vec<Field
         let mut value = Vec::new();
         match wire {
             WireType::Varint => {
-                let n = decode_varint(&mut input).map_err(|_| ())?;
+                let n = read_varint(&mut input, 10)?;
                 encode_varint(n, &mut value);
                 raw.extend_from_slice(&value);
             }
@@ -77,7 +65,7 @@ fn fields(mut input: &[u8], depth: usize, end: Option<u32>) -> Result<(Vec<Field
                 input = &input[n..];
             }
             WireType::LengthDelimited => {
-                let n = decode_varint(&mut input).map_err(|_| ())?;
+                let n = read_varint(&mut input, 5)?;
                 if n > i32::MAX as u64 || n > input.len() as u64 { return Err(()); }
                 value.extend_from_slice(&input[..n as usize]);
                 encode_varint(n, &mut raw);
@@ -177,10 +165,125 @@ fn entries(input: &[u8]) -> Result<Vec<u8>, ()> {
     Ok(output)
 }
 
+fn encode_nested<T: Message>(message: &Retained<T>, tag: u32, nested: &[Vec<u8>]) -> Result<Vec<u8>, ()> {
+    fn append(output: &mut Vec<u8>, tag: u32, nested: &[Vec<u8>]) {
+        for value in nested {
+            encode_key(tag, WireType::LengthDelimited, output);
+            encode_varint(value.len() as u64, output);
+            output.extend_from_slice(value);
+        }
+    }
+    let encoded = message.known.encode_to_vec();
+    let mut output = Vec::new();
+    let mut inserted = false;
+    for field in fields(&encoded, 0, None)?.0 {
+        if field.tag == tag { return Err(()); }
+        if !inserted && field.tag > tag {
+            append(&mut output, tag, nested);
+            inserted = true;
+        }
+        output.extend_from_slice(&field.raw);
+    }
+    if !inserted { append(&mut output, tag, nested); }
+    output.extend_from_slice(&message.unknown);
+    Ok(output)
+}
+
+fn periodic(input: &[u8], result: &mut Retained<content::PeriodicSyncOptions>) -> Result<(), ()> {
+    for field in fields(input, 2, None)?.0 {
+        if matches!((field.tag, field.wire), (1, WireType::Varint)) {
+            merge_known(&mut result.known, &field)?;
+        } else {
+            result.unknown.extend_from_slice(&field.raw);
+        }
+    }
+    Ok(())
+}
+
+fn registration(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut result = Retained::<content::BackgroundSyncRegistrationProto>::default();
+    let mut options = None;
+    let mut required = 0u8;
+    for field in fields(input, 1, None)?.0 {
+        match (field.tag, field.wire) {
+            (2, WireType::LengthDelimited) => { required |= 1; merge_known(&mut result.known, &field)?; }
+            (7, WireType::Varint) => { required |= 2; merge_known(&mut result.known, &field)?; }
+            (8, WireType::Varint) => { required |= 4; merge_known(&mut result.known, &field)?; }
+            (9, WireType::LengthDelimited) => periodic(&field.value, options.get_or_insert_with(Retained::<content::PeriodicSyncOptions>::default))?,
+            (10, WireType::Varint) => merge_known(&mut result.known, &field)?,
+            _ => result.unknown.extend_from_slice(&field.raw),
+        }
+    }
+    if required != 7 { return Err(()); }
+    let nested = options.map(|value| vec![value.encode()]).unwrap_or_default();
+    encode_nested(&result, 9, &nested)
+}
+
+fn registrations(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut result = Retained::<content::BackgroundSyncRegistrationsProto>::default();
+    let mut nested = Vec::new();
+    let mut origin_set = false;
+    for field in fields(input, 0, None)?.0 {
+        match (field.tag, field.wire) {
+            (1, WireType::LengthDelimited) => nested.push(registration(&field.value)?),
+            (3, WireType::LengthDelimited) => { origin_set = true; merge_known(&mut result.known, &field)?; }
+            _ => result.unknown.extend_from_slice(&field.raw),
+        }
+    }
+    if !origin_set { return Err(()); }
+    encode_nested(&result, 1, &nested)
+}
+
+fn image_size(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut result = Retained::<content::ImageSizeProto>::default();
+    for field in fields(input, 2, None)?.0 {
+        if matches!((field.tag, field.wire), (1 | 2, WireType::Varint)) {
+            merge_known(&mut result.known, &field)?;
+        } else {
+            result.unknown.extend_from_slice(&field.raw);
+        }
+    }
+    Ok(result.encode())
+}
+
+fn payment_image(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut result = Retained::<content::StoredPaymentInstrumentImageObject>::default();
+    let mut sizes = Vec::new();
+    for field in fields(input, 1, None)?.0 {
+        match (field.tag, field.wire) {
+            (1 | 2, WireType::LengthDelimited) => merge_known(&mut result.known, &field)?,
+            (3, WireType::LengthDelimited) => sizes.push(image_size(&field.value)?),
+            _ => result.unknown.extend_from_slice(&field.raw),
+        }
+    }
+    encode_nested(&result, 3, &sizes)
+}
+
+fn payment(input: &[u8]) -> Result<Vec<u8>, ()> {
+    let mut result = Retained::<content::StoredPaymentInstrumentProto>::default();
+    let mut icons = Vec::new();
+    for field in fields(input, 0, None)?.0 {
+        match (field.tag, field.wire) {
+            (1, WireType::Varint) | (2..=5 | 7, WireType::LengthDelimited) | (8, WireType::Varint) => merge_known(&mut result.known, &field)?,
+            (8, WireType::LengthDelimited) => {
+                let mut input = field.value.as_slice();
+                let mut value = Vec::new();
+                while !input.is_empty() { encode_varint(read_varint(&mut input, 10)?, &mut value); }
+                merge_known(&mut result.known, &Field { value, ..field })?;
+            }
+            (6, WireType::LengthDelimited) => icons.push(payment_image(&field.value)?),
+            _ => result.unknown.extend_from_slice(&field.raw),
+        }
+    }
+    encode_nested(&result, 6, &icons)
+}
+
 fn process(input: &[u8]) -> Vec<u8> {
     let response = match input.split_first() {
         Some((0, data)) => metadata(data),
         Some((1, data)) => entries(data),
+        Some((2, data)) => registrations(data),
+        Some((3, data)) => payment(data),
         _ => Err(()),
     };
     match response { Ok(bytes) => [vec![1], bytes].concat(), Err(()) => vec![0] }
@@ -228,5 +331,35 @@ mod tests {
         assert!(metadata(&[0x53, 0x5c]).is_err());
         assert!(entries(&[0x0a, 2, 0x08]).is_err());
         assert!(metadata(&[0x80]).is_err());
+    }
+
+    #[test]
+    fn sync_checks_required_fields_in_each_message() {
+        assert!(registrations(&[]).is_err());
+        assert!(registrations(&[0x0a, 4, 0x12, 0, 0x38, 0, 0x1a, 0]).is_err());
+        let valid = [0x0a, 6, 0x12, 0, 0x38, 0, 0x40, 0, 0x1a, 0];
+        assert_eq!(registrations(&valid).unwrap(), valid);
+    }
+
+    #[test]
+    fn payment_reads_packed_and_unpacked_networks() {
+        let input = [0x42, 3, 1, 0x96, 1, 0x40, 2];
+        assert_eq!(payment(&input).unwrap(), [0x40, 1, 0x40, 0x96, 1, 0x40, 2]);
+        assert!(payment(&[0x42, 1, 0x80]).is_err());
+    }
+
+    #[test]
+    fn chromium_truncates_oversized_varint_values_and_keys() {
+        assert_eq!(metadata(&[0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 2]).unwrap(),
+            [0x08, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f]);
+        assert_eq!(metadata(&[0xa8, 0x80, 0x80, 0x80, 0x10, 1]).unwrap(), [0x28, 1]);
+        assert!(metadata(&[0x88, 0x80, 0x80, 0x80, 0x80, 0, 1]).is_err());
+        assert!(metadata(&[0x0a, 0x80, 0x80, 0x80, 0x80, 0x80, 0]).is_err());
+    }
+
+    #[test]
+    fn payment_accepts_oversized_tenth_packed_varint_byte() {
+        let input = [0x42, 10, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 2];
+        assert_eq!(payment(&input).unwrap(), [0x40, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 1]);
     }
 }
