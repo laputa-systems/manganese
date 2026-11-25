@@ -1,6 +1,11 @@
+5237c7da0ec3c77d72660cfcfc3d4423c97e4bec4ca1da992f304387f68d59f0  ./amd64-r2/archive-members.txt
+bfd12b8c9bc53785dc31c421a4be05f3e9a89ca9ff2a1a4918c5696aed377735  ./amd64-r2/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz.acceptance.json
+ad8b3d3f284946b87617dcfa4649f79921e7dafaf1fec480dd89599640bc3f88  ./amd64-r2/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz.sha256
+0041a8beef0ac9eff9d62b62044c2d3bedad8adbe09b0e78e2ad4dd2b47e5f95  ./amd64-r2/package-manifest.json
+3e39d39b91969ef6243414250bb518d3bfd609144bfd883ea393e4334e5cfef9  ./amd64-r2/test-fast.json
 c39950c8558ab5517b7ff6e4e9c4817e45cdad996b6241c6bb9ace57830b5c7e  ./arm64-r2/archive-members.txt
 67e65c46ff3295d0439a6326982ffee9b847ad3759f35bfbd37bf2d21d5b852d  ./arm64-r2/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.acceptance.json
 546b8c17899f24e79e9f146211cfc8249e9f0c436fe960a31b8ced1e6d6e3469  ./arm64-r2/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.sha256
 244953d6ef795ebc946d3f9bc3a0af7b9cc9767a3c2660dd665505c51ae1f420  ./arm64-r2/package-manifest.json
 82007d3df2da918133025268a8989fcb7028103f1bbc9a538cbb2767a86ac784  ./arm64-r2/test-fast.json
-894f8d2033408febd94cb50f00bcb18d71f932d55e31b719e694b46bf89df228  ./artifacts.lock
+c8a6832a0e35604fad47d061fa323daa60537ec264fbbceb797e3d0df825c903  ./artifacts.lock

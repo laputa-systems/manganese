@@ -10,7 +10,7 @@ This is the single plan for this repository: all current and future work, and th
 - **Red or parked:** none.
 - **Next:** `p0-ground` on the campaign host.
 - **First command:** `sh scripts/setup-dev && make check lint`, then "resume the roadmap".
-- **Owner, before `p0-launch`:** publish the two frozen archives (Needs environment N1 and N2). Slices that need them park until then; the others proceed.
+- **Frozen archives:** both architectures' package revision 2 archives and sidecars are published by digest (`oracle/frozen/artifacts.lock`).
 
 ## Charter
 
@@ -38,7 +38,7 @@ J05, J06 and J08 are closed by removal (decision: supervisor and compositor are 
 |---|---|---|---|---|
 | `p0-ground` | A15 | Baseline section of this roadmap | none | `sh scripts/setup-dev && make check lint` on the campaign host; record the timings |
 | `p0-artifacts` | T13, T14 | `scripts/artifact`, `scripts/artifact-selftest` | `p0-ground` | `make artifact-selftest`: fetch from a `file://` blob base verifies digest and size, a corrupted blob fails, and a name missing from the lock fails |
-| `p0-launch` | U01 | `oracle/launch/` | `p0-artifacts`; N2 published, or `m1-source-oracle` accepted | `make oracle-launch ARCH=x86_64 MODE=headless`: appliance contract 2 to 4 hold for the frozen x86_64 archive (readiness, sandbox witness, `Browser.close` exit within 8 s), and the run writes a JSON report |
+| `p0-launch` | U01 | `oracle/launch/` | `p0-artifacts` | `make oracle-launch ARCH=x86_64 MODE=headless`: appliance contract 2 to 4 hold for the frozen x86_64 archive (readiness, sandbox witness, `Browser.close` exit within 8 s), and the run writes a JSON report |
 
 ### M0 — freeze the remaining evidence
 
@@ -250,7 +250,6 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
 - An owned-project fix is committed in that project's own clone. Because pushing is forbidden, Manganese consumes the fix as a snapshot under `vendor/<project>/` with `UPSTREAM.md` (repository, base revision, local commit, patch). The owner pushes the branch later (N7). Reversed when the owner grants pushes to owned repositories.
 - `/json/protocol` survives repeated requests although the oracle crashed (contract 7.3). It is an expected difference, because a crashing endpoint is not a persona surface.
 - A profile Manganese writes must reopen in Hydrogen, so rollback stays safe (contract 5.3).
-- If the frozen x86_64 archive is unavailable, the archive `m1-source-oracle` builds and qualifies is the x86_64 binary oracle, and receipts record which one was used.
 - Capture hooks are batched: one oracle rebuild per milestone carries every hook that milestone needs.
 - A box that stays inexact after 3 attempts is parked with its evidence. The comparator is never relaxed; only an owner decision can change a surface's class.
 - Browser performance is measured and logged, never gating, before the optimization phase.
@@ -298,8 +297,6 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
 
 | ID | Proof | Command the owner runs |
 |---|---|---|
-| N1 | Publish the frozen arm64 archive and sidecars | On the host holding them: `scripts/artifact publish manganese/oracle-inputs:hydrogen-r2-arm64 <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.sha256 <dir>/chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.acceptance.json` |
-| N2 | Publish the frozen x86_64 archive and sidecars | The same with the `x86_64` names and tag `hydrogen-r2-amd64`; then add the archive size and the sidecar digests to `oracle/frozen/artifacts.lock` |
 | N3 | arm64 parity | On an arm64 Alpine host: `make oracle-launch ARCH=aarch64`, the arm64 goldens for architecture-sensitive boxes, and `make contract ARCHIVE=<arm64 manganese archive>` |
 | N4 | Appliance acceptance | Build both production appliance images from the Manganese archive, then run the appliance's interop, profile-mode, audio-worklet, render-pass, egress, adblock and soak suites |
 | N5 | Shadowdriver workloads | Provide `GH_TOKEN` with read access to `joshuarli/shadowdriver` on the campaign host, or run `make contract CLIENTS=shadowdriver` on a host that has it |

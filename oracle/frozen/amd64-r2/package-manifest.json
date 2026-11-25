@@ -1,0 +1,2520 @@
+{
+  "schema": 1,
+  "status": "complete",
+  "product": "chromium",
+  "product_version": "156.0.8078.79",
+  "architecture": "amd64",
+  "launcher": "chromium",
+  "executable": "chrome",
+  "stage": "/work/stage/chromium-wayland-release",
+  "host_requirements": [
+    "libc.musl-x86_64.so.1"
+  ],
+  "bundled_libraries": [
+    "libEGL.so.1",
+    "libGLESv2.so.2",
+    "libLLVM.so.22.1",
+    "libSPIRV-Tools.so",
+    "libX11-xcb.so.1",
+    "libX11.so.6",
+    "libXau.so.6",
+    "libXdmcp.so.6",
+    "libXext.so.6",
+    "libXi.so.6",
+    "libatk-1.0.so.0",
+    "libatk-bridge-2.0.so.0",
+    "libatspi.so.0",
+    "libblkid.so.1",
+    "libbsd.so.0",
+    "libdbus-1.so.3",
+    "libdrm.so.2",
+    "libdrm_amdgpu.so.1",
+    "libdrm_intel.so.1",
+    "libeconf.so.0",
+    "libelf.so.1",
+    "libexpat.so.1",
+    "libffi.so.8",
+    "libfreebl3.so",
+    "libfreeblpriv3.so",
+    "libgallium-26.1.6.so",
+    "libgbm.so.1",
+    "libgcc_s.so.1",
+    "libgio-2.0.so.0",
+    "libglib-2.0.so.0",
+    "libgmodule-2.0.so.0",
+    "libgobject-2.0.so.0",
+    "libintl.so.8",
+    "liblzma.so.5",
+    "libmd.so.0",
+    "libmount.so.1",
+    "libnspr4.so",
+    "libnss3.so",
+    "libnssckbi.so",
+    "libnssutil3.so",
+    "libpciaccess.so.0",
+    "libpcre2-8.so.0",
+    "libplc4.so",
+    "libplds4.so",
+    "libsmime3.so",
+    "libsoftokn3.so",
+    "libsqlite3.so.0",
+    "libstdc++.so.6",
+    "libudev.so.1",
+    "libwayland-client.so.0",
+    "libwayland-egl.so.1",
+    "libxcb-dri3.so.0",
+    "libxcb-present.so.0",
+    "libxcb-randr.so.0",
+    "libxcb-shm.so.0",
+    "libxcb-sync.so.1",
+    "libxcb-xfixes.so.0",
+    "libxcb.so.1",
+    "libxkbcommon.so.0",
+    "libxml2.so.2",
+    "libxshmfence.so.1",
+    "libz.so.1",
+    "libzstd.so.1"
+  ],
+  "audit": {
+    "status": "complete",
+    "architecture": "amd64",
+    "root": "/work/package/.chromium-wayland-release.sf4bnaef",
+    "files": [
+      {
+        "path": "chrome",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-x86_64.so.1",
+        "needed": [
+          "libglib-2.0.so.0",
+          "libgobject-2.0.so.0",
+          "libnspr4.so",
+          "libnss3.so",
+          "libnssutil3.so",
+          "libsmime3.so",
+          "libgio-2.0.so.0",
+          "libatk-1.0.so.0",
+          "libatk-bridge-2.0.so.0",
+          "libexpat.so.1",
+          "libxkbcommon.so.0",
+          "libffi.so.8",
+          "libgbm.so.1",
+          "libudev.so.1",
+          "libatspi.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": null,
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "chrome_crashpad_handler",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-x86_64.so.1",
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": null,
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "chrome_sandbox",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": "/lib/ld-musl-x86_64.so.1",
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": null,
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libEGL.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libgallium-26.1.6.so",
+          "libgbm.so.1",
+          "libexpat.so.1",
+          "libX11-xcb.so.1",
+          "libX11.so.6",
+          "libxcb.so.1",
+          "libxcb-randr.so.0",
+          "libxcb-xfixes.so.0",
+          "libxcb-shm.so.0",
+          "libdrm.so.2",
+          "libwayland-client.so.0",
+          "libxcb-dri3.so.0",
+          "libxcb-present.so.0",
+          "libgcc_s.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libEGL.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libGLESv2.so.2",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libgallium-26.1.6.so"
+        ],
+        "soname": "libGLESv2.so.2",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libLLVM.so.22.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libffi.so.8",
+          "libz.so.1",
+          "libzstd.so.1",
+          "libxml2.so.2",
+          "libstdc++.so.6",
+          "libgcc_s.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libLLVM.so.22.1",
+        "rpath": [],
+        "runpath": [
+          "/usr/lib/llvm22"
+        ]
+      },
+      {
+        "path": "lib/libSPIRV-Tools.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libstdc++.so.6",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libSPIRV-Tools.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libX11-xcb.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [],
+        "soname": "libX11-xcb.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libX11.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libX11.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libXau.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libXau.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libXdmcp.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libbsd.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libXdmcp.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libXext.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libX11.so.6",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libXext.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libXi.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libXext.so.6",
+          "libX11.so.6",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libXi.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libatk-1.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libglib-2.0.so.0",
+          "libintl.so.8",
+          "libgobject-2.0.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libatk-1.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libatk-bridge-2.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libatspi.so.0",
+          "libatk-1.0.so.0",
+          "libdbus-1.so.3",
+          "libgobject-2.0.so.0",
+          "libglib-2.0.so.0",
+          "libgio-2.0.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libatk-bridge-2.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libatspi.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libdbus-1.so.3",
+          "libgobject-2.0.so.0",
+          "libglib-2.0.so.0",
+          "libintl.so.8",
+          "libgio-2.0.so.0",
+          "libX11.so.6",
+          "libXi.so.6",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libatspi.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libblkid.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libeconf.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libblkid.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libbsd.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libmd.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libbsd.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libdbus-1.so.3",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libdbus-1.so.3",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libdrm.so.2",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libdrm.so.2",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libdrm_amdgpu.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libdrm.so.2",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libdrm_amdgpu.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libdrm_intel.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libdrm.so.2",
+          "libpciaccess.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libdrm_intel.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libeconf.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libeconf.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libelf.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libz.so.1",
+          "libzstd.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libelf.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libexpat.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libexpat.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libffi.so.8",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libffi.so.8",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libfreebl3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1",
+          "libnspr4.so"
+        ],
+        "soname": "libfreebl3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libfreeblpriv3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libfreeblpriv3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgallium-26.1.6.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libdrm.so.2",
+          "libLLVM.so.22.1",
+          "libexpat.so.1",
+          "libz.so.1",
+          "libzstd.so.1",
+          "libSPIRV-Tools.so",
+          "libxcb.so.1",
+          "libxcb-randr.so.0",
+          "libxcb-sync.so.1",
+          "libxcb-present.so.0",
+          "libxshmfence.so.1",
+          "libxcb-xfixes.so.0",
+          "libxcb-dri3.so.0",
+          "libelf.so.1",
+          "libdrm_amdgpu.so.1",
+          "libdrm_intel.so.1",
+          "libX11-xcb.so.1",
+          "libstdc++.so.6",
+          "libgcc_s.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgallium-26.1.6.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgbm.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libdrm.so.2",
+          "libexpat.so.1",
+          "libgcc_s.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgbm.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgcc_s.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgcc_s.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgio-2.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libglib-2.0.so.0",
+          "libgobject-2.0.so.0",
+          "libgmodule-2.0.so.0",
+          "libz.so.1",
+          "libmount.so.1",
+          "libintl.so.8",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgio-2.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libglib-2.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libintl.so.8",
+          "libpcre2-8.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libglib-2.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgmodule-2.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libglib-2.0.so.0",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgmodule-2.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libgobject-2.0.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libglib-2.0.so.0",
+          "libffi.so.8",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libgobject-2.0.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libintl.so.8",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libintl.so.8",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/liblzma.so.5",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "liblzma.so.5",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libmd.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libmd.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libmount.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libblkid.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libmount.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnspr4.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libnspr4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnss3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnssutil3.so",
+          "libc.musl-x86_64.so.1",
+          "libplds4.so",
+          "libplc4.so",
+          "libnspr4.so"
+        ],
+        "soname": "libnss3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnssckbi.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1",
+          "libplds4.so",
+          "libplc4.so",
+          "libnspr4.so"
+        ],
+        "soname": "libnssckbi.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libnssutil3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1",
+          "libplds4.so",
+          "libplc4.so",
+          "libnspr4.so"
+        ],
+        "soname": "libnssutil3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libpciaccess.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libpciaccess.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libpcre2-8.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libpcre2-8.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libplc4.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnspr4.so",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libplc4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libplds4.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnspr4.so",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libplds4.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsmime3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnss3.so",
+          "libnssutil3.so",
+          "libc.musl-x86_64.so.1",
+          "libplds4.so",
+          "libplc4.so",
+          "libnspr4.so"
+        ],
+        "soname": "libsmime3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsoftokn3.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libnssutil3.so",
+          "libc.musl-x86_64.so.1",
+          "libsqlite3.so.0",
+          "libplds4.so",
+          "libplc4.so",
+          "libnspr4.so"
+        ],
+        "soname": "libsoftokn3.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libsqlite3.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libsqlite3.so.0",
+        "rpath": [],
+        "runpath": [
+          "/usr/lib"
+        ]
+      },
+      {
+        "path": "lib/libstdc++.so.6",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1",
+          "libgcc_s.so.1"
+        ],
+        "soname": "libstdc++.so.6",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libudev.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libudev.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libwayland-client.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libffi.so.8",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libwayland-client.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libwayland-egl.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libwayland-egl.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-dri3.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-dri3.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-present.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-present.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-randr.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-randr.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-shm.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-shm.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-sync.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-sync.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb-xfixes.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libxcb.so.1",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb-xfixes.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxcb.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libXau.so.6",
+          "libXdmcp.so.6",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxcb.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxkbcommon.so.0",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxkbcommon.so.0",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxml2.so.2",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libz.so.1",
+          "liblzma.so.5",
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxml2.so.2",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libxshmfence.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libxshmfence.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libz.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libz.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "lib/libzstd.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libzstd.so.1",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libEGL.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libEGL.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libGLESv2.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libGLESv2.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libVkICD_mock_icd.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libVkICD_mock_icd.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libVkLayer_khronos_validation.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libVkLayer_khronos_validation.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libvk_swiftshader.so",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libvk_swiftshader.so",
+        "rpath": [],
+        "runpath": []
+      },
+      {
+        "path": "libvulkan.so.1",
+        "class": "ELF64",
+        "machine": "Advanced Micro Devices X86-64",
+        "type": "DYN (Shared object file)",
+        "interpreter": null,
+        "needed": [
+          "libc.musl-x86_64.so.1"
+        ],
+        "soname": "libvulkan.so.1",
+        "rpath": [],
+        "runpath": []
+      }
+    ],
+    "gnu_runtime_edges": [
+      {
+        "path": "lib/libEGL.so.1",
+        "libraries": [
+          "libgcc_s.so.1"
+        ]
+      },
+      {
+        "path": "lib/libLLVM.so.22.1",
+        "libraries": [
+          "libstdc++.so.6",
+          "libgcc_s.so.1"
+        ]
+      },
+      {
+        "path": "lib/libSPIRV-Tools.so",
+        "libraries": [
+          "libstdc++.so.6"
+        ]
+      },
+      {
+        "path": "lib/libgallium-26.1.6.so",
+        "libraries": [
+          "libstdc++.so.6",
+          "libgcc_s.so.1"
+        ]
+      },
+      {
+        "path": "lib/libgbm.so.1",
+        "libraries": [
+          "libgcc_s.so.1"
+        ]
+      },
+      {
+        "path": "lib/libstdc++.so.6",
+        "libraries": [
+          "libgcc_s.so.1"
+        ]
+      }
+    ],
+    "ffmpeg_gnu_closure": [],
+    "failures": []
+  },
+  "files": [
+    {
+      "path": "IwaKeyDistribution/iwa-key-distribution.pb",
+      "size": 3793,
+      "sha256": "db1b46bcb253793ecc2cb734e2eb7c04ee6a69acfe3548abe27c4ea62a3b402a",
+      "mode": "0o644"
+    },
+    {
+      "path": "IwaKeyDistribution/manifest.json",
+      "size": 114,
+      "sha256": "2de00b641c03834a89f9c9c06327cb72a948dc59a18a5c2d28ddd617eb64ff9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "angledata/VkICD_mock_icd.json",
+      "size": 142,
+      "sha256": "7b3298c69e33b8da0dbac552fbdb82cf3af438850acf3f6824c1e439d6777c2e",
+      "mode": "0o644"
+    },
+    {
+      "path": "angledata/VkLayer_khronos_validation.json",
+      "size": 130593,
+      "sha256": "be7449fd772ae17a3da0e5ce4b3400e110a39cf168e95d6033c04c8d812f7a50",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome",
+      "size": 460468928,
+      "sha256": "42a7e52e6a1aeed40e0fed49d82b81b4fb74c4301a0f4f7c04e74a090ab9cf5c",
+      "mode": "0o755"
+    },
+    {
+      "path": "chrome_100_percent.pak",
+      "size": 586560,
+      "sha256": "0f28428f462f26d4c7df56b54671e1cd40a091e27820e01e035ac3f28cdb6da0",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome_200_percent.pak",
+      "size": 949265,
+      "sha256": "e0786bf96e5110b9a1afd93e7b5e6b405b7a1a801a12d7da7e2d4f3625218fa4",
+      "mode": "0o644"
+    },
+    {
+      "path": "chrome_crashpad_handler",
+      "size": 2189640,
+      "sha256": "f14467afddfa5856911b82b600e41c5f46627cefba9286c337b1d4ce968e4cf8",
+      "mode": "0o755"
+    },
+    {
+      "path": "chrome_sandbox",
+      "size": 86896,
+      "sha256": "cc1e26686ac532956bc01b6425dea59e35f54cdaa39df0ecb40448d4699b7f3c",
+      "mode": "0o4755"
+    },
+    {
+      "path": "chromium",
+      "size": 288,
+      "sha256": "aca83b75f2ab3e842c05cd6cf002a37aec838d7a285801b15c4c5fbbcd526561",
+      "mode": "0o755"
+    },
+    {
+      "path": "chromium.desktop",
+      "size": 280,
+      "sha256": "fbfb0ac02b411c33460799c567791c27154a91414948fbbae9c7eb0069cd831b",
+      "mode": "0o644"
+    },
+    {
+      "path": "chromium.png",
+      "size": 4393,
+      "sha256": "190dc5dbd72d856627acdc86acec90ec2fcc27781a3a2654fd3aa49d570cd474",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-hinting-slight.conf",
+      "size": 620,
+      "sha256": "d138eca2bac3f78d45ff7cfb649ad792caa4a6e61f73cea7cf0ea54b091f1ef4",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-scale-bitmap-fonts.conf",
+      "size": 2068,
+      "sha256": "df8e99abb6f82384c61978906a45a95794940545da95790d87f01d9391e0894b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-sub-pixel-none.conf",
+      "size": 647,
+      "sha256": "0f00b5cf0ce07062ec65b9b340aa888f6c5fbc215aafebd26781be2d5a13ff6a",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/10-yes-antialias.conf",
+      "size": 258,
+      "sha256": "e6d82a642d1b37f7d24dc37f938b999f00ff7aa4303b2602d04164d53f221005",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/11-lcdfilter-default.conf",
+      "size": 695,
+      "sha256": "76aec9d8dac48faabe1bbde9e887cfb09fa45f30be5f8826e945a394a0097e48",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/20-unhint-small-vera.conf",
+      "size": 1377,
+      "sha256": "278732c68c16177f2aa3c7e4ea318b9f720aee13a433c32eb15ba626806c609d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/30-metric-aliases.conf",
+      "size": 13610,
+      "sha256": "3baf25c82e1a14c606d45c212296852be06ae9795d60e84aab573226151450a2",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/40-nonlatin.conf",
+      "size": 7775,
+      "sha256": "5c3f7d62a44258d5d9e81a93b1685bee5ab78acb8688b25a43c4c1e749312a84",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-generic.conf",
+      "size": 3490,
+      "sha256": "24de9f68189d544bb4cc084d9bd8f3a59d8b988a9dc44b11e9877d5add5fc948",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-latin.conf",
+      "size": 7258,
+      "sha256": "b46e539c25dfd5531c8fcf4f22c3d156b09272ffbc6f8a83a8eeb7431c09aee5",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto-math.conf",
+      "size": 544,
+      "sha256": "d134e7c4f5e004bcb55eb98a5eb58f946506fbeb885830c02f855d207e4d50a1",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto-symbols.conf",
+      "size": 348,
+      "sha256": "1511c844daed58a05e1be80cbdf208f47f8428a5480c5b3437ae11cfd22264db",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/45-noto.conf",
+      "size": 571,
+      "sha256": "7e71006c21395b66272e0467720b7c5d6151d26855729c918c60eac116037c62",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/48-spacing.conf",
+      "size": 441,
+      "sha256": "99d839cd8aa28854e8f54f26e7200b6e57951f39f56791a0ed473662488bcef6",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/49-sansserif.conf",
+      "size": 639,
+      "sha256": "7849a11ce5243e8bb3d06bcad558737a8682e5122e73c8e427f4c011a2054818",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/50-user.conf",
+      "size": 542,
+      "sha256": "bc6e31684e4f5e0176200e558a250ff63e9ab0773300f47071223edc320c4c5e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/51-local.conf",
+      "size": 263,
+      "sha256": "dca9d917e1f66f73bfa495943b4d1eaab2d93810a51bc8e600cf4d4e9df03e67",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/58-noto-math.conf",
+      "size": 782,
+      "sha256": "00934fd7484a288bd1ae8e97d800e5bd03c07edd1946aeaac85af4f2168bd2b7",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/58-noto.conf",
+      "size": 10666,
+      "sha256": "262badb0c713ff0d620263ede3eac4b3ac918fd0cc4e884c819feb526047f7af",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/60-generic.conf",
+      "size": 1911,
+      "sha256": "195bc8605dd23289d42c10d79cc13a5ce4a4b3cf965df5b30ecc0b7149bb951f",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/60-latin.conf",
+      "size": 2169,
+      "sha256": "5c2c410bc584ba16a5e2ca5830311b0efaba9bdba3261d3247e880f6ea9d5220",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/65-fonts-persian.conf",
+      "size": 10132,
+      "sha256": "c675fab143a3638346874798be45f51f6878ebec591b4362d83cfffb828ec4ca",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/65-nonlatin.conf",
+      "size": 10011,
+      "sha256": "77ad64b2838b880377e54fd1a634adbfa67a73d2cb49b46c10117ec6c64b2b19",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/69-unifont.conf",
+      "size": 687,
+      "sha256": "fa97c0cf5f79d70e2dc3dc48155d4c9220cd7c6a8bc95b89c4ebcc517f97479e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/70-no-bitmaps-except-emoji.conf",
+      "size": 429,
+      "sha256": "bb5df65896bf3011b2f2935b63ab12db1ecf078674ff73a533123445f122a92b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/80-delicious.conf",
+      "size": 437,
+      "sha256": "34f27b7fe9cd83b2b6d46f16ef9c477412f2d7ef63634f86b9b38b79bc4f81ad",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/conf.d/90-synthetic.conf",
+      "size": 1757,
+      "sha256": "cdd0aac7840c664a7127b64db66bdfe8dc22be3774d10bc22f4a41c98de5d85e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fontconfig/fonts.conf",
+      "size": 241,
+      "sha256": "6ecde5d296a3864dbf4c0becf16a7df83b346a6bb208a60905c9a96376a2e7fa",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Bold.ttf",
+      "size": 631484,
+      "sha256": "1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-BoldItalic.ttf",
+      "size": 646092,
+      "sha256": "1b602a9d6353be42c91df097a4857b69fa2696f26703d7a33b54a15d87c2622c",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Italic.ttf",
+      "size": 639124,
+      "sha256": "467e3f89eeca4108bb8710a2b9e0cf2281ac56d5b0609211a83776d0505eecb5",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSans-Regular.ttf",
+      "size": 621572,
+      "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMath-Regular.ttf",
+      "size": 990564,
+      "sha256": "d51afd5739c7ba6c44fcab35a88160e25dfb69a2d4ad0bd99533f8d894af1f96",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMono-Bold.ttf",
+      "size": 610908,
+      "sha256": "a21ea0ba6ea49fda7b34ca39a504b487f1130885d36e1a4f9f4255b3ba6994bc",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansMono-Regular.ttf",
+      "size": 596428,
+      "sha256": "65b5e2b2c4a1fba9ae8be1f026cb35b03dcb8886d9b2a4147054fde12f7e767d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Black.ttf",
+      "size": 235968,
+      "sha256": "637e3857aa729ec67aae4bfc6838cd298cad2b4a54de953916f0b1c5e10b2121",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Bold.ttf",
+      "size": 228028,
+      "sha256": "af83250e7c5bdd37d542187a724ac6b33453a6550e741cebcacf7a771891f75e",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-ExtraBold.ttf",
+      "size": 229908,
+      "sha256": "3b603fecbbd9ad1b45223c6b7871cf9d54b653653fade3c1da0bdec98cef8740",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-ExtraLight.ttf",
+      "size": 232496,
+      "sha256": "a14c578c4b8ad2142a7830225a5d215ed15c7e2295cebd7e211614336e2288fc",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Light.ttf",
+      "size": 228800,
+      "sha256": "659843a49ef43ff42f9c315285a9e8b828853c46496f8bed426800b68b10b697",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Medium.ttf",
+      "size": 227616,
+      "sha256": "f2422696752b46d12ff32c4abfe5201b34c9b83404fc5da6ccab05fceaff6bd3",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Regular.ttf",
+      "size": 226980,
+      "sha256": "d0e98e9a2c046594c5021437273943be7e79e0fd980fde125279e22302212595",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-SemiBold.ttf",
+      "size": 228356,
+      "sha256": "9ab8ee074de01e611ee9085c4721eeaa02efe815dea7b32f682bba7dd6fb6afe",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols-Thin.ttf",
+      "size": 231428,
+      "sha256": "b3f87bf5316769f72382ac64cbefc08030350028d4dacb5622a1c5cefc6ec6e9",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSansSymbols2-Regular.ttf",
+      "size": 671568,
+      "sha256": "c4a0a80f0041ce4be81e2478faad22776d23edb98ae3f0d19bd37044820ecf9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Bold.ttf",
+      "size": 747144,
+      "sha256": "96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-BoldItalic.ttf",
+      "size": 779236,
+      "sha256": "c710c5b9cf354ae46e7a10472a08019b28220fafeb5887a482a76856f8f6fc0b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Italic.ttf",
+      "size": 756796,
+      "sha256": "749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerif-Regular.ttf",
+      "size": 712444,
+      "sha256": "19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Bold.ttf",
+      "size": 682480,
+      "sha256": "bca7070ed1e6a8f5b2b08ad04dad4bed677c8044060ace0f78b2e01d425e841b",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-BoldItalic.ttf",
+      "size": 682972,
+      "sha256": "b6521b09ecedf447a43f1eb202566ccf14d3ad7fb4f2008823762f71781405e8",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Italic.ttf",
+      "size": 676588,
+      "sha256": "60c8e4d1b55d3346fd7113bb12ec9ff9cc684129c32aadfa37eec4d76223dc37",
+      "mode": "0o644"
+    },
+    {
+      "path": "fonts/noto/NotoSerifDisplay-Regular.ttf",
+      "size": 670076,
+      "sha256": "8b45c367c7c6a4a1d82f132464b7f1aa8ff092df06602522b981daf1da64d927",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js",
+      "size": 8057,
+      "sha256": "84af11661013a9495c51b0ddff598f5ffb83597729456d9affbc18dc32cc6a86",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js.map",
+      "size": 18574,
+      "sha256": "d7f4fcc2c4d10b0c0adf72f3aa949f17d39d72739a2f9a60dc950dd96c0ffa3c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js",
+      "size": 5315,
+      "sha256": "c6a8622d3820c2407c92ab95420c5ecae26d02d7cbcf9a5538b726744809ea2c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js.map",
+      "size": 11934,
+      "sha256": "3fcde8318bb2c2d4dc0f7faab8565f0e5896c40577995de6d98f3d6603d47366",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js",
+      "size": 40218,
+      "sha256": "8ac2b6789d365201a2feaec4aede8604c49113f95dc4d9e274d5fa10e32326d8",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js.map",
+      "size": 67961,
+      "sha256": "8bd8f3222a46a143bd5561b22c3b16d8ca00a83f7feb2f515de15d9660550aea",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js",
+      "size": 4162,
+      "sha256": "19066ebfad118db49d60eb5902b31005fdc8f808ede97ae7eb6ec47cc553821d",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js.map",
+      "size": 8259,
+      "sha256": "4a9d844d1ae45544e3ef8e71ce277ce3a58b37e76527b39f043cff75fbae25b0",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js",
+      "size": 6075,
+      "sha256": "9f5bc6c420ff07fc19ff0e434c5b6ec309852bd022d4037aa63183bb439853c9",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js.map",
+      "size": 12218,
+      "sha256": "a36144026a6a6d90d319ebb9156180a0a08f6e27f21fc86057167d4e9f875f30",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js",
+      "size": 8563,
+      "sha256": "a669c9bdef4ed166fd36ce95c3c53d6d04d5064266383732b5b7994dcb28706d",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js.map",
+      "size": 18956,
+      "sha256": "8960a7a7affe8da3390b240a2291ada12fdaa3c403206eb3ef8f616919971dfc",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js",
+      "size": 1058,
+      "sha256": "c1490c62bc96275629897fe11513ecdc3c5bbe6f38a110e407a18879512b1ab3",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js.map",
+      "size": 2462,
+      "sha256": "74b830f93bfafc89e598263f20225687075370aca8fa20daff80e2d88d09d922",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js",
+      "size": 31190,
+      "sha256": "5ff68770ef35e630c795ccd03191ef6e40be4dbea148f3d401b41e45a33182c1",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js.map",
+      "size": 64560,
+      "sha256": "a53aec5185eba651da2b9ca34019d47c6a9f400afd2848834087b241e48a6570",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js",
+      "size": 13038,
+      "sha256": "b1a01e81169c11b7a13e760fb6af9259fc27d6a7a29295b5d8c1dd941975a354",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js.map",
+      "size": 23361,
+      "sha256": "eac52528b62887f39e950ed84f7b9057ff322f2b39ee250caaa5b82484f75344",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js",
+      "size": 1878,
+      "sha256": "87e6c9e90e7ee7f68abfc6d577a3caed076a9699cd36e29544eaf91685506cbd",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js.map",
+      "size": 4196,
+      "sha256": "166cdfecc44fd851b11aecb358a8e81a9608ea326855bfd27314669e8a6e517c",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js",
+      "size": 4962,
+      "sha256": "da8becb88b66bf9c36ecc77f93454e0500fc1a2db2ef1c67fcc81f5492c03100",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js.map",
+      "size": 10972,
+      "sha256": "d8368c77b8cc62c133ca83925261d382968df8a20af6c8cf95b96b6eb1a29186",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js",
+      "size": 3926,
+      "sha256": "edc9fabad304e152632887d0ddeeccaabd8ba90078dde263f61f775736780a82",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js.map",
+      "size": 7764,
+      "sha256": "c30f170105c560c2007f1018177b7f074760ce893a5b94c887707961eb81f042",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js",
+      "size": 5031,
+      "sha256": "717d0f798b400b76cbb3ff0a5a21cd6b4dfeda16931d61363b4ae63eeef9e476",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js.map",
+      "size": 10046,
+      "sha256": "15aca0b550a1252d4e15fe6d25d3988ee6268679898e38908ee2cf667e8a1092",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js",
+      "size": 24797,
+      "sha256": "ce6b7a1faa5da26d3aebb53819cd202b8f8ae7e78c8d67946da7c34623ea188b",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js.map",
+      "size": 49447,
+      "sha256": "ce41aef55b56153ddb7cc36e3af80fd8049f6eea1ca02c6afe0db48190705f72",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js",
+      "size": 2686,
+      "sha256": "30c954b21505c442b726bd36297e70976fcc2837424d76ecb744aead46d5a1ad",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js.map",
+      "size": 5525,
+      "sha256": "52355d5c87a8fec68f1b8c9b06531ac66f990c2c4cf510278f4df80b74bf8f89",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js",
+      "size": 5804,
+      "sha256": "f48ea61e272918d3fd22eeb7028fd9fc591e25f0fba78e8bfacd0bccc1df64c3",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js.map",
+      "size": 11516,
+      "sha256": "cf6dbcecf3bf38812f2ac843195a21613b8b17b1f42f709e5a3426a15c68f532",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js",
+      "size": 3532,
+      "sha256": "20cd0470ad1fb9002e272aa0b2ccff1b5f555b02d5da12b5b20e469cf60d1028",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js.map",
+      "size": 7678,
+      "sha256": "627bdb43b4cc3d456e278e71d3f3e33bf23c22e369d1c10775f3ce0144b941bb",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js",
+      "size": 9025,
+      "sha256": "635a6d658d393ae45ad6d4d5049356dfbb71ba5b14acf5867b5ef0a8f8c0e1e0",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js.map",
+      "size": 15851,
+      "sha256": "b49b03669a70c060cf5780de7bb396f82019ca8f610777d5a88b0493c59c5ca2",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js",
+      "size": 1642,
+      "sha256": "b57aff80263c3d95a0791aeec2a572883efeddc8a05a8ffc545e1f596e366306",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js.map",
+      "size": 3499,
+      "sha256": "bb4886cc8837da47e0d1837dabeaf9c795c60e8fefcdebaacc06ab6af547bfea",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js",
+      "size": 3252,
+      "sha256": "6662d559f17daffcdc4a2795d99d846c7e6870ba6dd98f1f89eeaac29d930ed2",
+      "mode": "0o644"
+    },
+    {
+      "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js.map",
+      "size": 6625,
+      "sha256": "0dda56d9b313fc28094ff0b73980ee0a9235282e5a769d55cd3d903e2ad35898",
+      "mode": "0o644"
+    },
+    {
+      "path": "icudtl.dat",
+      "size": 10824576,
+      "sha256": "e1ed8f674bb8449731b79cae956042da59f9ecbd37c8d3f86586a22b4836e5b2",
+      "mode": "0o644"
+    },
+    {
+      "path": "lib/libEGL.so.1",
+      "size": 392184,
+      "sha256": "7554efc73d9e66abbc0a05b8531a710de6966573fd5003c77c2f688f76423aed",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libGLESv2.so.2",
+      "size": 50968,
+      "sha256": "222ee92e05e1918b6373b1ea2f13cc8231cf7943bfd5d2d1a987f5c6d9dcb68b",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libLLVM.so.22.1",
+      "size": 190973792,
+      "sha256": "b18a2d3a58c244ad8bb58729a563f0a58bfebbdeffb74895d7b0d5f57c0d4b15",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libSPIRV-Tools.so",
+      "size": 1182064,
+      "sha256": "dfab8325bb6b562b4a86225e4fd3f17a4928da76922ac07588088237e61ea12f",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libX11-xcb.so.1",
+      "size": 13880,
+      "sha256": "f7a9e0281693f41309192880f242249e29afab9329eac458eed3f79dfb8f00c2",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libX11.so.6",
+      "size": 1161312,
+      "sha256": "5a7c2df00148b914e9d66b7455680bd2a1b29a0eaef68b115a0133ce441d2a76",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libXau.so.6",
+      "size": 13936,
+      "sha256": "0fd15be141dc06c149f2f2b92408dc91f4429d1f872a3fb9a655490e8c994578",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libXdmcp.so.6",
+      "size": 26384,
+      "sha256": "cb4e243ca95695d59f1de5abc8cb0092d5ac1066811302c0f874a9341778b7eb",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libXext.so.6",
+      "size": 68496,
+      "sha256": "a25b874bdaeed2ebea69eedd5be32f91bc868d714a584eed357ced0399694f54",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libXi.so.6",
+      "size": 63280,
+      "sha256": "b2280de9ea01dc90de961c2974830acae28232b67cfd6feb41d36266f20aae5d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libatk-1.0.so.0",
+      "size": 137016,
+      "sha256": "b8e2138546e25b32136460a5c491bf7fa93c9aa477dc35d91c99eeed042df061",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libatk-bridge-2.0.so.0",
+      "size": 227920,
+      "sha256": "6d115469ee3eafc7b6a7fd6609d0a6fc9197a9a3cabede4812f54bf6f58f5210",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libatspi.so.0",
+      "size": 219304,
+      "sha256": "2c5041f8b5cf66fe8f8967f10b204a20d754eec5722bb76df4fc33a0ba4ea63b",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libblkid.so.1",
+      "size": 203600,
+      "sha256": "0d0a939694978d45ac5546078ef7fdfcd25f902811dc17f31d48b2380b660492",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libbsd.so.0",
+      "size": 64272,
+      "sha256": "a5b321623fe7274c695805b7f46bb2ed8ac4e970413a4930f09701a17c44ed21",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libdbus-1.so.3",
+      "size": 296952,
+      "sha256": "59003e53934538d49c3d297126aff3f152e6fb2b1de8269261e5e8ca5f7889ce",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libdrm.so.2",
+      "size": 87744,
+      "sha256": "4f8856c00a3ffaf4212fc5193338087f76e8b0dca6776a2278efe7757317a96b",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libdrm_amdgpu.so.1",
+      "size": 46704,
+      "sha256": "9e5874e542a912b6789d68abc82bd7b94e8d03d69951a8df0c44620970f1587d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libdrm_intel.so.1",
+      "size": 146520,
+      "sha256": "b6a9763abef655aa08fc4afc981ebaad7f95ee1a9318ab573d06ec41127afecf",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libeconf.so.0",
+      "size": 38752,
+      "sha256": "4aa270277bea8c4fc301108c4e4a51dc33c6cd008c1e8567fccd0c3966c64798",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libelf.so.1",
+      "size": 92064,
+      "sha256": "d05e5e5ba8d5da92f3188b717b643990dc23cf5f84ea20e0da8cf5a68e38b786",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libexpat.so.1",
+      "size": 145088,
+      "sha256": "81b28279f2bb5cd61af664e75a18cbf3c016c2643c71691c1485d244bf272222",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libffi.so.8",
+      "size": 38960,
+      "sha256": "05ff2c2379c35e867e039cf48b4eb390c0faa30c73b04b3b66f1cb86fb287fa2",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libfreebl3.so",
+      "size": 14096,
+      "sha256": "440deece2248751c6617e892ea07bb2275f0ced193938c771b20a5f5c5e268f5",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libfreeblpriv3.so",
+      "size": 1214304,
+      "sha256": "b2eb73e6ca061d4d76bb079aef60fe3cb444c9f8d90efe31e336a7248f5f3c66",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgallium-26.1.6.so",
+      "size": 43945840,
+      "sha256": "c3aa5413c4dbdc50f0e529ebade3fe8ea004af59da1a07412da21e13ed614518",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgbm.so.1",
+      "size": 18248,
+      "sha256": "6ab0f48c1dc8e2b0356c6a30ef73765fd12bf29e21b1726dfda3006ff860dcfa",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgcc_s.so.1",
+      "size": 173920,
+      "sha256": "5ea51dd885b6fc691eccc569d0bda739204204f6161e97075b26dc9c050d1ca1",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgio-2.0.so.0",
+      "size": 2022640,
+      "sha256": "bb4854cc6be3123456260503d2314b2237d6fb35dd1eb4d67207ae949a3b5ab2",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libglib-2.0.so.0",
+      "size": 1424408,
+      "sha256": "50373a625b8d57672972fc77b41d6d946fbb62241ff79b94e522ee6e61a22595",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgmodule-2.0.so.0",
+      "size": 22208,
+      "sha256": "79bae6097b6a877b9f2946620e9643662266460cb38dae165bdab3200e48ff42",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libgobject-2.0.so.0",
+      "size": 395264,
+      "sha256": "c253d62e9dda18150d846978ca61817331b28a40c901dfd73c2d8a730fe9f317",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libintl.so.8",
+      "size": 136912,
+      "sha256": "c43f799d118a30b411000220133bf8d297ef5b4684dbca30b45b605e484815a0",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/liblzma.so.5",
+      "size": 227192,
+      "sha256": "6106974ac44f821cf97633527c65e7413be657a95e55aafb0885bf84743bb8a4",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libmd.so.0",
+      "size": 63408,
+      "sha256": "4fd22b05b1297facf99c57988915345ff0ba033fbb2c6f07e4e3bb41fdedfeea",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libmount.so.1",
+      "size": 293368,
+      "sha256": "9b76c3563ed4d173e4b2d8f1e7249454e3d108d4b464120ef0c3644a5529c6f2",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnspr4.so",
+      "size": 246016,
+      "sha256": "d200bd790620744fc619a26638c00cfde8ea20b214fc1670908f9e3bf97df13c",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnss3.so",
+      "size": 1331720,
+      "sha256": "85472d0dfcdc0f85f9581aa2669b5402bed565abfe80b277b9c4b1d61d3cee6d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnssckbi.so",
+      "size": 460984,
+      "sha256": "e638b26ac29a6675a70de94bdd5d50256988d7e651ad0549c178b36f41a79f0f",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libnssutil3.so",
+      "size": 186368,
+      "sha256": "630bc4590ee03c38cfe84c006ce9cdbff97ad1479b57acfc2afa583ea30419a6",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libpciaccess.so.0",
+      "size": 34512,
+      "sha256": "770fd8c6e58063b88a951d2d5ff686fc4f494cc460f8253f18f15cefc4495a84",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libpcre2-8.so.0",
+      "size": 784352,
+      "sha256": "496ce2b43e3910e8c232105fa04cf1b47df8860f9ec90e75dde05303c2fc69be",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libplc4.so",
+      "size": 22240,
+      "sha256": "f6f014b549805ee8237ccde489af672890b4d48be207ed30bf39a54c47071355",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libplds4.so",
+      "size": 14080,
+      "sha256": "f59b59ab7ec07b82c114683af83516f15778ce3cb1c3267d02ec9345a338ce8c",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsmime3.so",
+      "size": 182184,
+      "sha256": "833728949d4308e00d4224f66bcc6f387d0ac3d0b014866c4a8c8a8edf410e3e",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsoftokn3.so",
+      "size": 375840,
+      "sha256": "036744d0a6aa712e213626245b8b90c19d8a85d43d85e984ba804cbac2620c67",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libsqlite3.so.0",
+      "size": 1640464,
+      "sha256": "4290ff1e86e8c9204789104aed2a2eb562d7292ed9544c5ba235759ea1ff3281",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libstdc++.so.6",
+      "size": 2804104,
+      "sha256": "67a940194aec6c44c3eb47a98e44c53d248e4dac5f4eb57c0971c0d6286eafe5",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libudev.so.1",
+      "size": 55144,
+      "sha256": "d2bacf3c884443c5b63728f3cce0f93998b2316592b911975390c798f6fcfb3d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libwayland-client.so.0",
+      "size": 51864,
+      "sha256": "611dc1178c2369292b74040040dd152b7884a865eccc2c8b74e9eaff3d2f2839",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libwayland-egl.so.1",
+      "size": 13880,
+      "sha256": "694be1d3465aaa099cf63761b08bdfa66328e7a3e086df804285ca09d4bdf4a8",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-dri3.so.0",
+      "size": 18144,
+      "sha256": "f584b2eca04a2c089ecf9127252855ffa1684450376fda1d74f3368088d9f875",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-present.so.0",
+      "size": 14056,
+      "sha256": "83e090bf1e523f120694c7676e168ed3068b8ae0164c86d7f02d8b09df3342f4",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-randr.so.0",
+      "size": 63200,
+      "sha256": "022e82d784c62f1dd3ba58cf1db5176d1855905ad6181b62c031f5d143661f1d",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-shm.so.0",
+      "size": 14048,
+      "sha256": "bbc01db63523f38d313f8c4a9557e56df5970cc565a6b8bcb809d4448598c403",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-sync.so.1",
+      "size": 30432,
+      "sha256": "0b05db7410598c0f79f80a535d0250b93cee7f23852fe802bfe69ce22408ec7e",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb-xfixes.so.0",
+      "size": 34536,
+      "sha256": "2e98e1a986a53e0651da324cbe79dbfb75857a6c24728282931498c3f150eeb5",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxcb.so.1",
+      "size": 153344,
+      "sha256": "fd7bc55e8680c183fe038b22d5cc7407c323e3b1e1bd6ee488b57137124b0292",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxkbcommon.so.0",
+      "size": 329696,
+      "sha256": "37b22c6df0f2718ce1dc3781f2e526d8650b11b767a3390bda336056dd18965b",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxml2.so.2",
+      "size": 1072096,
+      "sha256": "c7742d413585cee3e2750472e04da810a7a9883a1c10a8270c2f6e8c56231ad7",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libxshmfence.so.1",
+      "size": 13944,
+      "sha256": "d1b7ede7861e917aa4aba4c454a1c9012f82c63199b239a4b6c85ef0ac28145f",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libz.so.1",
+      "size": 108376,
+      "sha256": "9995c2fe07ba436423709dd8ce6a186c2c6b3db7ac7719496a55554c4a95274e",
+      "mode": "0o755"
+    },
+    {
+      "path": "lib/libzstd.so.1",
+      "size": 714432,
+      "sha256": "a0a285da817a61e65d9e89bbfd38243cf8a4798cc429adc2772b5931f1d4fbb6",
+      "mode": "0o755"
+    },
+    {
+      "path": "libEGL.so",
+      "size": 375760,
+      "sha256": "ec20c5beb107b4d6b7e14bbf5f78ab0f174f747cfebb3da10c56ec61a12d5395",
+      "mode": "0o755"
+    },
+    {
+      "path": "libGLESv2.so",
+      "size": 375760,
+      "sha256": "57dead35fe29758d24f173f4f0175a59ed60385787c1b46f56f30d85397b3c89",
+      "mode": "0o755"
+    },
+    {
+      "path": "libVkICD_mock_icd.so",
+      "size": 698448,
+      "sha256": "5d9a99a4b9fdf13b0ea0f1b8a6ae2e5c571f19dbee75f686e1f29ae4a419d4c1",
+      "mode": "0o755"
+    },
+    {
+      "path": "libVkLayer_khronos_validation.so",
+      "size": 27543784,
+      "sha256": "5765b97ba4696e2f19018e2b569c27d6905963ee119df9e760ab03be516f8244",
+      "mode": "0o755"
+    },
+    {
+      "path": "libvk_swiftshader.so",
+      "size": 5854304,
+      "sha256": "1e04606c69b2fc61b1e4ed34efc00755c764020e1785bc910877821125382fa3",
+      "mode": "0o755"
+    },
+    {
+      "path": "libvulkan.so.1",
+      "size": 893232,
+      "sha256": "8c38918fab4e819f964e57bb9e161cdaab2896fb288390c0915abbc34dd5b0d5",
+      "mode": "0o755"
+    },
+    {
+      "path": "locales/en-US.pak",
+      "size": 583147,
+      "sha256": "1702c3e405e1952d2b051ed5dc1326d53c752c02373f2c417ebca62ccaaaa1a3",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/__init__.py",
+      "size": 349,
+      "sha256": "5b3af98ae1b57e1de43e10adf3714503364f9d3ca3dfb596524c0a997d8f265b",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/any.py",
+      "size": 1324,
+      "sha256": "c90e0a770b8c79be8661dd7524d665cad940e77d129a3b071cc218910899ea9d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor.py",
+      "size": 53321,
+      "sha256": "c82e91904557558e317ed4bbc12ed94e7a3b2fd6285a00cb42526c3e5a9eaf3d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_database.py",
+      "size": 6345,
+      "sha256": "51bc95aac632c881e7fd7dc12e33ae8ef6e093e66f7978ab4018f4fb5cf5969d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_pb2.py",
+      "size": 369823,
+      "sha256": "1fc7fde70dd922b96fc2a8d006e6a79ecd47ac2b4f9b281c9572e9f4991e31ae",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/descriptor_pool.py",
+      "size": 49027,
+      "sha256": "8d49f57de01248141361719819f37f994c41c057e6a8834d1663bf3b790ea4f6",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/duration.py",
+      "size": 2675,
+      "sha256": "760726b00e13605759b9400abe3114fdae3d8174bf3d0a66dd510f2883733cdc",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/__init__.py",
+      "size": 274,
+      "sha256": "d84335c9e7fae8099f595f9407809ea95ae181d9fb685ba568a4c51461a9b9c2",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/api_implementation.py",
+      "size": 4621,
+      "sha256": "732183edda12c8b742bd8ccda33111cc4b3d8f5f3dcd105867c3e48c428dedf5",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/builder.py",
+      "size": 4163,
+      "sha256": "f081a4b9a6ffd5860a6b3863cc0dcc8a9b713c5145da2925aa2c7b2b764b8bb4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/containers.py",
+      "size": 25620,
+      "sha256": "3750ddc124176fd39705396eeeae9e20759365b9ffbe15ed6bc0d19983466b32",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/decoder.py",
+      "size": 37855,
+      "sha256": "33bbf78329f112000926202ca770cfb7b638ae217bea3889d8ad91c340045fe7",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/encoder.py",
+      "size": 27019,
+      "sha256": "6f31e1e91eb911e3e38cc3839164254a2d9532b12c542ae6b463a36995b0234a",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/enum_type_wrapper.py",
+      "size": 3902,
+      "sha256": "07db8d61f7cfa55345a6326f6074c0de9879a076a928efe041398af25c46cde5",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/extension_dict.py",
+      "size": 7265,
+      "sha256": "9086ad78f13d1192d1b7cc84339d990d159df383f203e722d7a119c1e954d422",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/field_mask.py",
+      "size": 11320,
+      "sha256": "6e08f6fc34790820abefcec2faa4cb9e1d6669f772ae5b1dc345447bf9680b35",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/message_listener.py",
+      "size": 2008,
+      "sha256": "7e20253b0cc19aa9945f0703d831262583ffee4a2c49b07decf47ee981b236c7",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/python_edition_defaults.py",
+      "size": 645,
+      "sha256": "7fb7071b6bc4845347c1f3312dcb8de0451949a476cbff94af7a793fa3097118",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/python_message.py",
+      "size": 59722,
+      "sha256": "e96cfd4bc319f648f1e1bfba84dfb14325f42a12e24dc7a7f0f34f52c8bac9e0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/type_checkers.py",
+      "size": 16832,
+      "sha256": "7bce7c3965d6b8effc59cc5a2d3535cace9d59685185237e30a49328adc03227",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/well_known_types.py",
+      "size": 23345,
+      "sha256": "c9d564c17d883ab4ed3f235328432f9ae6b103cf165a39a29f597da01fdfb8b4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/internal/wire_format.py",
+      "size": 7115,
+      "sha256": "d2dd0306027223dba59383ddeb99dcac8c8f4ea008a30a279647724dab65a375",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/json_format.py",
+      "size": 39427,
+      "sha256": "ff24132f8bd6c012fc7627ef25617dc03773289467e5ee15870ac8a523cdb7a0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/message.py",
+      "size": 15608,
+      "sha256": "81e225d8338b1070cc58540cc499b037e1cc68b9aa0797ca8c7da46c49c961a1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/message_factory.py",
+      "size": 6611,
+      "sha256": "7b746231c1a91b890f98ee377a6a794bf1df35db1a5cdcf042257b9f5a4474ba",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto.py",
+      "size": 4403,
+      "sha256": "83c112c806258488d7724a53a91d73177797f8510e14941c0372e0cbc6c768c1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_builder.py",
+      "size": 4249,
+      "sha256": "a21c42d6118c0340baa97485d99f251a518726a4afc03852429ddac49c16e4d4",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_json.py",
+      "size": 2966,
+      "sha256": "ec414a61a96faf4332a3a4479473a3f1ca701616b7dd6b4a5e3228523b363ff1",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/proto_text.py",
+      "size": 4649,
+      "sha256": "17f51bd35b9587c67f028aacf82062c3ad132f8f69640026f8758c805ee8d9b0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/reflection.py",
+      "size": 1247,
+      "sha256": "feb2235110b1b989d9deabf1766d0c5c70db234bb08b277df409dfb598281809",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/runtime_version.py",
+      "size": 3040,
+      "sha256": "e58327f339aeaf7633b08cf3e713be7ea476cf396c16488273c8d19b92140864",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/service_reflection.py",
+      "size": 10108,
+      "sha256": "a14e400454a40c30d0fc60b9a5acb86d69a197664b20629aaf6daebf8f565db0",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/symbol_database.py",
+      "size": 5752,
+      "sha256": "dea860011d12860b9b3e45d400d2809585af1528b881659454bcb132a81d1bac",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/text_encoding.py",
+      "size": 3628,
+      "sha256": "3f04747bdb078d0b9e3349fff54c70a415cab1f6e136d49178a0fdd39ff16429",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/text_format.py",
+      "size": 66522,
+      "sha256": "947d7a49770c5f107ffb7de2a672683a60c3179aebbe6f0c5468c7a19ddbd98d",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/timestamp.py",
+      "size": 3136,
+      "sha256": "025ff58a4cb080d1eb2879f626fab6376fbab4d5eecefd65205abb85f3be52d9",
+      "mode": "0o644"
+    },
+    {
+      "path": "pyproto/google/protobuf/unknown_fields.py",
+      "size": 3050,
+      "sha256": "88acc92aaaf091e59597cde441a3189fc45dc994a93e1755d2185d42a1dbf465",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/accessibility/reading_mode_gdocs_helper_manifest.json",
+      "size": 2387,
+      "sha256": "b0a8ac7c5f45a71ae311356f31ca85545c65bc70ead958b016c4f39e8c2beb88",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/helium_adblock/assets/assets.json",
+      "size": 32105,
+      "sha256": "e1faa0710c49c50a694a59636f2c49d77a879a11caae3c9b632b506eae63cf9b",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources/helium_adblock/resources.json",
+      "size": 414558,
+      "sha256": "3a2cdd9c50baa201a8fc78748662cfd4de9735cd82119c843045a98b8e0e6b52",
+      "mode": "0o644"
+    },
+    {
+      "path": "resources.pak",
+      "size": 23577699,
+      "sha256": "4ebe42809659b444794cf1c8437c9e76f1258687743ed8867cfa79e920fa6ad6",
+      "mode": "0o644"
+    },
+    {
+      "path": "snapshot_blob.bin",
+      "size": 391248,
+      "sha256": "29b7cc93dff5d6a695fac6fd97cc4e412dbb225bc338618b1beb7d9b9774e69e",
+      "mode": "0o644"
+    },
+    {
+      "path": "v8_context_snapshot.bin",
+      "size": 769824,
+      "sha256": "7b44b5a07db949db031b47b3949d445fb0fb2cbeccd94aeed4a4545288c8e73d",
+      "mode": "0o644"
+    },
+    {
+      "path": "vk_swiftshader_icd.json",
+      "size": 107,
+      "sha256": "c9eef28b6b984fec220ef0abfecc40b502d46946706e47bfe97707027cb818bd",
+      "mode": "0o644"
+    }
+  ]
+}

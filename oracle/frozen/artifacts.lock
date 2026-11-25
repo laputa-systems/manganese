@@ -1,4 +1,8 @@
 # Frozen artifacts, fetched by digest from https://oci-blobs.17166969.xyz/sha256/<sha256>.
 # Columns: sha256, size in bytes or - when unknown, file name, OCI repository:tag.
 04f262a2851abde56d0c38a3abb526f68de0fcab4f8e9481051d7b40d178dfc6 139368488 chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz manganese/oracle-inputs:hydrogen-r2-arm64
-0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7 - chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz manganese/oracle-inputs:hydrogen-r2-amd64
+546b8c17899f24e79e9f146211cfc8249e9f0c436fe960a31b8ced1e6d6e3469 118 chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.sha256 manganese/oracle-inputs:hydrogen-r2-arm64
+67e65c46ff3295d0439a6326982ffee9b847ad3759f35bfbd37bf2d21d5b852d 919 chromium-156.0.8078.79-r2-linux-aarch64-musl.tar.xz.acceptance.json manganese/oracle-inputs:hydrogen-r2-arm64
+0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7 204335356 chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz manganese/oracle-inputs:hydrogen-r2-amd64
+ad8b3d3f284946b87617dcfa4649f79921e7dafaf1fec480dd89599640bc3f88 117 chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz.sha256 manganese/oracle-inputs:hydrogen-r2-amd64
+bfd12b8c9bc53785dc31c421a4be05f3e9a89ca9ff2a1a4918c5696aed377735 917 chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz.acceptance.json manganese/oracle-inputs:hydrogen-r2-amd64
