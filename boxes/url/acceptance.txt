@@ -1,0 +1,16 @@
+version 1
+box url
+revision 7a8eeed9c2a844f46e6e07e58acfc910901c484a
+arch x86_64
+spec sha256:db9531b8e46fe904f23e867119668154e0fe44b53b8689276d1fef38541447d6
+corpus sha256:13c005e5718621ab6834b7367af9fb09422de09f13ec1a2637b38f959f949e26 seen 1023 holdout 580
+oracle .work/tmp/url/oracle sha256:2ddd2431aa567834f5f5f3ce0269433cf7f977f92e2d790593a9d6b00a40a820
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/url sha256:78718560a07ea664bc0115c58817cac0058b6a93941cf05958d06ab0403e42cf
+dependencies cargo-lock sha256:6b63196632b8e2990317fde77bb31e39961e5da0d3a6ff8ddd64666e81c19722 tree sha256:cc54eff1cc354b087ebe9632c0c3904b14d48da435eadbe17ba5f9968608670d
+run seen exit 0 items 1023 1023
+run holdout exit 0 items 580 580
+run fuzz exit 0 seed 1795642220224392980 requested 20000 completed 20000
+level source-harness met
+level frozen-browser pending: frozen-browser URL and origin comparison has not been established
+level integration pending: arm64 evidence (assembly: compare URL and site behavior against the frozen arm64 browser) and make closure have not run
