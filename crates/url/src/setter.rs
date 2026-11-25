@@ -56,7 +56,7 @@ fn apply_inner(input: &str, base: Option<&str>, name: &str, value: &str, direct:
                 let value = if name == "host" { colon.map_or(value, |index| &value[..index]) } else { value };
                 let tail = &file.spec["file://".len() + file.host.as_deref().map_or(0, str::len)..];
                 let changed = format!("file://{}{}", clean(value), tail);
-                return Some(crate::file_url::parse(&changed, None).map_or_else(|| file.spec.clone(), |url| url.spec));
+                return Some(crate::file_url::parse(&changed, None).map_or_else(|| original_file.as_ref().unwrap().spec.clone(), |url| url.spec));
             }
             "pathname" => {
                 let path = escape_controls(&clean(value)).replace('?', "%3F").replace('#', "%23");

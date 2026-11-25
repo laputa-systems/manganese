@@ -53,7 +53,8 @@ fn absolute(input: &str) -> Option<FileUrl> {
     let (authority, path, has_host) = if count == 2 {
         let end = rest.find(slash).unwrap_or(rest.len());
         let host = &rest[..end];
-        if host.contains(['@', '?', '#']) || (host.contains(':') && !host.starts_with('[')) { return None; }
+        if host.contains(['@', '?', '#']) || (host.contains(':') && !host.starts_with('[')) ||
+           (host.starts_with('[') && !host.ends_with(']')) { return None; }
         (if host.is_empty() { "manganese.invalid" } else { host }, &rest[end..], !host.is_empty())
     } else {
         ("manganese.invalid", if count > 0 { &tail[count - 1..] } else { tail }, false)
@@ -221,5 +222,10 @@ mod tests {
     #[test]
     fn file_host_without_path_cannot_contain_query() {
         assert!(parse("file://example.com?x", None).is_none());
+    }
+
+    #[test]
+    fn file_ipv6_host_cannot_include_a_port() {
+        assert!(parse("file://[::1]:80", None).is_none());
     }
 }

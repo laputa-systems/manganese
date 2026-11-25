@@ -531,6 +531,16 @@ mod tests {
         assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("file:///.//b"));
 
         let mut request = Vec::new();
+        put_field(&mut request, Some("..// space"));
+        put_field(&mut request, Some("file:///tmp/a"));
+        put_field(&mut request, None);
+        request.push(1);
+        put_field(&mut request, Some("host"));
+        put_field(&mut request, Some("x@y"));
+        let response = respond(&request).unwrap();
+        assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("file:///.//%20space"));
+
+        let mut request = Vec::new();
         put_field(&mut request, Some("filesystem:/ space#"));
         put_field(&mut request, None);
         put_field(&mut request, None);
