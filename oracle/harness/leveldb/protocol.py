@@ -76,3 +76,23 @@ CLOSE = bytes([9])
 REPAIR = bytes([10])
 DESTROY = bytes([11])
 REWRITE = bytes([15])
+EXPORT = bytes([16])
+
+
+def exported(response, offset):
+    """Parse the files of an EXPORT response that starts at offset."""
+    if response[offset] != 0:
+        raise ValueError('export failed')
+    count = struct.unpack('>H', response[offset + 1:offset + 3])[0]
+    offset += 3
+    files = []
+    for _ in range(count):
+        values = []
+        for _ in range(2):
+            length = struct.unpack('>I', response[offset:offset + 4])[0]
+            values.append(response[offset + 4:offset + 4 + length])
+            offset += 4 + length
+        files.append((values[0].decode(), values[1]))
+    if offset != len(response):
+        raise ValueError('trailing export bytes')
+    return files

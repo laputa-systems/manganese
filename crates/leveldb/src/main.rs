@@ -392,6 +392,24 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
                 session.snapshots.clear();
                 output.push(status(&rewrite_db(&session.path, &session.options, &mut session.db)));
             }
+            16 => {
+                session.close();
+                let mut files: Vec<(String, PathBuf)> = Vec::new();
+                for entry in fs::read_dir(&session.path).into_iter().flatten() {
+                    let entry = entry?;
+                    let name = entry.file_name().into_string().map_err(|_| "non-UTF-8 database file name")?;
+                    if !matches!(name.as_str(), "LOCK" | "LOG" | "LOG.old") {
+                        files.push((name, entry.path()));
+                    }
+                }
+                files.sort();
+                output.push(0);
+                output.extend_from_slice(&u16::try_from(files.len())?.to_be_bytes());
+                for (name, file) in files {
+                    blob(&mut output, name.as_bytes())?;
+                    blob(&mut output, &fs::read(file)?)?;
+                }
+            }
             _ => return Err("invalid operation".into()),
         }
     }

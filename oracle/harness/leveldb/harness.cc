@@ -331,6 +331,26 @@ std::string Record(std::string_view bytes, const std::filesystem::path& root) {
         out.push_back(Code(status));
         break;
       }
+      case 16: {
+        if (db) close();
+        std::vector<std::filesystem::path> files;
+        for (const auto& entry : std::filesystem::directory_iterator(path, error)) {
+          auto name = entry.path().filename().string();
+          if (name != "LOCK" && name != "LOG" && name != "LOG.old") files.push_back(entry.path());
+        }
+        std::sort(files.begin(), files.end());
+        out.push_back(0);
+        out.push_back(static_cast<char>(files.size() >> 8));
+        out.push_back(static_cast<char>(files.size()));
+        for (const auto& file : files) {
+          std::string contents(std::filesystem::file_size(file), '\0');
+          std::unique_ptr<FILE, decltype(&std::fclose)> handle(std::fopen(file.c_str(), "rb"), &std::fclose);
+          if (!handle || std::fread(contents.data(), 1, contents.size(), handle.get()) != contents.size()) std::abort();
+          Blob(out, file.filename().string());
+          Blob(out, contents);
+        }
+        break;
+      }
       default: std::abort();
     }
     Flush();
