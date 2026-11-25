@@ -29,6 +29,16 @@ for path in sorted(source.glob('*.cc')):
     obj = scratch / (path.name + '.o')
     subprocess.run([compiler, *args, '-c', str(path), '-o', str(obj)], cwd=out, env=env, check=True)
     objects.append(str(obj))
+blink_flags = {}
+for line in (out / 'obj/third_party/blink/renderer/platform/wtf/wtf.ninja').read_text().splitlines():
+    for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc'):
+        if line.startswith(key + ' = '):
+            blink_flags[key] = shlex.split(line.split(' = ', 1)[1])
+blink_args = sum((blink_flags[key] for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc')), [])
+blink_args = [arg for arg in blink_args if not arg.startswith('-fcrash-diagnostics-dir=')]
+blink_obj = scratch / 'blink-dtoa.o'
+subprocess.run([compiler, *blink_args, '-c', '/work/src/third_party/blink/renderer/platform/wtf/dtoa.cc', '-o', str(blink_obj)], cwd=out, env=env, check=True)
+objects.append(str(blink_obj))
 simd_flags = {}
 for line in (out / 'obj/third_party/simdutf/simdutf.ninja').read_text().splitlines():
     for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc'):

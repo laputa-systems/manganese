@@ -81,7 +81,15 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn blink_formats_strip_only_nonexponential_trailing_zeroes() {
+        assert_eq!(blink_precision(1.5, 4), "1.5");
+        assert_eq!(blink_precision(1.5e20, 4), "1.500e+20");
+        assert_eq!(blink_fixed(-0.0, 2), "0.00");
+        assert_eq!(blink_fixed(f64::INFINITY, 2), "Infinity");
+    }
 
     #[test]
     fn utf8_distinguishes_noncharacters_from_invalid_sequences() {
@@ -379,4 +387,20 @@ pub fn validate_utf8(input: &[u8]) -> (bool, bool) {
         }), true),
         Err(_) => (false, false),
     }
+}
+
+pub fn blink_precision(value: f64, digits: usize) -> String {
+    let mut text = precision(value, digits, PrecisionStyle::Precision).unwrap_or_default();
+    if !text.contains('e') && text.contains('.') {
+        while text.ends_with('0') { text.pop(); }
+        if text.ends_with('.') { text.pop(); }
+    }
+    text
+}
+
+pub fn blink_fixed(value: f64, digits: usize) -> String {
+    if !value.is_finite() { return shortest(value, ShortestStyle::EcmaScript).expect("ECMAScript formats special values"); }
+    let mut text = fixed(value, digits).unwrap_or_default();
+    if value == 0.0 && text.starts_with('-') { text.remove(0); }
+    text
 }

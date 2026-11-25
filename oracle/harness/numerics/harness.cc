@@ -7,6 +7,7 @@
 #include "base/strings/string_number_conversions_internal.h"
 #include "base/strings/string_util_impl_helpers.h"
 #include "base/strings/utf_string_conversion_utils.h"
+#include "third_party/blink/renderer/platform/wtf/dtoa.h"
 
 using double_conversion::DoubleToStringConverter;
 using double_conversion::StringBuilder;
@@ -62,6 +63,17 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if ((input[0] == 10 || input[0] == 11) && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      unsigned digits = (unsigned(input[9]) << 8) | input[10];
+      if (digits > 20 || (input[0] == 10 && digits == 0)) return 1;
+      blink::DoubleToStringConverter converter;
+      auto result = input[0] == 10 ? converter.ToStringWithFixedPrecision(value, digits) : converter.ToStringWithFixedWidth(value, digits);
+      out_len = result.size();
+      memcpy(output, result.data(), out_len);
     } else if (input[0] == 9) {
       std::string_view text(reinterpret_cast<char*>(input + 1), length - 1);
       output[0] = base::internal::DoIsStringUTF8<base::IsValidCharacter>(text);

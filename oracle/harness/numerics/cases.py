@@ -2,7 +2,7 @@ import random
 import struct
 
 
-def generate(rng: random.Random) -> bytes:
+def generate_base(rng: random.Random) -> bytes:
     op = rng.choice((0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
     if op < 5:
         bits = rng.choice((rng.getrandbits(64), rng.getrandbits(64), rng.choice((0, 1, 0x8000000000000000, 0x7ff0000000000000, 0xfff0000000000000, 0x7ff8000000000000, 0x7fefffffffffffff, 0x0010000000000000))))
@@ -27,3 +27,16 @@ def generate(rng: random.Random) -> bytes:
     else:
         data = bytes(rng.choice(alphabet) for _ in range(rng.randrange(45)))
     return bytes((op, rng.randrange(8))) + data if op == 7 else bytes((op,)) + data
+
+
+def generate_blink(rng: random.Random) -> bytes:
+    op = rng.choice((10, 11))
+    bits = rng.getrandbits(64)
+    digits = rng.randrange(1, 21) if op == 10 else rng.randrange(21)
+    return struct.pack('>BQH', op, bits, digits)
+
+
+def generate(rng: random.Random) -> bytes:
+    if rng.randrange(6) == 0:
+        return generate_blink(rng)
+    return generate_base(rng)

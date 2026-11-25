@@ -4,7 +4,7 @@ import pathlib
 import random
 import struct
 import subprocess
-from cases import generate
+from cases import generate_base, generate_blink
 
 root = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(root)
@@ -63,7 +63,12 @@ for lane, seed in [('seen', 44101), ('holdout', 44102)]:
         for kind in range(8): add(lane, bytes([7, kind]) + data)
     count = 0
     while count < 1500:
-        count += add(lane, generate(rng))
+        count += add(lane, generate_base(rng))
+for lane, seed in [('seen', 55101), ('holdout', 55102)]:
+    rng = random.Random(seed)
+    count = 0
+    while count < 500:
+        count += add(lane, generate_blink(rng))
 proc.stdin.close()
 if proc.wait(): raise SystemExit('oracle failed')
 lock = pathlib.Path('goldens.lock')

@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,17 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if matches!(request[0], 10 | 11) && length == 11 {
+            let bits = u64::from_be_bytes(request[1..9].try_into().unwrap());
+            let number = f64::from_bits(bits);
+            let digits = u16::from_be_bytes(request[9..11].try_into().unwrap());
+            if digits > 20 || (request[0] == 10 && digits == 0) { return Err(io::ErrorKind::InvalidData.into()); }
+            let text = if request[0] == 10 { blink_precision(number, digits.into()) } else { blink_fixed(number, digits.into()) };
+            output.write_all(&(text.len() as u32).to_be_bytes())?;
+            output.write_all(text.as_bytes())?;
+            output.flush()?;
+            continue;
+        }
         if request[0] == 9 {
             let (all_characters, valid_codepoints) = validate_utf8(&request[1..]);
             output.write_all(&2u32.to_be_bytes())?;
