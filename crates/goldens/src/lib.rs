@@ -5,12 +5,12 @@ pub use digest::sha256;
 pub use spec::{Arm64Evidence, Comparator, Declaration, Fuzz, Spec};
 pub use fuzz::run as fuzz;
 
+mod process;
 mod sandbox;
 use std::collections::BTreeSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Lane { Seen, Holdout }
@@ -80,24 +80,8 @@ fn scoreboard(text: &str) -> Result<BTreeSet<String>, String> {
     Ok(result)
 }
 
-fn invoke(program: &Path, args: &[String], record: &[u8]) -> Result<Vec<u8>, String> {
-    let mut child = Command::new(program).args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().map_err(|e| format!("{}: {e}", program.display()))?;
-    let Some(mut input) = child.stdin.take() else { let _ = child.kill(); let _ = child.wait(); return Err("missing child stdin".into()); };
-    let record = record.to_vec();
-    let writer = match std::thread::Builder::new().spawn(move || {
-        input.write_all(b"MGB1").and_then(|_| input.write_all(&(record.len() as u32).to_be_bytes())).and_then(|_| input.write_all(&record))
-    }) {
-        Ok(writer) => writer,
-        Err(e) => { let _ = child.kill(); let _ = child.wait(); return Err(format!("start adapter writer: {e}")); }
-    };
-    let output = child.wait_with_output().map_err(|e| format!("wait adapter: {e}"))?;
-    let written = writer.join().map_err(|_| "adapter writer panicked")?;
-    if !output.status.success() { return Err(format!("{} exited {}: {}", program.display(), output.status, String::from_utf8_lossy(&output.stderr))); }
-    written.map_err(|e| format!("write adapter: {e}"))?;
-    if output.stdout.len() < 8 || &output.stdout[..4] != b"MGB1" { return Err("invalid adapter protocol header".into()); }
-    let len = u32::from_be_bytes(output.stdout[4..8].try_into().map_err(|_| "short header")?) as usize;
-    if output.stdout.len() != len + 8 { return Err("invalid adapter record length".into()); }
-    Ok(output.stdout[8..].to_vec())
+fn invoke(program: &Path, args: &[String], record: &[u8], limits: process::Limits) -> Result<Vec<u8>, String> {
+    process::Peer::start(program, args, &program.display().to_string(), limits)?.exchange(record)
 }
 
 fn compare(comparator: &Comparator, got: &[u8], expected: &[u8]) -> bool {
@@ -136,6 +120,7 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
     if !old.is_subset(&seen_ids) { return Err("scoreboard contains an unknown seen item".into()); }
     let oracle = options.oracle_override.clone().unwrap_or_else(|| PathBuf::from(&spec.oracle)).canonicalize().map_err(|e| format!("oracle path: {e}"))?;
     let candidate = options.candidate_override.clone().unwrap_or_else(|| PathBuf::from(&spec.candidate)).canonicalize().map_err(|e| format!("candidate path: {e}"))?;
+    let limits = process::Limits::from_env()?;
     let score_dir = if options.ratchet { Some(fs::File::open(&boxdir).map_err(|e| format!("open scoreboard directory: {e}"))?) } else { None };
     let mut corpus = Vec::new();
     for item in items.iter().filter(|item| item.lane == options.lane) {
@@ -148,15 +133,15 @@ pub fn run(options: &RunOptions) -> Result<(), String> {
         }
     }
     for (item, input, golden) in &corpus {
-        let first = invoke(&oracle, &options.oracle_args, input).map_err(|e| format!("oracle {}: {e}", item.id))?;
-        let second = invoke(&oracle, &options.oracle_args, input).map_err(|e| format!("oracle {}: {e}", item.id))?;
+        let first = invoke(&oracle, &options.oracle_args, input, limits).map_err(|e| format!("oracle {}: {e}", item.id))?;
+        let second = invoke(&oracle, &options.oracle_args, input, limits).map_err(|e| format!("oracle {}: {e}", item.id))?;
         if first != second { return Err(format!("oracle self-disagreement: {}", item.id)); }
         if first != *golden { return Err(format!("oracle differs from recorded golden: {}", item.id)); }
     }
     let mut passing = BTreeSet::new();
     let mut failing = Vec::new();
     for (item, input, golden) in &corpus {
-        let got = invoke(&candidate, &[], input).map_err(|e| format!("candidate {}: {e}", item.id))?;
+        let got = invoke(&candidate, &[], input, limits).map_err(|e| format!("candidate {}: {e}", item.id))?;
         if compare(&spec.comparator, &got, golden) { passing.insert(item.id.clone()); } else { failing.push(item.id.clone()); }
     }
     let regressions: Vec<_> = old.difference(&passing).cloned().collect();

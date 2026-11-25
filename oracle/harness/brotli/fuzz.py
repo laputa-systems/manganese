@@ -3,7 +3,11 @@ import os
 import pathlib
 import random
 import struct
-from compare import ask, peer, request
+import sys
+from compare import request
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import fuzzdriver
 
 STREAM, EXACT, BUFFER, PATCH, SHARED, SHARED_DICT = range(6)
 MAX_SEED_BYTES = 200000
@@ -37,8 +41,7 @@ if not seeds:
     raise RuntimeError('no seen inputs')
 dictionaries = sorted({dictionary for _, _, dictionary, _ in seeds if dictionary})
 
-seed = int(os.environ.get('SEED') or 10023)
-cases = int(os.environ.get('CASES') or 10000)
+seed, cases = fuzzdriver.budget()
 rng = random.Random(seed)
 
 
@@ -67,7 +70,7 @@ def mutate(data):
     return bytes(data)
 
 
-def generate():
+def generate(oracle):
     mode, output_size, dictionary, encoded = rng.choice(seeds)
     kind = rng.randrange(20)
     if kind == 0:
@@ -99,16 +102,4 @@ def generate():
     return request(mode, output_size, dictionary, chunks)
 
 
-a, b = peer(os.environ['FUZZ_ORACLE']), peer(os.environ['FUZZ_CANDIDATE'])
-print(f'fuzz box=brotli seed={seed} cases={cases}', flush=True)
-for index in range(cases):
-    record = generate()
-    expected, actual = ask(a, record), ask(b, record)
-    if expected != actual:
-        print('divergence seed', seed, 'case', index, 'request', record.hex(), 'oracle', expected.hex(), 'candidate', actual.hex(), flush=True)
-        raise SystemExit(1)
-for process in (a, b):
-    process.stdin.close()
-    if process.wait():
-        raise SystemExit('peer failed')
-print(f'fuzz passed {cases} cases seed={seed}')
+fuzzdriver.run('brotli', seed, cases, generate)

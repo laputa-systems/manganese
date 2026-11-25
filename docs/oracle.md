@@ -161,10 +161,19 @@ candidate comparisons. Run `make box-fuzz BOX=<id>` for L1 differential
 fuzzing against the prebuilt oracle named by the spec. Build the harness beforehand. The lane starts one
 oracle and one candidate and sends each a stream of requests. `SEED` selects a
 decimal u64 seed; otherwise the runner chooses and prints one. `CASES` defaults
-to 10000. On divergence the runner minimizes byte removals and prints the seed,
+to 10000 and must be a positive integer; the runner validates both before it
+starts any generator or driver. On divergence the runner minimizes byte removals and prints the seed,
 zero-based case index, input and outputs, and saves the input as
 `.work/tmp/fuzz-<box>-<seed>.bin`. `INJECT=1` selects the selftest injected
 candidate as a negative control.
+
+Every adapter response, in the seen and holdout lanes and in fuzzing, must arrive within
+`PEER_TIMEOUT_SECS` (default 300) and announce at most `PEER_MAX_OUTPUT` bytes (default 1 GiB). An
+adapter that hangs, exits early, frames its output wrongly, writes an unrequested record or exits
+nonzero fails the run with its stderr. Each adapter runs in its own process group, which is killed
+when the run stops, so no helper it started survives. A fuzz failure of any kind saves the request in
+flight as `.work/tmp/fuzz-<box>-<seed>-case<index>.bin` and prints it with the oracle's and
+candidate's paths and SHA-256 digests.
 
 Each spec declares `fuzz = "bytes"` or `fuzz = "corpus"` and an integer
 `fuzz_max_len` from 1 to 1048576. The bytes generator chooses random lengths
@@ -173,7 +182,7 @@ string of seen item IDs in `goldens.lock`. It mutates those inputs with bit
 flips, insertions, deletions, splices and truncations. Holdout items cannot be
 used as seeds.
 
-A box whose wire records carry structure that byte mutation would only break declares `fuzz = "driver"` and `fuzz_driver = "<executable>"` instead, with no `fuzz_max_len`. The runner starts the driver with `FUZZ_ORACLE` and `FUZZ_CANDIDATE` naming the two programs and passes `SEED` and `CASES` through; the driver generates, sends and compares the records itself, prints its seed and the diverging case, and exits nonzero on a divergence. The zlib box's driver, `oracle/harness/zlib/fuzz.py`, mutates seen deflate inputs and invalid streams and samples the declared level, window, memLevel, strategy and flush matrix.
+A box whose wire records carry structure that byte mutation would only break declares `fuzz = "driver"` and `fuzz_driver = "<executable>"` instead, with no `fuzz_max_len`. The runner starts the driver with `FUZZ_ORACLE` and `FUZZ_CANDIDATE` naming the two programs, the validated `SEED` and `CASES`, and `FUZZ_RESULT` naming a file the driver must write with `seed=`, `requested=` and `completed=` lines; a run passes only when the driver exits zero and that file reports every requested case completed for the given seed. The driver may run for `FUZZ_TIMEOUT_SECS` (default 86400). Drivers generate their records and hand them to `oracle/harness/fuzzdriver.py`, which runs both peers under the same deadlines and output budget, compares the responses, preserves the request in flight and writes the result. The zlib box's driver, `oracle/harness/zlib/fuzz.py`, mutates seen deflate inputs and invalid streams and samples the declared level, window, memLevel, strategy and flush matrix.
 
 `boxes/<id>/scoreboard.toml` records version 1 and the set of passing seen
 items. A previously passing item that fails is a regression. Run
