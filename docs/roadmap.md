@@ -4,7 +4,7 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** active. Accepted: `p0-ground`, `p0-artifacts`, `p0-launch`, `m1-kache-oracle`.
+- **State:** active. Accepted: `p0-ground`, `p0-artifacts`, `p0-launch`, `m1-kache-oracle`, `m1-workspace`.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Last accepted revision:** the scaffold on `main` (local, not pushed); `make check lint` is green in pristine Alpine capsules on x86_64 and aarch64 (see Baseline).
 - **Red or parked:** none.
