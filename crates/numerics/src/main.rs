@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, parse_double, shortest, ShortestStyle};
+use numerics::{fixed, parse_double, precision, shortest, shortest_exponential, PrecisionStyle, ShortestStyle};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -36,6 +36,9 @@ fn main() -> io::Result<()> {
             0 => shortest(number, ShortestStyle::Base),
             1 => places.checked_sub(1).and_then(|places| fixed(number, places.into())),
             2 => shortest(number, ShortestStyle::EcmaScript),
+            3 => precision(number, places.saturating_sub(1).into(), PrecisionStyle::Precision),
+            4 if places == 0 => Some(shortest_exponential(number)),
+            4 => precision(number, places.into(), PrecisionStyle::Exponential),
             _ => return Err(io::ErrorKind::InvalidData.into()),
         };
         let mut response = vec![u8::from(value.is_some())];

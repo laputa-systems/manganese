@@ -81,7 +81,16 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, parse_double, shortest, ShortestStyle};
+    use super::{fixed, parse_double, precision, shortest, shortest_exponential, PrecisionStyle, ShortestStyle};
+
+    #[test]
+    fn precision_preserves_significant_digits_and_exponent() {
+        assert_eq!(precision(1.25, 2, PrecisionStyle::Precision).as_deref(), Some("1.3"));
+        assert_eq!(precision(12345.0, 3, PrecisionStyle::Precision).as_deref(), Some("1.23e+4"));
+        assert_eq!(precision(0.000001, 3, PrecisionStyle::Precision).as_deref(), Some("0.00000100"));
+        assert_eq!(precision(-0.0, 3, PrecisionStyle::Exponential).as_deref(), Some("0.00e+0"));
+        assert_eq!(shortest_exponential(100.0), "1e+2");
+    }
 
     #[test]
     fn parse_reports_prefix_and_saturation() {
@@ -120,8 +129,7 @@ mod tests {
     }
 }
 
-pub fn fixed(value: f64, places: usize) -> Option<String> {
-    if !value.is_finite() || value.abs() >= 1e60 || places > 100 { return None; }
+fn exact_decimal(value: f64) -> (Vec<u8>, usize) {
     let bits = value.to_bits();
     let encoded = ((bits >> 52) & 0x7ff) as i32;
     let mut significand = bits & ((1 << 52) - 1);
@@ -140,6 +148,12 @@ pub fn fixed(value: f64, places: usize) -> Option<String> {
         }
         if carry > 0 { digits.push(carry); }
     }
+    (digits, scale)
+}
+
+pub fn fixed(value: f64, places: usize) -> Option<String> {
+    if !value.is_finite() || value.abs() >= 1e60 || places > 100 { return None; }
+    let (mut digits, scale) = exact_decimal(value);
     if scale > places {
         let drop = scale - places;
         let round_up = digits.get(drop - 1).is_some_and(|&digit| digit >= 5);
@@ -191,4 +205,75 @@ pub fn parse_double(input: &[u8]) -> (f64, usize) {
     let decimal = std::str::from_utf8(&input[number_start..cursor]).expect("decimal grammar is ASCII");
     let value = decimal.parse::<f64>().expect("decimal grammar is valid");
     (value, cursor)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum PrecisionStyle {
+    Precision,
+    Exponential,
+}
+
+pub fn precision(value: f64, count: usize, style: PrecisionStyle) -> Option<String> {
+    let exponential = matches!(style, PrecisionStyle::Exponential);
+    if !value.is_finite() { return shortest(value, ShortestStyle::EcmaScript); }
+    if count == 0 || count > 121 || (!exponential && count > 120) { return None; }
+    let (mut digits, scale) = if value == 0.0 { (vec![0], 0) } else { exact_decimal(value) };
+    let mut point = digits.len() as i32 - scale as i32;
+    if digits.len() > count {
+        let drop = digits.len() - count;
+        let round = digits[drop - 1] >= 5;
+        digits.drain(..drop);
+        if round {
+            let mut carry = 1;
+            for digit in &mut digits {
+                let next = *digit + carry;
+                *digit = next % 10;
+                carry = next / 10;
+                if carry == 0 { break; }
+            }
+            if carry != 0 { digits.push(carry); }
+            if digits.len() > count { digits.remove(0); point += 1; }
+        }
+    } else {
+        digits.splice(0..0, std::iter::repeat_n(0, count - digits.len()));
+    }
+    let text: String = digits.iter().rev().map(|digit| char::from(b'0' + *digit)).collect();
+    let mut result = String::new();
+    if value.is_sign_negative() && value != 0.0 { result.push('-'); }
+    if exponential || 1 - point > 6 || point > count as i32 {
+        result.push(text.as_bytes()[0] as char);
+        if count > 1 { result.push('.'); result.push_str(&text[1..]); }
+        result.push('e');
+        if point - 1 >= 0 { result.push('+'); }
+        result.push_str(&(point - 1).to_string());
+    } else if point <= 0 {
+        result.push_str("0.");
+        result.extend(std::iter::repeat_n('0', (-point) as usize));
+        result.push_str(&text);
+    } else {
+        result.push_str(&text[..point as usize]);
+        if (point as usize) < count { result.push('.'); result.push_str(&text[point as usize..]); }
+    }
+    Some(result)
+}
+
+pub fn shortest_exponential(value: f64) -> String {
+    let shortest = shortest(value, ShortestStyle::EcmaScript).expect("ECMAScript formats all values");
+    if !value.is_finite() { return shortest; }
+    if value == 0.0 { return "0e+0".into(); }
+    let (sign, magnitude) = if let Some(rest) = shortest.strip_prefix('-') { ("-", rest) } else { ("", shortest.as_str()) };
+    if magnitude.contains('e') { return shortest; }
+    let point = magnitude.find('.').unwrap_or(magnitude.len());
+    let raw: String = magnitude.chars().filter(|&c| c != '.').collect();
+    let first = raw.bytes().position(|b| b != b'0').expect("nonzero value");
+    let last = raw.bytes().rposition(|b| b != b'0').expect("nonzero value") + 1;
+    let digits = &raw[first..last];
+    let exponent = point as i32 - first as i32 - 1;
+    let mut result = String::from(sign);
+    result.push(digits.as_bytes()[0] as char);
+    if digits.len() > 1 { result.push('.'); result.push_str(&digits[1..]); }
+    result.push('e');
+    if exponent >= 0 { result.push('+'); }
+    result.push_str(&exponent.to_string());
+    result
 }
