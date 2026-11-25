@@ -1,0 +1,3153 @@
+{
+  ".": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "IwaKeyDistribution/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "IwaKeyDistribution/iwa-key-distribution.pb": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "IwaKeyDistribution/iwa-key-distribution.pb",
+    "producers": [
+      "//chrome/browser/web_applications/isolated_web_apps/key_distribution/preload:component"
+    ],
+    "sha256": "db1b46bcb253793ecc2cb734e2eb7c04ee6a69acfe3548abe27c4ea62a3b402a",
+    "size": 3793,
+    "source": "/work/out/chromium-wayland-release/IwaKeyDistribution/iwa-key-distribution.pb"
+  },
+  "IwaKeyDistribution/manifest.json": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "IwaKeyDistribution/manifest.json",
+    "producers": [
+      "//chrome/browser/web_applications/isolated_web_apps/key_distribution/preload:component"
+    ],
+    "sha256": "2de00b641c03834a89f9c9c06327cb72a948dc59a18a5c2d28ddd617eb64ff9d",
+    "size": 114,
+    "source": "/work/out/chromium-wayland-release/IwaKeyDistribution/manifest.json"
+  },
+  "angledata/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "angledata/VkICD_mock_icd.json": {
+    "class": "data",
+    "consumer": "Vulkan infrastructure",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "I07",
+    "owner": "third_party/vulkan-tools",
+    "path": "angledata/VkICD_mock_icd.json",
+    "producers": [
+      "//third_party/vulkan-tools/src:vulkan_gen_icd_json_file"
+    ],
+    "sha256": "7b3298c69e33b8da0dbac552fbdb82cf3af438850acf3f6824c1e439d6777c2e",
+    "size": 142,
+    "source": "/work/out/chromium-wayland-release/angledata/VkICD_mock_icd.json"
+  },
+  "angledata/VkLayer_khronos_validation.json": {
+    "class": "data",
+    "consumer": "Vulkan infrastructure",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "I07",
+    "owner": "third_party/vulkan-validation-layers",
+    "path": "angledata/VkLayer_khronos_validation.json",
+    "producers": [
+      "//third_party/vulkan-validation-layers/src:vulkan_gen_json_files"
+    ],
+    "sha256": "be7449fd772ae17a3da0e5ce4b3400e110a39cf168e95d6033c04c8d812f7a50",
+    "size": 130593,
+    "source": "/work/out/chromium-wayland-release/angledata/VkLayer_khronos_validation.json"
+  },
+  "chrome": {
+    "class": "target",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o755",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "chrome",
+    "producers": [
+      "//chrome:chrome_initial"
+    ],
+    "sha256": "42a7e52e6a1aeed40e0fed49d82b81b4fb74c4301a0f4f7c04e74a090ab9cf5c",
+    "size": 460468928,
+    "source": "/work/out/chromium-wayland-release/chrome"
+  },
+  "chrome_100_percent.pak": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "chrome_100_percent.pak",
+    "producers": [
+      "//chrome:packed_resources_100_percent"
+    ],
+    "sha256": "0f28428f462f26d4c7df56b54671e1cd40a091e27820e01e035ac3f28cdb6da0",
+    "size": 586560,
+    "source": "/work/out/chromium-wayland-release/chrome_100_percent.pak"
+  },
+  "chrome_200_percent.pak": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "chrome_200_percent.pak",
+    "producers": [
+      "//chrome:packed_resources_200_percent"
+    ],
+    "sha256": "e0786bf96e5110b9a1afd93e7b5e6b405b7a1a801a12d7da7e2d4f3625218fa4",
+    "size": 949265,
+    "source": "/work/out/chromium-wayland-release/chrome_200_percent.pak"
+  },
+  "chrome_crashpad_handler": {
+    "class": "target",
+    "consumer": "browser features",
+    "disposition": "port",
+    "mode": "0o755",
+    "obligation": "A05",
+    "owner": "components",
+    "path": "chrome_crashpad_handler",
+    "producers": [
+      "//components/crash/core/app:chrome_crashpad_handler"
+    ],
+    "sha256": "f14467afddfa5856911b82b600e41c5f46627cefba9286c337b1d4ce968e4cf8",
+    "size": 2189640,
+    "source": "/work/out/chromium-wayland-release/chrome_crashpad_handler"
+  },
+  "chrome_sandbox": {
+    "class": "target",
+    "consumer": "process isolation",
+    "disposition": "port",
+    "mode": "0o4755",
+    "obligation": "B04",
+    "owner": "sandbox",
+    "path": "chrome_sandbox",
+    "producers": [
+      "//sandbox/linux:chrome_sandbox"
+    ],
+    "sha256": "cc1e26686ac532956bc01b6425dea59e35f54cdaa39df0ecb40448d4699b7f3c",
+    "size": 86896,
+    "source": "/work/out/chromium-wayland-release/chrome_sandbox"
+  },
+  "chromium": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "mode": "0o755",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "path": "chromium",
+    "sha256": "aca83b75f2ab3e842c05cd6cf002a37aec838d7a285801b15c4c5fbbcd526561",
+    "size": 288,
+    "source": "oracle/build/scripts/package-runtime.py"
+  },
+  "chromium.desktop": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "mode": "0o644",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "path": "chromium.desktop",
+    "sha256": "fbfb0ac02b411c33460799c567791c27154a91414948fbbae9c7eb0069cd831b",
+    "size": 280,
+    "source": "oracle/build/scripts/stage-runtime.py"
+  },
+  "chromium.png": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "chromium.png",
+    "sha256": "190dc5dbd72d856627acdc86acec90ec2fcc27781a3a2654fd3aa49d570cd474",
+    "size": 4393,
+    "source": "//chrome/app/theme/chromium/linux/product_logo_256.png"
+  },
+  "fontconfig/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "fontconfig/conf.d/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "fontconfig/conf.d/10-hinting-slight.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/10-hinting-slight.conf",
+    "sha256": "d138eca2bac3f78d45ff7cfb649ad792caa4a6e61f73cea7cf0ea54b091f1ef4",
+    "size": 620,
+    "source": "/etc/fonts/conf.d/10-hinting-slight.conf"
+  },
+  "fontconfig/conf.d/10-scale-bitmap-fonts.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/10-scale-bitmap-fonts.conf",
+    "sha256": "df8e99abb6f82384c61978906a45a95794940545da95790d87f01d9391e0894b",
+    "size": 2068,
+    "source": "/etc/fonts/conf.d/10-scale-bitmap-fonts.conf"
+  },
+  "fontconfig/conf.d/10-sub-pixel-none.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/10-sub-pixel-none.conf",
+    "sha256": "0f00b5cf0ce07062ec65b9b340aa888f6c5fbc215aafebd26781be2d5a13ff6a",
+    "size": 647,
+    "source": "/etc/fonts/conf.d/10-sub-pixel-none.conf"
+  },
+  "fontconfig/conf.d/10-yes-antialias.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/10-yes-antialias.conf",
+    "sha256": "e6d82a642d1b37f7d24dc37f938b999f00ff7aa4303b2602d04164d53f221005",
+    "size": 258,
+    "source": "/etc/fonts/conf.d/10-yes-antialias.conf"
+  },
+  "fontconfig/conf.d/11-lcdfilter-default.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/11-lcdfilter-default.conf",
+    "sha256": "76aec9d8dac48faabe1bbde9e887cfb09fa45f30be5f8826e945a394a0097e48",
+    "size": 695,
+    "source": "/etc/fonts/conf.d/11-lcdfilter-default.conf"
+  },
+  "fontconfig/conf.d/20-unhint-small-vera.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/20-unhint-small-vera.conf",
+    "sha256": "278732c68c16177f2aa3c7e4ea318b9f720aee13a433c32eb15ba626806c609d",
+    "size": 1377,
+    "source": "/etc/fonts/conf.d/20-unhint-small-vera.conf"
+  },
+  "fontconfig/conf.d/30-metric-aliases.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/30-metric-aliases.conf",
+    "sha256": "3baf25c82e1a14c606d45c212296852be06ae9795d60e84aab573226151450a2",
+    "size": 13610,
+    "source": "/etc/fonts/conf.d/30-metric-aliases.conf"
+  },
+  "fontconfig/conf.d/40-nonlatin.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/40-nonlatin.conf",
+    "sha256": "5c3f7d62a44258d5d9e81a93b1685bee5ab78acb8688b25a43c4c1e749312a84",
+    "size": 7775,
+    "source": "/etc/fonts/conf.d/40-nonlatin.conf"
+  },
+  "fontconfig/conf.d/45-generic.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/45-generic.conf",
+    "sha256": "24de9f68189d544bb4cc084d9bd8f3a59d8b988a9dc44b11e9877d5add5fc948",
+    "size": 3490,
+    "source": "/etc/fonts/conf.d/45-generic.conf"
+  },
+  "fontconfig/conf.d/45-latin.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/45-latin.conf",
+    "sha256": "b46e539c25dfd5531c8fcf4f22c3d156b09272ffbc6f8a83a8eeb7431c09aee5",
+    "size": 7258,
+    "source": "/etc/fonts/conf.d/45-latin.conf"
+  },
+  "fontconfig/conf.d/45-noto-math.conf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-math-2026.11.01-r0",
+    "path": "fontconfig/conf.d/45-noto-math.conf",
+    "sha256": "d134e7c4f5e004bcb55eb98a5eb58f946506fbeb885830c02f855d207e4d50a1",
+    "size": 544,
+    "source": "/etc/fonts/conf.d/45-noto-math.conf"
+  },
+  "fontconfig/conf.d/45-noto-symbols.conf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fontconfig/conf.d/45-noto-symbols.conf",
+    "sha256": "1511c844daed58a05e1be80cbdf208f47f8428a5480c5b3437ae11cfd22264db",
+    "size": 348,
+    "source": "/etc/fonts/conf.d/45-noto-symbols.conf"
+  },
+  "fontconfig/conf.d/45-noto.conf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fontconfig/conf.d/45-noto.conf",
+    "sha256": "7e71006c21395b66272e0467720b7c5d6151d26855729c918c60eac116037c62",
+    "size": 571,
+    "source": "/etc/fonts/conf.d/45-noto.conf"
+  },
+  "fontconfig/conf.d/48-spacing.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/48-spacing.conf",
+    "sha256": "99d839cd8aa28854e8f54f26e7200b6e57951f39f56791a0ed473662488bcef6",
+    "size": 441,
+    "source": "/etc/fonts/conf.d/48-spacing.conf"
+  },
+  "fontconfig/conf.d/49-sansserif.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/49-sansserif.conf",
+    "sha256": "7849a11ce5243e8bb3d06bcad558737a8682e5122e73c8e427f4c011a2054818",
+    "size": 639,
+    "source": "/etc/fonts/conf.d/49-sansserif.conf"
+  },
+  "fontconfig/conf.d/50-user.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/50-user.conf",
+    "sha256": "bc6e31684e4f5e0176200e558a250ff63e9ab0773300f47071223edc320c4c5e",
+    "size": 542,
+    "source": "/etc/fonts/conf.d/50-user.conf"
+  },
+  "fontconfig/conf.d/51-local.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/51-local.conf",
+    "sha256": "dca9d917e1f66f73bfa495943b4d1eaab2d93810a51bc8e600cf4d4e9df03e67",
+    "size": 263,
+    "source": "/etc/fonts/conf.d/51-local.conf"
+  },
+  "fontconfig/conf.d/58-noto-math.conf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-math-2026.11.01-r0",
+    "path": "fontconfig/conf.d/58-noto-math.conf",
+    "sha256": "00934fd7484a288bd1ae8e97d800e5bd03c07edd1946aeaac85af4f2168bd2b7",
+    "size": 782,
+    "source": "/etc/fonts/conf.d/58-noto-math.conf"
+  },
+  "fontconfig/conf.d/58-noto.conf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-common-2026.11.01-r0",
+    "path": "fontconfig/conf.d/58-noto.conf",
+    "sha256": "262badb0c713ff0d620263ede3eac4b3ac918fd0cc4e884c819feb526047f7af",
+    "size": 10666,
+    "source": "/etc/fonts/conf.d/58-noto.conf"
+  },
+  "fontconfig/conf.d/60-generic.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/60-generic.conf",
+    "sha256": "195bc8605dd23289d42c10d79cc13a5ce4a4b3cf965df5b30ecc0b7149bb951f",
+    "size": 1911,
+    "source": "/etc/fonts/conf.d/60-generic.conf"
+  },
+  "fontconfig/conf.d/60-latin.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/60-latin.conf",
+    "sha256": "5c2c410bc584ba16a5e2ca5830311b0efaba9bdba3261d3247e880f6ea9d5220",
+    "size": 2169,
+    "source": "/etc/fonts/conf.d/60-latin.conf"
+  },
+  "fontconfig/conf.d/65-fonts-persian.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/65-fonts-persian.conf",
+    "sha256": "c675fab143a3638346874798be45f51f6878ebec591b4362d83cfffb828ec4ca",
+    "size": 10132,
+    "source": "/etc/fonts/conf.d/65-fonts-persian.conf"
+  },
+  "fontconfig/conf.d/65-nonlatin.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/65-nonlatin.conf",
+    "sha256": "77ad64b2838b880377e54fd1a634adbfa67a73d2cb49b46c10117ec6c64b2b19",
+    "size": 10011,
+    "source": "/etc/fonts/conf.d/65-nonlatin.conf"
+  },
+  "fontconfig/conf.d/69-unifont.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/69-unifont.conf",
+    "sha256": "fa97c0cf5f79d70e2dc3dc48155d4c9220cd7c6a8bc95b89c4ebcc517f97479e",
+    "size": 687,
+    "source": "/etc/fonts/conf.d/69-unifont.conf"
+  },
+  "fontconfig/conf.d/70-no-bitmaps-except-emoji.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/70-no-bitmaps-except-emoji.conf",
+    "sha256": "bb5df65896bf3011b2f2935b63ab12db1ecf078674ff73a533123445f122a92b",
+    "size": 429,
+    "source": "/etc/fonts/conf.d/70-no-bitmaps-except-emoji.conf"
+  },
+  "fontconfig/conf.d/80-delicious.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/80-delicious.conf",
+    "sha256": "34f27b7fe9cd83b2b6d46f16ef9c477412f2d7ef63634f86b9b38b79bc4f81ad",
+    "size": 437,
+    "source": "/etc/fonts/conf.d/80-delicious.conf"
+  },
+  "fontconfig/conf.d/90-synthetic.conf": {
+    "class": "data",
+    "consumer": "font configuration",
+    "disposition": "remove",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/fontconfig-2.17.1-r1",
+    "path": "fontconfig/conf.d/90-synthetic.conf",
+    "sha256": "cdd0aac7840c664a7127b64db66bdfe8dc22be3774d10bc22f4a41c98de5d85e",
+    "size": 1757,
+    "source": "/etc/fonts/conf.d/90-synthetic.conf"
+  },
+  "fontconfig/fonts.conf": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "mode": "0o644",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "path": "fontconfig/fonts.conf",
+    "sha256": "6ecde5d296a3864dbf4c0becf16a7df83b346a6bb208a60905c9a96376a2e7fa",
+    "size": 241,
+    "source": "oracle/build/scripts/package-runtime.py"
+  },
+  "fonts/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "fonts/noto/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "fonts/noto/NotoSans-Bold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSans-Bold.ttf",
+    "sha256": "1df075a380fc7cb898acf64c1f7b3b4dd780de3caa860178bf929de35817a913",
+    "size": 631484,
+    "source": "/usr/share/fonts/noto/NotoSans-Bold.ttf"
+  },
+  "fonts/noto/NotoSans-BoldItalic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSans-BoldItalic.ttf",
+    "sha256": "1b602a9d6353be42c91df097a4857b69fa2696f26703d7a33b54a15d87c2622c",
+    "size": 646092,
+    "source": "/usr/share/fonts/noto/NotoSans-BoldItalic.ttf"
+  },
+  "fonts/noto/NotoSans-Italic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSans-Italic.ttf",
+    "sha256": "467e3f89eeca4108bb8710a2b9e0cf2281ac56d5b0609211a83776d0505eecb5",
+    "size": 639124,
+    "source": "/usr/share/fonts/noto/NotoSans-Italic.ttf"
+  },
+  "fonts/noto/NotoSans-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSans-Regular.ttf",
+    "sha256": "478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823",
+    "size": 621572,
+    "source": "/usr/share/fonts/noto/NotoSans-Regular.ttf"
+  },
+  "fonts/noto/NotoSansMath-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-math-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansMath-Regular.ttf",
+    "sha256": "d51afd5739c7ba6c44fcab35a88160e25dfb69a2d4ad0bd99533f8d894af1f96",
+    "size": 990564,
+    "source": "/usr/share/fonts/noto/NotoSansMath-Regular.ttf"
+  },
+  "fonts/noto/NotoSansMono-Bold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansMono-Bold.ttf",
+    "sha256": "a21ea0ba6ea49fda7b34ca39a504b487f1130885d36e1a4f9f4255b3ba6994bc",
+    "size": 610908,
+    "source": "/usr/share/fonts/noto/NotoSansMono-Bold.ttf"
+  },
+  "fonts/noto/NotoSansMono-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansMono-Regular.ttf",
+    "sha256": "65b5e2b2c4a1fba9ae8be1f026cb35b03dcb8886d9b2a4147054fde12f7e767d",
+    "size": 596428,
+    "source": "/usr/share/fonts/noto/NotoSansMono-Regular.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Black.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Black.ttf",
+    "sha256": "637e3857aa729ec67aae4bfc6838cd298cad2b4a54de953916f0b1c5e10b2121",
+    "size": 235968,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Black.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Bold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Bold.ttf",
+    "sha256": "af83250e7c5bdd37d542187a724ac6b33453a6550e741cebcacf7a771891f75e",
+    "size": 228028,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Bold.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-ExtraBold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-ExtraBold.ttf",
+    "sha256": "3b603fecbbd9ad1b45223c6b7871cf9d54b653653fade3c1da0bdec98cef8740",
+    "size": 229908,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-ExtraBold.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-ExtraLight.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-ExtraLight.ttf",
+    "sha256": "a14c578c4b8ad2142a7830225a5d215ed15c7e2295cebd7e211614336e2288fc",
+    "size": 232496,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-ExtraLight.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Light.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Light.ttf",
+    "sha256": "659843a49ef43ff42f9c315285a9e8b828853c46496f8bed426800b68b10b697",
+    "size": 228800,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Light.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Medium.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Medium.ttf",
+    "sha256": "f2422696752b46d12ff32c4abfe5201b34c9b83404fc5da6ccab05fceaff6bd3",
+    "size": 227616,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Medium.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Regular.ttf",
+    "sha256": "d0e98e9a2c046594c5021437273943be7e79e0fd980fde125279e22302212595",
+    "size": 226980,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Regular.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-SemiBold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-SemiBold.ttf",
+    "sha256": "9ab8ee074de01e611ee9085c4721eeaa02efe815dea7b32f682bba7dd6fb6afe",
+    "size": 228356,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-SemiBold.ttf"
+  },
+  "fonts/noto/NotoSansSymbols-Thin.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols-Thin.ttf",
+    "sha256": "b3f87bf5316769f72382ac64cbefc08030350028d4dacb5622a1c5cefc6ec6e9",
+    "size": 231428,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols-Thin.ttf"
+  },
+  "fonts/noto/NotoSansSymbols2-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-symbols-2026.11.01-r0",
+    "path": "fonts/noto/NotoSansSymbols2-Regular.ttf",
+    "sha256": "c4a0a80f0041ce4be81e2478faad22776d23edb98ae3f0d19bd37044820ecf9d",
+    "size": 671568,
+    "source": "/usr/share/fonts/noto/NotoSansSymbols2-Regular.ttf"
+  },
+  "fonts/noto/NotoSerif-Bold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerif-Bold.ttf",
+    "sha256": "96656aa5cec8f1d6fd0e804c1fad397e1a1cfa082e6642124e0bda68cd8363ce",
+    "size": 747144,
+    "source": "/usr/share/fonts/noto/NotoSerif-Bold.ttf"
+  },
+  "fonts/noto/NotoSerif-BoldItalic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerif-BoldItalic.ttf",
+    "sha256": "c710c5b9cf354ae46e7a10472a08019b28220fafeb5887a482a76856f8f6fc0b",
+    "size": 779236,
+    "source": "/usr/share/fonts/noto/NotoSerif-BoldItalic.ttf"
+  },
+  "fonts/noto/NotoSerif-Italic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerif-Italic.ttf",
+    "sha256": "749e80e313ef711f9373c6cce17c72297ef05490b3dcda7967d1d5d90bf1183f",
+    "size": 756796,
+    "source": "/usr/share/fonts/noto/NotoSerif-Italic.ttf"
+  },
+  "fonts/noto/NotoSerif-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerif-Regular.ttf",
+    "sha256": "19e72cd8d595fae5bd74a5206f5d938512e1183d4fed7abb1ec1be1d7efa5f88",
+    "size": 712444,
+    "source": "/usr/share/fonts/noto/NotoSerif-Regular.ttf"
+  },
+  "fonts/noto/NotoSerifDisplay-Bold.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerifDisplay-Bold.ttf",
+    "sha256": "bca7070ed1e6a8f5b2b08ad04dad4bed677c8044060ace0f78b2e01d425e841b",
+    "size": 682480,
+    "source": "/usr/share/fonts/noto/NotoSerifDisplay-Bold.ttf"
+  },
+  "fonts/noto/NotoSerifDisplay-BoldItalic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerifDisplay-BoldItalic.ttf",
+    "sha256": "b6521b09ecedf447a43f1eb202566ccf14d3ad7fb4f2008823762f71781405e8",
+    "size": 682972,
+    "source": "/usr/share/fonts/noto/NotoSerifDisplay-BoldItalic.ttf"
+  },
+  "fonts/noto/NotoSerifDisplay-Italic.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerifDisplay-Italic.ttf",
+    "sha256": "60c8e4d1b55d3346fd7113bb12ec9ff9cc684129c32aadfa37eec4d76223dc37",
+    "size": 676588,
+    "source": "/usr/share/fonts/noto/NotoSerifDisplay-Italic.ttf"
+  },
+  "fonts/noto/NotoSerifDisplay-Regular.ttf": {
+    "class": "data",
+    "consumer": "embedded fonts",
+    "disposition": "reuse",
+    "mode": "0o644",
+    "obligation": "H04",
+    "owner": "builder package/font-noto-2026.11.01-r0",
+    "path": "fonts/noto/NotoSerifDisplay-Regular.ttf",
+    "sha256": "8b45c367c7c6a4a1d82f132464b7f1aa8ff092df06602522b981daf1da64d927",
+    "size": 670076,
+    "source": "/usr/share/fonts/noto/NotoSerifDisplay-Regular.ttf"
+  },
+  "gen/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/front_end/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/front_end/core/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/front_end/core/common/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/front_end/core/common:ColorUtils_checked"
+    ],
+    "sha256": "84af11661013a9495c51b0ddff598f5ffb83597729456d9affbc18dc32cc6a86",
+    "size": 8057,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js"
+  },
+  "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/front_end/core/common:ColorUtils_checked"
+    ],
+    "sha256": "d7f4fcc2c4d10b0c0adf72f3aa949f17d39d72739a2f9a60dc950dd96c0ffa3c",
+    "size": 18574,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/front_end/core/common/ColorUtils.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/common.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "c6a8622d3820c2407c92ab95420c5ecae26d02d7cbcf9a5538b726744809ea2c",
+    "size": 5315,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/common.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/common.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/common.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "3fcde8318bb2c2d4dc0f7faab8565f0e5896c40577995de6d98f3d6603d47366",
+    "size": 11934,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/common.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "8ac2b6789d365201a2feaec4aede8604c49113f95dc4d9e274d5fa10e32326d8",
+    "size": 40218,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "8bd8f3222a46a143bd5561b22c3b16d8ca00a83f7feb2f515de15d9660550aea",
+    "size": 67961,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/css_grid_label_helpers.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "19066ebfad118db49d60eb5902b31005fdc8f808ede97ae7eb6ec47cc553821d",
+    "size": 4162,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "4a9d844d1ae45544e3ef8e71ce277ce3a58b37e76527b39f043cff75fbae25b0",
+    "size": 8259,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/drag_resize_handler.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "9f5bc6c420ff07fc19ff0e434c5b6ec309852bd022d4037aa63183bb439853c9",
+    "size": 6075,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "a36144026a6a6d90d319ebb9156180a0a08f6e27f21fc86057167d4e9f875f30",
+    "size": 12218,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_anchor.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "a669c9bdef4ed166fd36ce95c3c53d6d04d5064266383732b5b7994dcb28706d",
+    "size": 8563,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "8960a7a7affe8da3390b240a2291ada12fdaa3c403206eb3ef8f616919971dfc",
+    "size": 18956,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_common.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "c1490c62bc96275629897fe11513ecdc3c5bbe6f38a110e407a18879512b1ab3",
+    "size": 1058,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "74b830f93bfafc89e598263f20225687075370aca8fa20daff80e2d88d09d922",
+    "size": 2462,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_container_query.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "5ff68770ef35e630c795ccd03191ef6e40be4dbea148f3d401b41e45a33182c1",
+    "size": 31190,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "a53aec5185eba651da2b9ca34019d47c6a9f400afd2848834087b241e48a6570",
+    "size": 64560,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_flex_common.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "b1a01e81169c11b7a13e760fb6af9259fc27d6a7a29295b5d8c1dd941975a354",
+    "size": 13038,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "eac52528b62887f39e950ed84f7b9057ff322f2b39ee250caaa5b82484f75344",
+    "size": 23361,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_grid_common.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "87e6c9e90e7ee7f68abfc6d577a3caed076a9699cd36e29544eaf91685506cbd",
+    "size": 1878,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "166cdfecc44fd851b11aecb358a8e81a9608ea326855bfd27314669e8a6e517c",
+    "size": 4196,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_isolated_element.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "da8becb88b66bf9c36ecc77f93454e0500fc1a2db2ef1c67fcc81f5492c03100",
+    "size": 4962,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "d8368c77b8cc62c133ca83925261d382968df8a20af6c8cf95b96b6eb1a29186",
+    "size": 10972,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/highlight_scroll_snap.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/main.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "edc9fabad304e152632887d0ddeeccaabd8ba90078dde263f61f775736780a82",
+    "size": 3926,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/main.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/main.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/main.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "c30f170105c560c2007f1018177b7f074760ce893a5b94c887707961eb81f042",
+    "size": 7764,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/main.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "717d0f798b400b76cbb3ff0a5a21cd6b4dfeda16931d61363b4ae63eeef9e476",
+    "size": 5031,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "15aca0b550a1252d4e15fe6d25d3988ee6268679898e38908ee2cf667e8a1092",
+    "size": 10046,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_green_dev_anchors.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "ce6b7a1faa5da26d3aebb53819cd202b8f8ae7e78c8d67946da7c34623ea188b",
+    "size": 24797,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "ce41aef55b56153ddb7cc36e3af80fd8049f6eea1ca02c6afe0db48190705f72",
+    "size": 49447,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_highlight.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "30c954b21505c442b726bd36297e70976fcc2837424d76ecb744aead46d5a1ad",
+    "size": 2686,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "52355d5c87a8fec68f1b8c9b06531ac66f990c2c4cf510278f4df80b74bf8f89",
+    "size": 5525,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_paused.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "f48ea61e272918d3fd22eeb7028fd9fc591e25f0fba78e8bfacd0bccc1df64c3",
+    "size": 5804,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "cf6dbcecf3bf38812f2ac843195a21613b8b17b1f42f709e5a3426a15c68f532",
+    "size": 11516,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_persistent.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "20cd0470ad1fb9002e272aa0b2ccff1b5f555b02d5da12b5b20e469cf60d1028",
+    "size": 3532,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "627bdb43b4cc3d456e278e71d3f3e33bf23c22e369d1c10775f3ce0144b941bb",
+    "size": 7678,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_screenshot.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "635a6d658d393ae45ad6d4d5049356dfbb71ba5b14acf5867b5ef0a8f8c0e1e0",
+    "size": 9025,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "b49b03669a70c060cf5780de7bb396f82019ca8f610777d5a88b0493c59c5ca2",
+    "size": 15851,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_source_order.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "b57aff80263c3d95a0791aeec2a572883efeddc8a05a8ffc545e1f596e366306",
+    "size": 1642,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "bb4886cc8837da47e0d1837dabeaf9c795c60e8fefcdebaacc06ab6af547bfea",
+    "size": 3499,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_viewport_size.js.map"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "6662d559f17daffcdc4a2795d99d846c7e6870ba6dd98f1f89eeaac29d930ed2",
+    "size": 3252,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js"
+  },
+  "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js.map": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/devtools-frontend",
+    "path": "gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js.map",
+    "producers": [
+      "//third_party/devtools-frontend/src/inspector_overlay:inspector_overlay_checked"
+    ],
+    "sha256": "0dda56d9b313fc28094ff0b73980ee0a9235282e5a769d55cd3d903e2ad35898",
+    "size": 6625,
+    "source": "/work/out/chromium-wayland-release/gen/third_party/devtools-frontend/src/inspector_overlay/tool_window_controls.js.map"
+  },
+  "icudtl.dat": {
+    "class": "data",
+    "consumer": "internationalization",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "H07",
+    "owner": "third_party/icu",
+    "path": "icudtl.dat",
+    "producers": [
+      "//third_party/icu:copy_icudata"
+    ],
+    "sha256": "e1ed8f674bb8449731b79cae956042da59f9ecbd37c8d3f86586a22b4836e5b2",
+    "size": 10824576,
+    "source": "/work/out/chromium-wayland-release/icudtl.dat"
+  },
+  "lib/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "lib/libEGL.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/mesa-egl-26.1.6-r0",
+    "path": "lib/libEGL.so.1",
+    "sha256": "7554efc73d9e66abbc0a05b8531a710de6966573fd5003c77c2f688f76423aed",
+    "size": 392184,
+    "source": "/usr/lib/libEGL.so.1"
+  },
+  "lib/libGLESv2.so.2": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/mesa-gles-26.1.6-r0",
+    "path": "lib/libGLESv2.so.2",
+    "sha256": "222ee92e05e1918b6373b1ea2f13cc8231cf7943bfd5d2d1a987f5c6d9dcb68b",
+    "size": 50968,
+    "source": "/usr/lib/libGLESv2.so.2"
+  },
+  "lib/libLLVM.so.22.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/llvm22-libs-22.1.3-r1",
+    "path": "lib/libLLVM.so.22.1",
+    "sha256": "b18a2d3a58c244ad8bb58729a563f0a58bfebbdeffb74895d7b0d5f57c0d4b15",
+    "size": 190973792,
+    "source": "/usr/lib/libLLVM.so.22.1"
+  },
+  "lib/libSPIRV-Tools.so": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/spirv-tools-1.4.341.0-r0",
+    "path": "lib/libSPIRV-Tools.so",
+    "sha256": "dfab8325bb6b562b4a86225e4fd3f17a4928da76922ac07588088237e61ea12f",
+    "size": 1182064,
+    "source": "/usr/lib/libSPIRV-Tools.so"
+  },
+  "lib/libX11-xcb.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libx11-1.8.14-r0",
+    "path": "lib/libX11-xcb.so.1",
+    "sha256": "f7a9e0281693f41309192880f242249e29afab9329eac458eed3f79dfb8f00c2",
+    "size": 13880,
+    "source": "/usr/lib/libX11-xcb.so.1"
+  },
+  "lib/libX11.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libx11-1.8.14-r0",
+    "path": "lib/libX11.so.6",
+    "sha256": "5a7c2df00148b914e9d66b7455680bd2a1b29a0eaef68b115a0133ce441d2a76",
+    "size": 1161312,
+    "source": "/usr/lib/libX11.so.6"
+  },
+  "lib/libXau.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxau-1.0.12-r0",
+    "path": "lib/libXau.so.6",
+    "sha256": "0fd15be141dc06c149f2f2b92408dc91f4429d1f872a3fb9a655490e8c994578",
+    "size": 13936,
+    "source": "/usr/lib/libXau.so.6"
+  },
+  "lib/libXdmcp.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxdmcp-1.1.5-r1",
+    "path": "lib/libXdmcp.so.6",
+    "sha256": "cb4e243ca95695d59f1de5abc8cb0092d5ac1066811302c0f874a9341778b7eb",
+    "size": 26384,
+    "source": "/usr/lib/libXdmcp.so.6"
+  },
+  "lib/libXext.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxext-1.3.7-r0",
+    "path": "lib/libXext.so.6",
+    "sha256": "a25b874bdaeed2ebea69eedd5be32f91bc868d714a584eed357ced0399694f54",
+    "size": 68496,
+    "source": "/usr/lib/libXext.so.6"
+  },
+  "lib/libXi.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxi-1.8.4-r0",
+    "path": "lib/libXi.so.6",
+    "sha256": "b2280de9ea01dc90de961c2974830acae28232b67cfd6feb41d36266f20aae5d",
+    "size": 63280,
+    "source": "/usr/lib/libXi.so.6"
+  },
+  "lib/libatk-1.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libatk-1.0-2.60.5-r0",
+    "path": "lib/libatk-1.0.so.0",
+    "sha256": "b8e2138546e25b32136460a5c491bf7fa93c9aa477dc35d91c99eeed042df061",
+    "size": 137016,
+    "source": "/usr/lib/libatk-1.0.so.0"
+  },
+  "lib/libatk-bridge-2.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libatk-bridge-2.0-2.60.5-r0",
+    "path": "lib/libatk-bridge-2.0.so.0",
+    "sha256": "6d115469ee3eafc7b6a7fd6609d0a6fc9197a9a3cabede4812f54bf6f58f5210",
+    "size": 227920,
+    "source": "/usr/lib/libatk-bridge-2.0.so.0"
+  },
+  "lib/libatspi.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/at-spi2-core-libs-2.60.5-r0",
+    "path": "lib/libatspi.so.0",
+    "sha256": "2c5041f8b5cf66fe8f8967f10b204a20d754eec5722bb76df4fc33a0ba4ea63b",
+    "size": 219304,
+    "source": "/usr/lib/libatspi.so.0"
+  },
+  "lib/libblkid.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libblkid-2.42.3-r1",
+    "path": "lib/libblkid.so.1",
+    "sha256": "0d0a939694978d45ac5546078ef7fdfcd25f902811dc17f31d48b2380b660492",
+    "size": 203600,
+    "source": "/usr/lib/libblkid.so.1"
+  },
+  "lib/libbsd.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libbsd-0.12.2-r0",
+    "path": "lib/libbsd.so.0",
+    "sha256": "a5b321623fe7274c695805b7f46bb2ed8ac4e970413a4930f09701a17c44ed21",
+    "size": 64272,
+    "source": "/usr/lib/libbsd.so.0"
+  },
+  "lib/libdbus-1.so.3": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/dbus-libs-1.16.2-r2",
+    "path": "lib/libdbus-1.so.3",
+    "sha256": "59003e53934538d49c3d297126aff3f152e6fb2b1de8269261e5e8ca5f7889ce",
+    "size": 296952,
+    "source": "/usr/lib/libdbus-1.so.3"
+  },
+  "lib/libdrm.so.2": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libdrm-2.4.134-r0",
+    "path": "lib/libdrm.so.2",
+    "sha256": "4f8856c00a3ffaf4212fc5193338087f76e8b0dca6776a2278efe7757317a96b",
+    "size": 87744,
+    "source": "/usr/lib/libdrm.so.2"
+  },
+  "lib/libdrm_amdgpu.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libdrm-2.4.134-r0",
+    "path": "lib/libdrm_amdgpu.so.1",
+    "sha256": "9e5874e542a912b6789d68abc82bd7b94e8d03d69951a8df0c44620970f1587d",
+    "size": 46704,
+    "source": "/usr/lib/libdrm_amdgpu.so.1"
+  },
+  "lib/libdrm_intel.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libdrm-2.4.134-r0",
+    "path": "lib/libdrm_intel.so.1",
+    "sha256": "b6a9763abef655aa08fc4afc981ebaad7f95ee1a9318ab573d06ec41127afecf",
+    "size": 146520,
+    "source": "/usr/lib/libdrm_intel.so.1"
+  },
+  "lib/libeconf.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libeconf-0.8.3-r0",
+    "path": "lib/libeconf.so.0",
+    "sha256": "4aa270277bea8c4fc301108c4e4a51dc33c6cd008c1e8567fccd0c3966c64798",
+    "size": 38752,
+    "source": "/usr/lib/libeconf.so.0"
+  },
+  "lib/libelf.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libelf-0.195-r0",
+    "path": "lib/libelf.so.1",
+    "sha256": "d05e5e5ba8d5da92f3188b717b643990dc23cf5f84ea20e0da8cf5a68e38b786",
+    "size": 92064,
+    "source": "/usr/lib/libelf.so.1"
+  },
+  "lib/libexpat.so.1": {
+    "class": "target",
+    "consumer": "XML",
+    "disposition": "extend",
+    "mode": "0o755",
+    "obligation": "F01",
+    "owner": "builder package/libexpat-2.10.0-r0",
+    "path": "lib/libexpat.so.1",
+    "sha256": "81b28279f2bb5cd61af664e75a18cbf3c016c2643c71691c1485d244bf272222",
+    "size": 145088,
+    "source": "/usr/lib/libexpat.so.1"
+  },
+  "lib/libffi.so.8": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libffi-3.5.2-r1",
+    "path": "lib/libffi.so.8",
+    "sha256": "05ff2c2379c35e867e039cf48b4eb390c0faa30c73b04b3b66f1cb86fb287fa2",
+    "size": 38960,
+    "source": "/usr/lib/libffi.so.8"
+  },
+  "lib/libfreebl3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libfreebl3.so",
+    "sha256": "440deece2248751c6617e892ea07bb2275f0ced193938c771b20a5f5c5e268f5",
+    "size": 14096,
+    "source": "/usr/lib/libfreebl3.so"
+  },
+  "lib/libfreeblpriv3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libfreeblpriv3.so",
+    "sha256": "b2eb73e6ca061d4d76bb079aef60fe3cb444c9f8d90efe31e336a7248f5f3c66",
+    "size": 1214304,
+    "source": "/usr/lib/libfreeblpriv3.so"
+  },
+  "lib/libgallium-26.1.6.so": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/mesa-26.1.6-r0",
+    "path": "lib/libgallium-26.1.6.so",
+    "sha256": "c3aa5413c4dbdc50f0e529ebade3fe8ea004af59da1a07412da21e13ed614518",
+    "size": 43945840,
+    "source": "/usr/lib/libgallium-26.1.6.so"
+  },
+  "lib/libgbm.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/mesa-gbm-26.1.6-r0",
+    "path": "lib/libgbm.so.1",
+    "sha256": "6ab0f48c1dc8e2b0356c6a30ef73765fd12bf29e21b1726dfda3006ff860dcfa",
+    "size": 18248,
+    "source": "/usr/lib/libgbm.so.1"
+  },
+  "lib/libgcc_s.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libgcc-15.2.0-r5",
+    "path": "lib/libgcc_s.so.1",
+    "sha256": "5ea51dd885b6fc691eccc569d0bda739204204f6161e97075b26dc9c050d1ca1",
+    "size": 173920,
+    "source": "/usr/lib/libgcc_s.so.1"
+  },
+  "lib/libgio-2.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/glib-2.88.1-r1",
+    "path": "lib/libgio-2.0.so.0",
+    "sha256": "bb4854cc6be3123456260503d2314b2237d6fb35dd1eb4d67207ae949a3b5ab2",
+    "size": 2022640,
+    "source": "/usr/lib/libgio-2.0.so.0"
+  },
+  "lib/libglib-2.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/glib-2.88.1-r1",
+    "path": "lib/libglib-2.0.so.0",
+    "sha256": "50373a625b8d57672972fc77b41d6d946fbb62241ff79b94e522ee6e61a22595",
+    "size": 1424408,
+    "source": "/usr/lib/libglib-2.0.so.0"
+  },
+  "lib/libgmodule-2.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/glib-2.88.1-r1",
+    "path": "lib/libgmodule-2.0.so.0",
+    "sha256": "79bae6097b6a877b9f2946620e9643662266460cb38dae165bdab3200e48ff42",
+    "size": 22208,
+    "source": "/usr/lib/libgmodule-2.0.so.0"
+  },
+  "lib/libgobject-2.0.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/glib-2.88.1-r1",
+    "path": "lib/libgobject-2.0.so.0",
+    "sha256": "c253d62e9dda18150d846978ca61817331b28a40c901dfd73c2d8a730fe9f317",
+    "size": 395264,
+    "source": "/usr/lib/libgobject-2.0.so.0"
+  },
+  "lib/libintl.so.8": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libintl-1.0-r0",
+    "path": "lib/libintl.so.8",
+    "sha256": "c43f799d118a30b411000220133bf8d297ef5b4684dbca30b45b605e484815a0",
+    "size": 136912,
+    "source": "/usr/lib/libintl.so.8"
+  },
+  "lib/liblzma.so.5": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/xz-libs-5.8.4-r0",
+    "path": "lib/liblzma.so.5",
+    "sha256": "6106974ac44f821cf97633527c65e7413be657a95e55aafb0885bf84743bb8a4",
+    "size": 227192,
+    "source": "/usr/lib/liblzma.so.5"
+  },
+  "lib/libmd.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libmd-1.2.0-r0",
+    "path": "lib/libmd.so.0",
+    "sha256": "4fd22b05b1297facf99c57988915345ff0ba033fbb2c6f07e4e3bb41fdedfeea",
+    "size": 63408,
+    "source": "/usr/lib/libmd.so.0"
+  },
+  "lib/libmount.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libmount-2.42.3-r1",
+    "path": "lib/libmount.so.1",
+    "sha256": "9b76c3563ed4d173e4b2d8f1e7249454e3d108d4b464120ef0c3644a5529c6f2",
+    "size": 293368,
+    "source": "/usr/lib/libmount.so.1"
+  },
+  "lib/libnspr4.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nspr-4.38.2-r0",
+    "path": "lib/libnspr4.so",
+    "sha256": "d200bd790620744fc619a26638c00cfde8ea20b214fc1670908f9e3bf97df13c",
+    "size": 246016,
+    "source": "/usr/lib/libnspr4.so"
+  },
+  "lib/libnss3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libnss3.so",
+    "sha256": "85472d0dfcdc0f85f9581aa2669b5402bed565abfe80b277b9c4b1d61d3cee6d",
+    "size": 1331720,
+    "source": "/usr/lib/libnss3.so"
+  },
+  "lib/libnssckbi.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libnssckbi.so",
+    "sha256": "e638b26ac29a6675a70de94bdd5d50256988d7e651ad0549c178b36f41a79f0f",
+    "size": 460984,
+    "source": "/usr/lib/libnssckbi.so"
+  },
+  "lib/libnssutil3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libnssutil3.so",
+    "sha256": "630bc4590ee03c38cfe84c006ce9cdbff97ad1479b57acfc2afa583ea30419a6",
+    "size": 186368,
+    "source": "/usr/lib/libnssutil3.so"
+  },
+  "lib/libpciaccess.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libpciaccess-0.19-r0",
+    "path": "lib/libpciaccess.so.0",
+    "sha256": "770fd8c6e58063b88a951d2d5ff686fc4f494cc460f8253f18f15cefc4495a84",
+    "size": 34512,
+    "source": "/usr/lib/libpciaccess.so.0"
+  },
+  "lib/libpcre2-8.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/pcre2-10.49-r0",
+    "path": "lib/libpcre2-8.so.0",
+    "sha256": "496ce2b43e3910e8c232105fa04cf1b47df8860f9ec90e75dde05303c2fc69be",
+    "size": 784352,
+    "source": "/usr/lib/libpcre2-8.so.0"
+  },
+  "lib/libplc4.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nspr-4.38.2-r0",
+    "path": "lib/libplc4.so",
+    "sha256": "f6f014b549805ee8237ccde489af672890b4d48be207ed30bf39a54c47071355",
+    "size": 22240,
+    "source": "/usr/lib/libplc4.so"
+  },
+  "lib/libplds4.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nspr-4.38.2-r0",
+    "path": "lib/libplds4.so",
+    "sha256": "f59b59ab7ec07b82c114683af83516f15778ce3cb1c3267d02ec9345a338ce8c",
+    "size": 14080,
+    "source": "/usr/lib/libplds4.so"
+  },
+  "lib/libsmime3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libsmime3.so",
+    "sha256": "833728949d4308e00d4224f66bcc6f387d0ac3d0b014866c4a8c8a8edf410e3e",
+    "size": 182184,
+    "source": "/usr/lib/libsmime3.so"
+  },
+  "lib/libsoftokn3.so": {
+    "class": "target",
+    "consumer": "TLS and certificates",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "N01",
+    "owner": "builder package/nss-3.133-r0",
+    "path": "lib/libsoftokn3.so",
+    "sha256": "036744d0a6aa712e213626245b8b90c19d8a85d43d85e984ba804cbac2620c67",
+    "size": 375840,
+    "source": "/usr/lib/libsoftokn3.so"
+  },
+  "lib/libsqlite3.so.0": {
+    "class": "target",
+    "consumer": "storage",
+    "disposition": "extend",
+    "mode": "0o755",
+    "obligation": "P01",
+    "owner": "builder package/sqlite-libs-3.53.4-r0",
+    "path": "lib/libsqlite3.so.0",
+    "sha256": "4290ff1e86e8c9204789104aed2a2eb562d7292ed9544c5ba235759ea1ff3281",
+    "size": 1640464,
+    "source": "/usr/lib/libsqlite3.so.0"
+  },
+  "lib/libstdc++.so.6": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libstdc++-15.2.0-r5",
+    "path": "lib/libstdc++.so.6",
+    "sha256": "67a940194aec6c44c3eb47a98e44c53d248e4dac5f4eb57c0971c0d6286eafe5",
+    "size": 2804104,
+    "source": "/usr/lib/libstdc++.so.6"
+  },
+  "lib/libudev.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/eudev-libs-3.2.14-r6",
+    "path": "lib/libudev.so.1",
+    "sha256": "d2bacf3c884443c5b63728f3cce0f93998b2316592b911975390c798f6fcfb3d",
+    "size": 55144,
+    "source": "/usr/lib/libudev.so.1"
+  },
+  "lib/libwayland-client.so.0": {
+    "class": "target",
+    "consumer": "Wayland session",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "R01",
+    "owner": "builder package/wayland-libs-client-1.25.0-r0",
+    "path": "lib/libwayland-client.so.0",
+    "sha256": "611dc1178c2369292b74040040dd152b7884a865eccc2c8b74e9eaff3d2f2839",
+    "size": 51864,
+    "source": "/usr/lib/libwayland-client.so.0"
+  },
+  "lib/libwayland-egl.so.1": {
+    "class": "target",
+    "consumer": "Wayland session",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "R01",
+    "owner": "builder package/wayland-libs-egl-1.25.0-r0",
+    "path": "lib/libwayland-egl.so.1",
+    "sha256": "694be1d3465aaa099cf63761b08bdfa66328e7a3e086df804285ca09d4bdf4a8",
+    "size": 13880,
+    "source": "/usr/lib/libwayland-egl.so.1"
+  },
+  "lib/libxcb-dri3.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-dri3.so.0",
+    "sha256": "f584b2eca04a2c089ecf9127252855ffa1684450376fda1d74f3368088d9f875",
+    "size": 18144,
+    "source": "/usr/lib/libxcb-dri3.so.0"
+  },
+  "lib/libxcb-present.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-present.so.0",
+    "sha256": "83e090bf1e523f120694c7676e168ed3068b8ae0164c86d7f02d8b09df3342f4",
+    "size": 14056,
+    "source": "/usr/lib/libxcb-present.so.0"
+  },
+  "lib/libxcb-randr.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-randr.so.0",
+    "sha256": "022e82d784c62f1dd3ba58cf1db5176d1855905ad6181b62c031f5d143661f1d",
+    "size": 63200,
+    "source": "/usr/lib/libxcb-randr.so.0"
+  },
+  "lib/libxcb-shm.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-shm.so.0",
+    "sha256": "bbc01db63523f38d313f8c4a9557e56df5970cc565a6b8bcb809d4448598c403",
+    "size": 14048,
+    "source": "/usr/lib/libxcb-shm.so.0"
+  },
+  "lib/libxcb-sync.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-sync.so.1",
+    "sha256": "0b05db7410598c0f79f80a535d0250b93cee7f23852fe802bfe69ce22408ec7e",
+    "size": 30432,
+    "source": "/usr/lib/libxcb-sync.so.1"
+  },
+  "lib/libxcb-xfixes.so.0": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb-xfixes.so.0",
+    "sha256": "2e98e1a986a53e0651da324cbe79dbfb75857a6c24728282931498c3f150eeb5",
+    "size": 34536,
+    "source": "/usr/lib/libxcb-xfixes.so.0"
+  },
+  "lib/libxcb.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxcb-1.17.0-r2",
+    "path": "lib/libxcb.so.1",
+    "sha256": "fd7bc55e8680c183fe038b22d5cc7407c323e3b1e1bd6ee488b57137124b0292",
+    "size": 153344,
+    "source": "/usr/lib/libxcb.so.1"
+  },
+  "lib/libxkbcommon.so.0": {
+    "class": "target",
+    "consumer": "keyboard input",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "R01",
+    "owner": "builder package/libxkbcommon-1.13.1-r0",
+    "path": "lib/libxkbcommon.so.0",
+    "sha256": "37b22c6df0f2718ce1dc3781f2e526d8650b11b767a3390bda336056dd18965b",
+    "size": 329696,
+    "source": "/usr/lib/libxkbcommon.so.0"
+  },
+  "lib/libxml2.so.2": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxml2-2.13.9-r2",
+    "path": "lib/libxml2.so.2",
+    "sha256": "c7742d413585cee3e2750472e04da810a7a9883a1c10a8270c2f6e8c56231ad7",
+    "size": 1072096,
+    "source": "/usr/lib/libxml2.so.2"
+  },
+  "lib/libxshmfence.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/libxshmfence-1.3.3-r0",
+    "path": "lib/libxshmfence.so.1",
+    "sha256": "d1b7ede7861e917aa4aba4c454a1c9012f82c63199b239a4b6c85ef0ac28145f",
+    "size": 13944,
+    "source": "/usr/lib/libxshmfence.so.1"
+  },
+  "lib/libz.so.1": {
+    "class": "target",
+    "consumer": "compression",
+    "disposition": "reuse",
+    "mode": "0o755",
+    "obligation": "Q01",
+    "owner": "builder package/zlib-1.4-r0",
+    "path": "lib/libz.so.1",
+    "sha256": "9995c2fe07ba436423709dd8ce6a186c2c6b3db7ac7719496a55554c4a95274e",
+    "size": 108376,
+    "source": "/usr/lib/libz.so.1"
+  },
+  "lib/libzstd.so.1": {
+    "class": "target",
+    "consumer": "platform runtime closure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "A04",
+    "owner": "builder package/zstd-libs-1.5.7-r2",
+    "path": "lib/libzstd.so.1",
+    "sha256": "a0a285da817a61e65d9e89bbfd38243cf8a4798cc429adc2772b5931f1d4fbb6",
+    "size": 714432,
+    "source": "/usr/lib/libzstd.so.1"
+  },
+  "libEGL.so": {
+    "class": "target",
+    "consumer": "browser user interface",
+    "disposition": "port",
+    "mode": "0o755",
+    "obligation": "A05",
+    "owner": "ui",
+    "path": "libEGL.so",
+    "producers": [
+      "//ui/gl:dummy_libEGL"
+    ],
+    "sha256": "ec20c5beb107b4d6b7e14bbf5f78ab0f174f747cfebb3da10c56ec61a12d5395",
+    "size": 375760,
+    "source": "/work/out/chromium-wayland-release/libEGL.so"
+  },
+  "libGLESv2.so": {
+    "class": "target",
+    "consumer": "browser user interface",
+    "disposition": "port",
+    "mode": "0o755",
+    "obligation": "A05",
+    "owner": "ui",
+    "path": "libGLESv2.so",
+    "producers": [
+      "//ui/gl:dummy_libGLESv2"
+    ],
+    "sha256": "57dead35fe29758d24f173f4f0175a59ed60385787c1b46f56f30d85397b3c89",
+    "size": 375760,
+    "source": "/work/out/chromium-wayland-release/libGLESv2.so"
+  },
+  "libVkICD_mock_icd.so": {
+    "class": "target",
+    "consumer": "Vulkan infrastructure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "I07",
+    "owner": "third_party/vulkan-tools",
+    "path": "libVkICD_mock_icd.so",
+    "producers": [
+      "//third_party/vulkan-tools/src:VkICD_mock_icd"
+    ],
+    "sha256": "5d9a99a4b9fdf13b0ea0f1b8a6ae2e5c571f19dbee75f686e1f29ae4a419d4c1",
+    "size": 698448,
+    "source": "/work/out/chromium-wayland-release/libVkICD_mock_icd.so"
+  },
+  "libVkLayer_khronos_validation.so": {
+    "class": "target",
+    "consumer": "Vulkan infrastructure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "I07",
+    "owner": "third_party/vulkan-validation-layers",
+    "path": "libVkLayer_khronos_validation.so",
+    "producers": [
+      "//third_party/vulkan-validation-layers/src:VkLayer_khronos_validation"
+    ],
+    "sha256": "5765b97ba4696e2f19018e2b569c27d6905963ee119df9e760ab03be516f8244",
+    "size": 27543784,
+    "source": "/work/out/chromium-wayland-release/libVkLayer_khronos_validation.so"
+  },
+  "libvk_swiftshader.so": {
+    "class": "target",
+    "consumer": "graphics",
+    "disposition": "extend",
+    "mode": "0o755",
+    "obligation": "I09",
+    "owner": "third_party/swiftshader",
+    "path": "libvk_swiftshader.so",
+    "producers": [
+      "//third_party/swiftshader/src/Vulkan:swiftshader_libvulkan"
+    ],
+    "sha256": "1e04606c69b2fc61b1e4ed34efc00755c764020e1785bc910877821125382fa3",
+    "size": 5854304,
+    "source": "/work/out/chromium-wayland-release/libvk_swiftshader.so"
+  },
+  "libvulkan.so.1": {
+    "class": "target",
+    "consumer": "Vulkan infrastructure",
+    "disposition": "remove",
+    "mode": "0o755",
+    "obligation": "I07",
+    "owner": "third_party/vulkan-loader",
+    "path": "libvulkan.so.1",
+    "producers": [
+      "//third_party/vulkan-loader/src:libvulkan"
+    ],
+    "sha256": "8c38918fab4e819f964e57bb9e161cdaab2896fb288390c0915abbc34dd5b0d5",
+    "size": 893232,
+    "source": "/work/out/chromium-wayland-release/libvulkan.so.1"
+  },
+  "locales/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "locales/en-US.pak": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "locales/en-US.pak",
+    "producers": [
+      "//chrome:packed_resources_locales_en-US"
+    ],
+    "sha256": "1702c3e405e1952d2b051ed5dc1326d53c752c02373f2c417ebca62ccaaaa1a3",
+    "size": 583147,
+    "source": "/work/out/chromium-wayland-release/locales/en-US.pak"
+  },
+  "package-manifest.json": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "oracle/build/scripts/package-runtime.py"
+  },
+  "pyproto/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "pyproto/google/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "pyproto/google/protobuf/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "pyproto/google/protobuf/__init__.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/__init__.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "5b3af98ae1b57e1de43e10adf3714503364f9d3ca3dfb596524c0a997d8f265b",
+    "size": 349,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/__init__.py"
+  },
+  "pyproto/google/protobuf/any.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/any.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "c90e0a770b8c79be8661dd7524d665cad940e77d129a3b071cc218910899ea9d",
+    "size": 1324,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/any.py"
+  },
+  "pyproto/google/protobuf/descriptor.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/descriptor.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "c82e91904557558e317ed4bbc12ed94e7a3b2fd6285a00cb42526c3e5a9eaf3d",
+    "size": 53321,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/descriptor.py"
+  },
+  "pyproto/google/protobuf/descriptor_database.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/descriptor_database.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "51bc95aac632c881e7fd7dc12e33ae8ef6e093e66f7978ab4018f4fb5cf5969d",
+    "size": 6345,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/descriptor_database.py"
+  },
+  "pyproto/google/protobuf/descriptor_pb2.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/descriptor_pb2.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "1fc7fde70dd922b96fc2a8d006e6a79ecd47ac2b4f9b281c9572e9f4991e31ae",
+    "size": 369823,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/descriptor_pb2.py"
+  },
+  "pyproto/google/protobuf/descriptor_pool.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/descriptor_pool.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "8d49f57de01248141361719819f37f994c41c057e6a8834d1663bf3b790ea4f6",
+    "size": 49027,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/descriptor_pool.py"
+  },
+  "pyproto/google/protobuf/duration.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/duration.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "760726b00e13605759b9400abe3114fdae3d8174bf3d0a66dd510f2883733cdc",
+    "size": 2675,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/duration.py"
+  },
+  "pyproto/google/protobuf/internal/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "pyproto/google/protobuf/internal/__init__.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/__init__.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "d84335c9e7fae8099f595f9407809ea95ae181d9fb685ba568a4c51461a9b9c2",
+    "size": 274,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/__init__.py"
+  },
+  "pyproto/google/protobuf/internal/api_implementation.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/api_implementation.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "732183edda12c8b742bd8ccda33111cc4b3d8f5f3dcd105867c3e48c428dedf5",
+    "size": 4621,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/api_implementation.py"
+  },
+  "pyproto/google/protobuf/internal/builder.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/builder.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "f081a4b9a6ffd5860a6b3863cc0dcc8a9b713c5145da2925aa2c7b2b764b8bb4",
+    "size": 4163,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/builder.py"
+  },
+  "pyproto/google/protobuf/internal/containers.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/containers.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "3750ddc124176fd39705396eeeae9e20759365b9ffbe15ed6bc0d19983466b32",
+    "size": 25620,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/containers.py"
+  },
+  "pyproto/google/protobuf/internal/decoder.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/decoder.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "33bbf78329f112000926202ca770cfb7b638ae217bea3889d8ad91c340045fe7",
+    "size": 37855,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/decoder.py"
+  },
+  "pyproto/google/protobuf/internal/encoder.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/encoder.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "6f31e1e91eb911e3e38cc3839164254a2d9532b12c542ae6b463a36995b0234a",
+    "size": 27019,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/encoder.py"
+  },
+  "pyproto/google/protobuf/internal/enum_type_wrapper.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/enum_type_wrapper.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "07db8d61f7cfa55345a6326f6074c0de9879a076a928efe041398af25c46cde5",
+    "size": 3902,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/enum_type_wrapper.py"
+  },
+  "pyproto/google/protobuf/internal/extension_dict.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/extension_dict.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "9086ad78f13d1192d1b7cc84339d990d159df383f203e722d7a119c1e954d422",
+    "size": 7265,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/extension_dict.py"
+  },
+  "pyproto/google/protobuf/internal/field_mask.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/field_mask.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "6e08f6fc34790820abefcec2faa4cb9e1d6669f772ae5b1dc345447bf9680b35",
+    "size": 11320,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/field_mask.py"
+  },
+  "pyproto/google/protobuf/internal/message_listener.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/message_listener.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "7e20253b0cc19aa9945f0703d831262583ffee4a2c49b07decf47ee981b236c7",
+    "size": 2008,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/message_listener.py"
+  },
+  "pyproto/google/protobuf/internal/python_edition_defaults.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/python_edition_defaults.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "7fb7071b6bc4845347c1f3312dcb8de0451949a476cbff94af7a793fa3097118",
+    "size": 645,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/python_edition_defaults.py"
+  },
+  "pyproto/google/protobuf/internal/python_message.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/python_message.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "e96cfd4bc319f648f1e1bfba84dfb14325f42a12e24dc7a7f0f34f52c8bac9e0",
+    "size": 59722,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/python_message.py"
+  },
+  "pyproto/google/protobuf/internal/type_checkers.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/type_checkers.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "7bce7c3965d6b8effc59cc5a2d3535cace9d59685185237e30a49328adc03227",
+    "size": 16832,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/type_checkers.py"
+  },
+  "pyproto/google/protobuf/internal/well_known_types.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/well_known_types.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "c9d564c17d883ab4ed3f235328432f9ae6b103cf165a39a29f597da01fdfb8b4",
+    "size": 23345,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/well_known_types.py"
+  },
+  "pyproto/google/protobuf/internal/wire_format.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/internal/wire_format.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf_internal"
+    ],
+    "sha256": "d2dd0306027223dba59383ddeb99dcac8c8f4ea008a30a279647724dab65a375",
+    "size": 7115,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/internal/wire_format.py"
+  },
+  "pyproto/google/protobuf/json_format.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/json_format.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "ff24132f8bd6c012fc7627ef25617dc03773289467e5ee15870ac8a523cdb7a0",
+    "size": 39427,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/json_format.py"
+  },
+  "pyproto/google/protobuf/message.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/message.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "81e225d8338b1070cc58540cc499b037e1cc68b9aa0797ca8c7da46c49c961a1",
+    "size": 15608,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/message.py"
+  },
+  "pyproto/google/protobuf/message_factory.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/message_factory.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "7b746231c1a91b890f98ee377a6a794bf1df35db1a5cdcf042257b9f5a4474ba",
+    "size": 6611,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/message_factory.py"
+  },
+  "pyproto/google/protobuf/proto.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/proto.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "83c112c806258488d7724a53a91d73177797f8510e14941c0372e0cbc6c768c1",
+    "size": 4403,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/proto.py"
+  },
+  "pyproto/google/protobuf/proto_builder.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/proto_builder.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "a21c42d6118c0340baa97485d99f251a518726a4afc03852429ddac49c16e4d4",
+    "size": 4249,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/proto_builder.py"
+  },
+  "pyproto/google/protobuf/proto_json.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/proto_json.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "ec414a61a96faf4332a3a4479473a3f1ca701616b7dd6b4a5e3228523b363ff1",
+    "size": 2966,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/proto_json.py"
+  },
+  "pyproto/google/protobuf/proto_text.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/proto_text.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "17f51bd35b9587c67f028aacf82062c3ad132f8f69640026f8758c805ee8d9b0",
+    "size": 4649,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/proto_text.py"
+  },
+  "pyproto/google/protobuf/reflection.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/reflection.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "feb2235110b1b989d9deabf1766d0c5c70db234bb08b277df409dfb598281809",
+    "size": 1247,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/reflection.py"
+  },
+  "pyproto/google/protobuf/runtime_version.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/runtime_version.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "e58327f339aeaf7633b08cf3e713be7ea476cf396c16488273c8d19b92140864",
+    "size": 3040,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/runtime_version.py"
+  },
+  "pyproto/google/protobuf/service_reflection.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/service_reflection.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "a14e400454a40c30d0fc60b9a5acb86d69a197664b20629aaf6daebf8f565db0",
+    "size": 10108,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/service_reflection.py"
+  },
+  "pyproto/google/protobuf/symbol_database.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/symbol_database.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "dea860011d12860b9b3e45d400d2809585af1528b881659454bcb132a81d1bac",
+    "size": 5752,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/symbol_database.py"
+  },
+  "pyproto/google/protobuf/text_encoding.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/text_encoding.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "3f04747bdb078d0b9e3349fff54c70a415cab1f6e136d49178a0fdd39ff16429",
+    "size": 3628,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/text_encoding.py"
+  },
+  "pyproto/google/protobuf/text_format.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/text_format.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "947d7a49770c5f107ffb7de2a672683a60c3179aebbe6f0c5468c7a19ddbd98d",
+    "size": 66522,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/text_format.py"
+  },
+  "pyproto/google/protobuf/timestamp.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/timestamp.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "025ff58a4cb080d1eb2879f626fab6376fbab4d5eecefd65205abb85f3be52d9",
+    "size": 3136,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/timestamp.py"
+  },
+  "pyproto/google/protobuf/unknown_fields.py": {
+    "class": "data",
+    "consumer": "third-party dependency",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "third_party/protobuf",
+    "path": "pyproto/google/protobuf/unknown_fields.py",
+    "producers": [
+      "//third_party/protobuf:copy_google_protobuf"
+    ],
+    "sha256": "88acc92aaaf091e59597cde441a3189fc45dc994a93e1755d2185d42a1dbf465",
+    "size": 3050,
+    "source": "/work/out/chromium-wayland-release/pyproto/google/protobuf/unknown_fields.py"
+  },
+  "resources.pak": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "resources.pak",
+    "producers": [
+      "//chrome:packed_resources_extra"
+    ],
+    "sha256": "4ebe42809659b444794cf1c8437c9e76f1258687743ed8867cfa79e920fa6ad6",
+    "size": 23577699,
+    "source": "/work/out/chromium-wayland-release/resources.pak"
+  },
+  "resources/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "resources/accessibility/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "resources/accessibility/reading_mode_gdocs_helper_manifest.json": {
+    "class": "data",
+    "consumer": "browser shell",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "chrome",
+    "path": "resources/accessibility/reading_mode_gdocs_helper_manifest.json",
+    "producers": [
+      "//chrome/browser/resources/accessibility:reading_mode_gdocs_helper_manifest"
+    ],
+    "sha256": "b0a8ac7c5f45a71ae311356f31ca85545c65bc70ead958b016c4f39e8c2beb88",
+    "size": 2387,
+    "source": "/work/out/chromium-wayland-release/resources/accessibility/reading_mode_gdocs_helper_manifest.json"
+  },
+  "resources/helium_adblock/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "resources/helium_adblock/assets/": {
+    "class": "data",
+    "consumer": "archive layout",
+    "disposition": "retain-oracle-only",
+    "obligation": "A03",
+    "owner": "oracle packaging",
+    "source": "archive directory"
+  },
+  "resources/helium_adblock/assets/assets.json": {
+    "class": "data",
+    "consumer": "browser features",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "components",
+    "path": "resources/helium_adblock/assets/assets.json",
+    "producers": [
+      "//components/helium_adblock/resources:adblock_desktop_catalog"
+    ],
+    "sha256": "e1faa0710c49c50a694a59636f2c49d77a879a11caae3c9b632b506eae63cf9b",
+    "size": 32105,
+    "source": "/work/out/chromium-wayland-release/resources/helium_adblock/assets/assets.json"
+  },
+  "resources/helium_adblock/resources.json": {
+    "class": "data",
+    "consumer": "browser features",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "A05",
+    "owner": "components",
+    "path": "resources/helium_adblock/resources.json",
+    "producers": [
+      "//components/helium_adblock/resources:adblock_desktop_resources"
+    ],
+    "sha256": "3a2cdd9c50baa201a8fc78748662cfd4de9735cd82119c843045a98b8e0e6b52",
+    "size": 414558,
+    "source": "/work/out/chromium-wayland-release/resources/helium_adblock/resources.json"
+  },
+  "snapshot_blob.bin": {
+    "class": "data",
+    "consumer": "JavaScript engine",
+    "disposition": "port",
+    "mode": "0o644",
+    "obligation": "E01",
+    "owner": "v8",
+    "path": "snapshot_blob.bin",
+    "producers": [
+      "//v8:run_mksnapshot_default"
+    ],
+    "sha256": "29b7cc93dff5d6a695fac6fd97cc4e412dbb225bc338618b1beb7d9b9774e69e",
+    "size": 391248,
+    "source": "/work/out/chromium-wayland-release/snapshot_blob.bin"
+  },
+  "v8_context_snapshot.bin": {
+    "class": "data",
+    "consumer": "oracle build",
+    "disposition": "retain-oracle-only",
+    "mode": "0o644",
+    "obligation": "A03",
+    "owner": "tools",
+    "path": "v8_context_snapshot.bin",
+    "producers": [
+      "//tools/v8_context_snapshot:generate_v8_context_snapshot"
+    ],
+    "sha256": "7b44b5a07db949db031b47b3949d445fb0fb2cbeccd94aeed4a4545288c8e73d",
+    "size": 769824,
+    "source": "/work/out/chromium-wayland-release/v8_context_snapshot.bin"
+  },
+  "vk_swiftshader_icd.json": {
+    "class": "data",
+    "consumer": "graphics",
+    "disposition": "extend",
+    "mode": "0o644",
+    "obligation": "I09",
+    "owner": "third_party/swiftshader",
+    "path": "vk_swiftshader_icd.json",
+    "producers": [
+      "//third_party/swiftshader/src/Vulkan:icd_file"
+    ],
+    "sha256": "c9eef28b6b984fec220ef0abfecc40b502d46946706e47bfe97707027cb818bd",
+    "size": 107,
+    "source": "/work/out/chromium-wayland-release/vk_swiftshader_icd.json"
+  }
+}

@@ -42,6 +42,8 @@ contract-selftest:
 	python3 -B oracle/launch/contract/selftest.py
 
 .PHONY: box
+census:
+	python3 -B oracle/probes/census/census.py
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
 
@@ -52,3 +54,4 @@ assembly:
 .PHONY: capability-probes
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
+.PHONY: setup check lint test artifact-selftest oracle-launch oracle-gate-a census box assembly

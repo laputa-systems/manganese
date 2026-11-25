@@ -26,3 +26,6 @@ de91df0559b1b33ed7f289229e2bf065cbb72f59dd20005ef2751b1b3099b11a  ./capability/p
 37a0dc503ecf7ae674b1c26f62898975c57847930a302007660510e494d4a0a4  ./capability/webgl.json
 03ee1b3171a03b6b7a9b8897ff43063eb7a6a7019d902e1a34e9afa611156095  ./capability/webrtc.json
 786f5f005e567fe0f3b5a801903ed6ea065d3185f8381c95ec00d9255c6fd600  ./capability/xslt.json
+8394e31fe14ed6e829ee758ae7e0e17ef535e63e1d0838c7b449d54b9f32bdce  ./census/staged.json
+a8b70acfdf0aeae0ee61a8371072aeebe4be842ca9254917a2028edc8987366d  ./census/store-manifest.txt
+e5e9f5d56dde0ca10d1a93e13e96edcfbc87627f17c77882c95e4d1fdfc272be  ./census/summary.json
