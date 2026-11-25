@@ -22,17 +22,20 @@ static int record(const unsigned char *in, uint32_t n, unsigned char **result, u
     if (!out) return -1;
     z_stream stream = {0};
     int status = Z_OK;
-    uLong sum = op == 2 ? crc32(0, Z_NULL, 0) : adler32(0, Z_NULL, 0);
+    uLong sum = (op == 2 || op == 4) ? crc32(0, Z_NULL, 0) : adler32(0, Z_NULL, 0);
     if (op == 0) status = deflateInit2(&stream, level, Z_DEFLATED, window, mem, strategy);
     else if (op == 1) status = inflateInit2(&stream, window);
-    else if (op > 3) { free(out); return -1; }
+    else if (op > 5) { free(out); return -1; }
     int initialized = status == Z_OK;
     for (unsigned i = 0; i < chunks; i++) {
         if (pos + 5 > n) { free(out); return -1; }
         uint32_t len = get32(in + pos); int flush = in[pos + 4]; pos += 5;
         if (len > n - pos) { free(out); return -1; }
-        if (op >= 2) sum = op == 2 ? crc32(sum, in + pos, len) : adler32(sum, in + pos, len);
-        else if (initialized && status >= 0 && status != Z_STREAM_END) {
+        if (op == 2) sum = crc32(sum, in + pos, len);
+        else if (op == 3) sum = adler32(sum, in + pos, len);
+        else if (op == 4) sum = crc32_combine(sum, crc32(0, in + pos, len), len);
+        else if (op == 5) sum = adler32_combine(sum, adler32(1, in + pos, len), len);
+        else if (initialized && status == Z_OK) {
             stream.next_in = (Bytef *)(in + pos); stream.avail_in = len;
             do {
                 if (cap - used < 65536) {
@@ -43,16 +46,27 @@ static int record(const unsigned char *in, uint32_t n, unsigned char **result, u
                 stream.next_out = out + used; stream.avail_out = 65536;
                 status = op == 0 ? deflate(&stream, flush) : inflate(&stream, flush);
                 used += 65536 - stream.avail_out;
-                if (status < 0 || status == Z_STREAM_END) break;
+                if (status != Z_OK) break;
             } while (stream.avail_in || stream.avail_out == 0);
         }
         pos += len;
     }
     if (pos != n) { free(out); return -1; }
+    const char *msg = stream.msg ? stream.msg : "";
+    size_t msglen = strlen(msg);
+    if (used + msglen + 4 > cap) {
+        unsigned char *next = realloc(out, used + msglen + 4);
+        if (!next) { free(out); return -1; }
+        out = next;
+    }
+    memmove(out + 8 + msglen, out + 4, used - 4);
+    put32(out + 4, (uint32_t)msglen);
+    memcpy(out + 8, msg, msglen);
+    used += 4 + msglen;
     if (initialized && op == 0) deflateEnd(&stream);
     if (initialized && op == 1) inflateEnd(&stream);
     put32(out, (uint32_t)status);
-    if (op >= 2) { put32(out + 4, (uint32_t)sum); used = 8; }
+    if (op >= 2) { put32(out + 8, (uint32_t)sum); used = 12; }
     *result = out; *size = (uint32_t)used; return 0;
 }
 
