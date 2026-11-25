@@ -5,7 +5,7 @@ import time
 import urllib.request
 
 sys.path.insert(0, '/launch')
-from cdp import Cdp
+from cdp import Cdp, CdpError
 
 seed = sys.argv[1] == 'seed'
 c = Cdp.connect()
@@ -63,9 +63,12 @@ if seed:
         return events
 
     default_events = click_download()
-    histogram = c.send('Browser.getHistogram', {'name':'Download.CancelReason'})
+    try:
+        histogram = c.send('Browser.getHistogram', {'name':'Download.CancelReason'})
+    except CdpError as error:
+        histogram = {'error':str(error)}
     canceled = any(x['method'] == 'Browser.downloadProgress' and x['params'].get('state') == 'canceled' for x in default_events)
-    confirmation = any(x['low'] == 1 and x['count'] > 0 for x in histogram['histogram']['buckets'])
+    confirmation = any(x['low'] == 1 and x['count'] > 0 for x in histogram.get('histogram', {}).get('buckets', []))
     result['default_behavior_download'] = 'canceled-target-confirmation' if canceled and confirmation else 'other'
     result['default_download_events'] = default_events
     result['default_cancel_histogram'] = histogram
