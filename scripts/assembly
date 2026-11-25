@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+id=${1:?usage: scripts/assembly ID}
+case $id in *[!a-z0-9_-]*|'') echo "invalid assembly id" >&2; exit 2 ;; esac
+if [ ! -f "crates/asm-$id/Cargo.toml" ]; then
+    echo "unknown assembly: $id" >&2
+    exit 1
+fi
+mkdir -p .work/tmp
+TMPDIR=$root/.work/tmp
+CARGO_TARGET_DIR=$root/.work/tmp/target
+RUSTC_WRAPPER=kache
+export TMPDIR CARGO_TARGET_DIR RUSTC_WRAPPER
+exec cargo test --locked --offline --target x86_64-unknown-linux-musl -p "asm-$id"

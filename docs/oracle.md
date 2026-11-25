@@ -82,7 +82,7 @@ Most work happens in L0. Day-to-day work never builds Chromium.
 
 | Lane | What runs | Where and how long | Needs Chromium |
 |---|---|---|---|
-| L0 goldens | `cargo nextest` for one crate against its stored goldens, with kache as `RUSTC_WRAPPER` | The campaign host, seconds | No |
+| L0 goldens | The runner checks one crate against stored goldens and its prebuilt oracle harness, with kache as `RUSTC_WRAPPER` | The campaign host, seconds | Prebuilt harness only |
 | L1 live oracle | The holdout corpus and differential fuzzing of one crate against its box's prebuilt oracle harness | The campaign host, minutes | Prebuilt harness only |
 | L2 assembly | Rust-only assemblies against their own goldens | The campaign host, minutes to an hour | No |
 | L3 contract | A Manganese archive against the appliance contract in containers: the frozen verifier, the launch harness, readiness, sandbox and shutdown, the frozen client workloads and the persona report, compared with the oracle archive under the same harness | The campaign host, from M8 | No |
@@ -101,3 +101,56 @@ Smolith enters through the first service box, the DevTools HTTP and WebSocket en
 3. Hill-climb in L0 until the scoreboard is exact, or within the box's approved tolerance.
 4. Run L1 on the holdout set and under differential fuzzing. Merge only when both are clean.
 5. Feed the crate into the next assembly.
+
+## Box runner reference
+
+`boxes/<id>/box.toml` uses one top-level key per declaration. The runner accepts
+basic double-quoted strings without escapes and decimal integers. It rejects
+unknown, duplicate, empty and omitted keys. `seam`, `streaming`, `reentrancy`,
+`callbacks`, `threading`, `corpus_sources`, `environment`,
+`varying_relationships`, `ordering`, `oracle_defects`, `improvements` and
+`anchor` describe the U15 contract. For an inapplicable declaration, write
+`none: ` followed by a reason. A present defect or improvement includes its
+absolute assertion after `assert: `. Present varying values include their
+relationship check after `check: `. `wire_version` is `1`.
+
+`comparison` is `exact` or `tolerance`; `observable_surface` names the output's
+observable surface. The tolerance class also needs `tolerance_bound`, a
+nonnegative finite decimal encoded as a string. Tolerance compares a single
+finite UTF-8 number by absolute difference. `arm64_evidence` starts with
+`captures: `, `public_api: `, `harness: ` or `assembly: ` and names that path.
+`holdout_percent` is an integer from 30 to 99. `oracle` and `candidate` name
+executable paths relative to the repository root. The selftest spec is a
+complete example.
+
+`goldens.lock` has one whitespace-separated row per corpus item: box ID, lane
+(`seen` or `holdout`), item ID, input SHA-256, input byte count, output SHA-256
+and output byte count. The runner reads the blobs from `sha256/<digest>` under
+`MANGANESE_STORE`, defaulting to `~/.local/share/manganese/store`. It validates
+each loaded blob's length and digest and refuses a digest shared across the
+seen and holdout sets. The actual holdout share must meet the spec. The
+synthetic selftest generates its blobs in a temporary store under `.work/tmp`.
+
+Protocol version 1 begins with the four bytes `MGB1` on both stdin and stdout.
+Each request and response is a four-byte big-endian length followed by that
+many bytes, at most 2^32-1 bytes. A peer returns one response for each request, in
+order, and writes diagnostics only to stderr. EOF closes the request stream.
+The runner starts a fresh process for each item and sends one request. It runs
+the oracle twice in separate processes for every item and checks all oracle
+results before starting any candidate. Oracle output must equal the recorded
+golden even for a tolerance comparator.
+
+Run `make box BOX=<id>` for L0 or `make box BOX=<id> LANE=holdout` for L1.
+L0 loads seen blobs only, then applies Linux Landlock before invoking either
+adapter. The sandbox permits read and execution of the adapter binaries and
+runtime libraries but denies access to the blob store. L0 fails closed when
+Landlock is unavailable. L1 loads holdout blobs and runs the same oracle and
+candidate comparisons. The separate differential-fuzz lane is owned by
+`m1-fuzz-lane`.
+
+`boxes/<id>/scoreboard.toml` records version 1 and the set of passing seen
+items. A previously passing item that fails is a regression. Run
+`make box BOX=<id> LANE=ratchet` to atomically record newly passing items;
+ordinary runs do not update the scoreboard. `make box BOX=selftest` runs the
+framework's synthetic acceptance cases. `make assembly A=<id>` runs the named
+assembly crate's tests; each assembly owns its golden comparisons.
