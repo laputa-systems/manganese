@@ -1,3 +1,4 @@
+import os
 import asyncio
 import base64
 import hashlib
@@ -18,7 +19,7 @@ def cdp_sockets():
 
 
 async def main():
-    browser, tab = await connect_browser('http://127.0.0.1:9221', stealth=False)
+    browser, tab = await connect_browser(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'), stealth=False)
     try:
         version = await browser.command('Browser.getVersion')
         targets = await browser.command('Target.getTargets')
@@ -98,7 +99,7 @@ async def main():
                 break
             await asyncio.sleep(0.1)
         confirm = await tab.evaluate('document.body.dataset.confirm')
-        monitor = Cdp.connect()
+        monitor = Cdp.connect(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
         monitor.send('Browser.setDownloadBehavior', {'behavior':'allow', 'downloadPath':'/home/browser/Downloads', 'eventsEnabled':True})
         await tab.activate()
         await tab.command('Page.bringToFront')
@@ -131,7 +132,7 @@ async def main():
     await asyncio.sleep(0.2)
     before = cdp_sockets()
     for _ in range(10):
-        browser, tab = await connect_browser('http://127.0.0.1:9221', stealth=False)
+        browser, tab = await connect_browser(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'), stealth=False)
         try:
             await browser.command('Browser.getVersion')
         finally:

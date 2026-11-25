@@ -1,3 +1,4 @@
+import os
 import json
 import sys
 import time
@@ -5,7 +6,7 @@ import time
 sys.path.insert(0, '/launch')
 from cdp import Cdp
 
-c = Cdp.connect()
+c = Cdp.connect(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
 c.send('Browser.setDownloadBehavior', {'behavior':'allow', 'downloadPath':'/home/browser/Downloads', 'eventsEnabled':True})
 extensions = c.send('Extensions.getExtensions')['extensions']
 extension = next(item for item in extensions if item['name'] == 'Browser Extensions' and item['enabled'])

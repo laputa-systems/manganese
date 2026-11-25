@@ -13,7 +13,7 @@ import launch
 
 
 def run(run_dir: Path, archive: launch.Archive, preferences: Callable[[Path, bool], object],
-        selected: set[str]) -> dict[str, dict[str, object]]:
+        selected: set[str], endpoint: str = "http://127.0.0.1:9221") -> dict[str, dict[str, object]]:
     directory = run_dir / 'clients'
     directory.mkdir()
     browser_root = launch.verified_root(archive)
@@ -27,7 +27,7 @@ def run(run_dir: Path, archive: launch.Archive, preferences: Callable[[Path, boo
     jobs = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=7) as executor:
         def submit(name: str, function: Callable[..., object], *args: object) -> None:
-            jobs[name] = executor.submit(function, directory / name, browser_root, *args)
+            jobs[name] = executor.submit(function, directory / name, browser_root, *args, endpoint)
         if '7.5' in selected:
             submit('browser-use-cli', client_browser_use.run, images['browser-use'], preferences, 'cli')
             submit('browser-use-library', client_browser_use.run, images['browser-use'], preferences, 'library')

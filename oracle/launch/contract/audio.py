@@ -1,3 +1,4 @@
+import os
 import base64
 import json
 import sys
@@ -20,7 +21,7 @@ async function startAudio() {
  return {state:context.state,node:!!node,sampleRate:context.sampleRate};
 }
 </script>'''
-client = Cdp.connect()
+client = Cdp.connect(os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
 client.send('Target.setDiscoverTargets', {'discover': True})
 pages = []
 targets = []

@@ -81,3 +81,6 @@ zlib-anchor:
 .PHONY: abi-census
 abi-census:
 	python3 -B oracle/probes/abi/census.py
+.PHONY: cdp-trace
+cdp-trace:
+	python3 -B oracle/probes/cdp/run.py

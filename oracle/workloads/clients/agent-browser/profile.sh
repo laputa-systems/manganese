@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-export AGENT_BROWSER_CDP=http://127.0.0.1:9221
+export AGENT_BROWSER_CDP="${CDP_ENDPOINT:-http://127.0.0.1:9221}"
 case "$1" in
     seed) url='http://forms.test/profile?seed' ;;
     read) url='http://forms.test/profile' ;;

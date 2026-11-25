@@ -177,3 +177,5 @@ items. A previously passing item that fails is a regression. Run
 ordinary runs do not update the scoreboard. `make box BOX=selftest` runs the
 framework's synthetic acceptance cases. `make assembly A=<id>` runs the named
 assembly crate's tests; each assembly owns its golden comparisons.
+
+`make cdp-trace` records the frozen client, extension, native automation and audio CDP exchanges through a loopback proxy and reduces them to the sorted inventory in `oracle/frozen/cdp/`. String values are recorded as types, and event counts are omitted.

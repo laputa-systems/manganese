@@ -18,7 +18,7 @@ async def main():
     connections = []
     mode = os.environ.get('PROFILE_MODE')
     for _ in range(1 if mode else 10):
-        browser = Browser(cdp_url='http://127.0.0.1:9221')
+        browser = Browser(cdp_url=os.environ.get('CDP_ENDPOINT', 'http://127.0.0.1:9221'))
         try:
             environment = await browser.start()
             connections.append(environment)

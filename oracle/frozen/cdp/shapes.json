@@ -1,0 +1,3890 @@
+{
+  "archive": {
+    "identity": "frozen:hydrogen-r2-amd64",
+    "sha256": "0103d7fded225b8c03883cb82fd15887939facafaba33d75d7831dcb2fa926e7"
+  },
+  "events": {
+    "Browser.downloadProgress": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "filePath": [
+          "string"
+        ],
+        "guid": [
+          "string"
+        ],
+        "receivedBytes": [
+          "number"
+        ],
+        "state": [
+          "string"
+        ],
+        "totalBytes": [
+          "number"
+        ]
+      }
+    },
+    "Browser.downloadWillBegin": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "guid": [
+          "string"
+        ],
+        "suggestedFilename": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "DOM.attributeModified": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "nodeId": [
+          "number"
+        ],
+        "value": [
+          "string"
+        ]
+      }
+    },
+    "DOM.childNodeRemoved": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "nodeId": [
+          "number"
+        ],
+        "parentNodeId": [
+          "number"
+        ]
+      }
+    },
+    "DOM.documentUpdated": {
+      "event": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "DOM.setChildNodes": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "nodes": [
+          "array"
+        ],
+        "nodes[]": [
+          "object"
+        ],
+        "nodes[].attributes": [
+          "array"
+        ],
+        "nodes[].attributes[]": [
+          "string"
+        ],
+        "nodes[].backendNodeId": [
+          "number"
+        ],
+        "nodes[].childNodeCount": [
+          "number"
+        ],
+        "nodes[].children": [
+          "array"
+        ],
+        "nodes[].children[]": [
+          "object"
+        ],
+        "nodes[].children[].backendNodeId": [
+          "number"
+        ],
+        "nodes[].children[].localName": [
+          "string"
+        ],
+        "nodes[].children[].nodeId": [
+          "number"
+        ],
+        "nodes[].children[].nodeName": [
+          "string"
+        ],
+        "nodes[].children[].nodeType": [
+          "number"
+        ],
+        "nodes[].children[].nodeValue": [
+          "string"
+        ],
+        "nodes[].children[].parentId": [
+          "number"
+        ],
+        "nodes[].contentDocument": [
+          "object"
+        ],
+        "nodes[].contentDocument.backendNodeId": [
+          "number"
+        ],
+        "nodes[].contentDocument.baseURL": [
+          "string"
+        ],
+        "nodes[].contentDocument.childNodeCount": [
+          "number"
+        ],
+        "nodes[].contentDocument.compatibilityMode": [
+          "string"
+        ],
+        "nodes[].contentDocument.documentURL": [
+          "string"
+        ],
+        "nodes[].contentDocument.localName": [
+          "string"
+        ],
+        "nodes[].contentDocument.nodeId": [
+          "number"
+        ],
+        "nodes[].contentDocument.nodeName": [
+          "string"
+        ],
+        "nodes[].contentDocument.nodeType": [
+          "number"
+        ],
+        "nodes[].contentDocument.nodeValue": [
+          "string"
+        ],
+        "nodes[].contentDocument.xmlVersion": [
+          "string"
+        ],
+        "nodes[].frameId": [
+          "string"
+        ],
+        "nodes[].localName": [
+          "string"
+        ],
+        "nodes[].nodeId": [
+          "number"
+        ],
+        "nodes[].nodeName": [
+          "string"
+        ],
+        "nodes[].nodeType": [
+          "number"
+        ],
+        "nodes[].nodeValue": [
+          "string"
+        ],
+        "nodes[].parentId": [
+          "number"
+        ],
+        "nodes[].shadowRoots": [
+          "array"
+        ],
+        "nodes[].shadowRoots[]": [
+          "object"
+        ],
+        "nodes[].shadowRoots[].backendNodeId": [
+          "number"
+        ],
+        "nodes[].shadowRoots[].childNodeCount": [
+          "number"
+        ],
+        "nodes[].shadowRoots[].localName": [
+          "string"
+        ],
+        "nodes[].shadowRoots[].nodeId": [
+          "number"
+        ],
+        "nodes[].shadowRoots[].nodeName": [
+          "string"
+        ],
+        "nodes[].shadowRoots[].nodeType": [
+          "number"
+        ],
+        "nodes[].shadowRoots[].nodeValue": [
+          "string"
+        ],
+        "nodes[].shadowRoots[].shadowRootType": [
+          "string"
+        ],
+        "parentId": [
+          "number"
+        ]
+      }
+    },
+    "Fetch.requestPaused": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "networkId": [
+          "string"
+        ],
+        "request": [
+          "object"
+        ],
+        "request.headers": [
+          "object"
+        ],
+        "request.headers.Accept": [
+          "string"
+        ],
+        "request.headers.Referer": [
+          "string"
+        ],
+        "request.headers.Upgrade-Insecure-Requests": [
+          "string"
+        ],
+        "request.headers.User-Agent": [
+          "string"
+        ],
+        "request.headers.sec-ch-ua": [
+          "string"
+        ],
+        "request.headers.sec-ch-ua-mobile": [
+          "string"
+        ],
+        "request.headers.sec-ch-ua-platform": [
+          "string"
+        ],
+        "request.initialPriority": [
+          "string"
+        ],
+        "request.method": [
+          "string"
+        ],
+        "request.referrerPolicy": [
+          "string"
+        ],
+        "request.url": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "resourceType": [
+          "string"
+        ]
+      }
+    },
+    "Inspector.detached": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "reason": [
+          "string"
+        ]
+      }
+    },
+    "Network.dataReceived": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "dataLength": [
+          "number"
+        ],
+        "encodedDataLength": [
+          "number"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ]
+      }
+    },
+    "Network.loadingFailed": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "canceled": [
+          "boolean"
+        ],
+        "errorText": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ],
+        "type": [
+          "string"
+        ]
+      }
+    },
+    "Network.loadingFinished": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "encodedDataLength": [
+          "number"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ]
+      }
+    },
+    "Network.policyUpdated": {
+      "event": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Network.requestWillBeSent": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "documentURL": [
+          "string"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "hasUserGesture": [
+          "boolean"
+        ],
+        "initiator": [
+          "object"
+        ],
+        "initiator.columnNumber": [
+          "number"
+        ],
+        "initiator.lineNumber": [
+          "number"
+        ],
+        "initiator.stack": [
+          "object"
+        ],
+        "initiator.stack.callFrames": [
+          "array"
+        ],
+        "initiator.stack.callFrames[]": [
+          "object"
+        ],
+        "initiator.stack.callFrames[].columnNumber": [
+          "number"
+        ],
+        "initiator.stack.callFrames[].functionName": [
+          "string"
+        ],
+        "initiator.stack.callFrames[].lineNumber": [
+          "number"
+        ],
+        "initiator.stack.callFrames[].scriptId": [
+          "string"
+        ],
+        "initiator.stack.callFrames[].url": [
+          "string"
+        ],
+        "initiator.type": [
+          "string"
+        ],
+        "initiator.url": [
+          "string"
+        ],
+        "loaderId": [
+          "string"
+        ],
+        "redirectHasExtraInfo": [
+          "boolean"
+        ],
+        "request": [
+          "object"
+        ],
+        "request.hasPostData": [
+          "boolean"
+        ],
+        "request.headers": [
+          "object"
+        ],
+        "request.headers.Accept-Language": [
+          "string"
+        ],
+        "request.headers.Content-Type": [
+          "string"
+        ],
+        "request.headers.Origin": [
+          "string"
+        ],
+        "request.headers.Referer": [
+          "string"
+        ],
+        "request.headers.Upgrade-Insecure-Requests": [
+          "string"
+        ],
+        "request.headers.User-Agent": [
+          "string"
+        ],
+        "request.initialPriority": [
+          "string"
+        ],
+        "request.isSameSite": [
+          "boolean"
+        ],
+        "request.method": [
+          "string"
+        ],
+        "request.mixedContentType": [
+          "string"
+        ],
+        "request.postData": [
+          "string"
+        ],
+        "request.postDataEntries": [
+          "array"
+        ],
+        "request.postDataEntries[]": [
+          "object"
+        ],
+        "request.postDataEntries[].bytes": [
+          "string"
+        ],
+        "request.referrerPolicy": [
+          "string"
+        ],
+        "request.url": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ],
+        "type": [
+          "string"
+        ],
+        "wallTime": [
+          "number"
+        ]
+      }
+    },
+    "Network.requestWillBeSentExtraInfo": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "associatedCookies": [
+          "array"
+        ],
+        "associatedCookies[]": [
+          "object"
+        ],
+        "associatedCookies[].blockedReasons": [
+          "array"
+        ],
+        "associatedCookies[].cookie": [
+          "object"
+        ],
+        "associatedCookies[].cookie.domain": [
+          "string"
+        ],
+        "associatedCookies[].cookie.expires": [
+          "number"
+        ],
+        "associatedCookies[].cookie.httpOnly": [
+          "boolean"
+        ],
+        "associatedCookies[].cookie.name": [
+          "string"
+        ],
+        "associatedCookies[].cookie.path": [
+          "string"
+        ],
+        "associatedCookies[].cookie.priority": [
+          "string"
+        ],
+        "associatedCookies[].cookie.sameSite": [
+          "string"
+        ],
+        "associatedCookies[].cookie.secure": [
+          "boolean"
+        ],
+        "associatedCookies[].cookie.session": [
+          "boolean"
+        ],
+        "associatedCookies[].cookie.size": [
+          "number"
+        ],
+        "associatedCookies[].cookie.sourcePort": [
+          "number"
+        ],
+        "associatedCookies[].cookie.sourceScheme": [
+          "string"
+        ],
+        "associatedCookies[].cookie.value": [
+          "string"
+        ],
+        "associatedCookies[].exemptionReason": [
+          "string"
+        ],
+        "clientSecurityState": [
+          "object"
+        ],
+        "clientSecurityState.initiatorIPAddressSpace": [
+          "string"
+        ],
+        "clientSecurityState.initiatorIsSecureContext": [
+          "boolean"
+        ],
+        "clientSecurityState.localNetworkAccessRequestPolicy": [
+          "string"
+        ],
+        "connectTiming": [
+          "object"
+        ],
+        "connectTiming.requestTime": [
+          "number"
+        ],
+        "headers": [
+          "object"
+        ],
+        "headers.Accept": [
+          "string"
+        ],
+        "headers.Accept-Encoding": [
+          "string"
+        ],
+        "headers.Accept-Language": [
+          "string"
+        ],
+        "headers.Cache-Control": [
+          "string"
+        ],
+        "headers.Connection": [
+          "string"
+        ],
+        "headers.Content-Length": [
+          "string"
+        ],
+        "headers.Content-Type": [
+          "string"
+        ],
+        "headers.Cookie": [
+          "string"
+        ],
+        "headers.Host": [
+          "string"
+        ],
+        "headers.Origin": [
+          "string"
+        ],
+        "headers.Referer": [
+          "string"
+        ],
+        "headers.Upgrade-Insecure-Requests": [
+          "string"
+        ],
+        "headers.User-Agent": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "siteHasCookieInOtherPartition": [
+          "boolean"
+        ]
+      }
+    },
+    "Network.responseReceived": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "hasExtraInfo": [
+          "boolean"
+        ],
+        "loaderId": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "response": [
+          "object"
+        ],
+        "response.alternateProtocolUsage": [
+          "string"
+        ],
+        "response.charset": [
+          "string"
+        ],
+        "response.connectionId": [
+          "number"
+        ],
+        "response.connectionReused": [
+          "boolean"
+        ],
+        "response.encodedDataLength": [
+          "number"
+        ],
+        "response.fromDiskCache": [
+          "boolean"
+        ],
+        "response.fromPrefetchCache": [
+          "boolean"
+        ],
+        "response.fromServiceWorker": [
+          "boolean"
+        ],
+        "response.headers": [
+          "object"
+        ],
+        "response.headers.Content-Length": [
+          "string"
+        ],
+        "response.headers.Content-Type": [
+          "string"
+        ],
+        "response.headers.Date": [
+          "string"
+        ],
+        "response.headers.Server": [
+          "string"
+        ],
+        "response.mimeType": [
+          "string"
+        ],
+        "response.protocol": [
+          "string"
+        ],
+        "response.remoteIPAddress": [
+          "string"
+        ],
+        "response.remotePort": [
+          "number"
+        ],
+        "response.responseTime": [
+          "number"
+        ],
+        "response.securityState": [
+          "string"
+        ],
+        "response.status": [
+          "number"
+        ],
+        "response.statusText": [
+          "string"
+        ],
+        "response.timing": [
+          "object"
+        ],
+        "response.timing.connectEnd": [
+          "number"
+        ],
+        "response.timing.connectStart": [
+          "number"
+        ],
+        "response.timing.dnsEnd": [
+          "number"
+        ],
+        "response.timing.dnsStart": [
+          "number"
+        ],
+        "response.timing.proxyEnd": [
+          "number"
+        ],
+        "response.timing.proxyStart": [
+          "number"
+        ],
+        "response.timing.pushEnd": [
+          "number"
+        ],
+        "response.timing.pushStart": [
+          "number"
+        ],
+        "response.timing.receiveHeadersEnd": [
+          "number"
+        ],
+        "response.timing.receiveHeadersStart": [
+          "number"
+        ],
+        "response.timing.requestTime": [
+          "number"
+        ],
+        "response.timing.sendEnd": [
+          "number"
+        ],
+        "response.timing.sendStart": [
+          "number"
+        ],
+        "response.timing.sslEnd": [
+          "number"
+        ],
+        "response.timing.sslStart": [
+          "number"
+        ],
+        "response.timing.workerFetchStart": [
+          "number"
+        ],
+        "response.timing.workerReady": [
+          "number"
+        ],
+        "response.timing.workerRespondWithSettled": [
+          "number"
+        ],
+        "response.timing.workerStart": [
+          "number"
+        ],
+        "response.url": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ],
+        "type": [
+          "string"
+        ]
+      }
+    },
+    "Network.responseReceivedExtraInfo": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "blockedCookies": [
+          "array"
+        ],
+        "cookiePartitionKey": [
+          "object"
+        ],
+        "cookiePartitionKey.hasCrossSiteAncestor": [
+          "boolean"
+        ],
+        "cookiePartitionKey.topLevelSite": [
+          "string"
+        ],
+        "cookiePartitionKeyOpaque": [
+          "boolean"
+        ],
+        "exemptedCookies": [
+          "array"
+        ],
+        "headers": [
+          "object"
+        ],
+        "headers.Content-Length": [
+          "string"
+        ],
+        "headers.Content-Type": [
+          "string"
+        ],
+        "headers.Date": [
+          "string"
+        ],
+        "headers.Server": [
+          "string"
+        ],
+        "headers.Set-Cookie": [
+          "string"
+        ],
+        "headersText": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "resourceIPAddressSpace": [
+          "string"
+        ],
+        "statusCode": [
+          "number"
+        ]
+      }
+    },
+    "Page.domContentEventFired": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "timestamp": [
+          "number"
+        ]
+      }
+    },
+    "Page.downloadProgress": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "guid": [
+          "string"
+        ],
+        "receivedBytes": [
+          "number"
+        ],
+        "state": [
+          "string"
+        ],
+        "totalBytes": [
+          "number"
+        ]
+      }
+    },
+    "Page.downloadWillBegin": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "guid": [
+          "string"
+        ],
+        "suggestedFilename": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameAttached": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "parentFrameId": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameClearedScheduledNavigation": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameDetached": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "reason": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameNavigated": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frame": [
+          "object"
+        ],
+        "frame.adFrameStatus": [
+          "object"
+        ],
+        "frame.adFrameStatus.adFrameType": [
+          "string"
+        ],
+        "frame.adFrameStatus.explanations": [
+          "array"
+        ],
+        "frame.crossOriginIsolatedContextType": [
+          "string"
+        ],
+        "frame.domainAndRegistry": [
+          "string"
+        ],
+        "frame.gatedAPIFeatures": [
+          "array"
+        ],
+        "frame.id": [
+          "string"
+        ],
+        "frame.loaderId": [
+          "string"
+        ],
+        "frame.mimeType": [
+          "string"
+        ],
+        "frame.name": [
+          "string"
+        ],
+        "frame.parentId": [
+          "string"
+        ],
+        "frame.secureContextType": [
+          "string"
+        ],
+        "frame.securityOrigin": [
+          "string"
+        ],
+        "frame.securityOriginDetails": [
+          "object"
+        ],
+        "frame.securityOriginDetails.isLocalhost": [
+          "boolean"
+        ],
+        "frame.url": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameRequestedNavigation": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "disposition": [
+          "string"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "reason": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameResized": {
+      "event": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.frameScheduledNavigation": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "delay": [
+          "number"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "reason": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameStartedLoading": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameStartedNavigating": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "loaderId": [
+          "string"
+        ],
+        "navigationType": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameStoppedLoading": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      }
+    },
+    "Page.frameSubtreeWillBeDetached": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      }
+    },
+    "Page.javascriptDialogClosed": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "result": [
+          "boolean"
+        ],
+        "userInput": [
+          "string"
+        ]
+      }
+    },
+    "Page.javascriptDialogOpening": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "defaultPrompt": [
+          "string"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "hasBrowserHandler": [
+          "boolean"
+        ],
+        "message": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.lifecycleEvent": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "loaderId": [
+          "string"
+        ],
+        "name": [
+          "string"
+        ],
+        "timestamp": [
+          "number"
+        ]
+      }
+    },
+    "Page.loadEventFired": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "timestamp": [
+          "number"
+        ]
+      }
+    },
+    "Page.navigatedWithinDocument": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "navigationType": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      }
+    },
+    "Page.windowOpen": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "url": [
+          "string"
+        ],
+        "userGesture": [
+          "boolean"
+        ],
+        "windowFeatures": [
+          "array"
+        ],
+        "windowFeatures[]": [
+          "string"
+        ],
+        "windowName": [
+          "string"
+        ]
+      }
+    },
+    "Runtime.executionContextCreated": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "context": [
+          "object"
+        ],
+        "context.auxData": [
+          "object"
+        ],
+        "context.auxData.frameId": [
+          "string"
+        ],
+        "context.auxData.isDefault": [
+          "boolean"
+        ],
+        "context.auxData.type": [
+          "string"
+        ],
+        "context.id": [
+          "number"
+        ],
+        "context.name": [
+          "string"
+        ],
+        "context.origin": [
+          "string"
+        ],
+        "context.uniqueId": [
+          "string"
+        ]
+      }
+    },
+    "Runtime.executionContextDestroyed": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "executionContextId": [
+          "number"
+        ],
+        "executionContextUniqueId": [
+          "string"
+        ]
+      }
+    },
+    "Runtime.executionContextsCleared": {
+      "event": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Target.attachedToTarget": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "sessionId": [
+          "string"
+        ],
+        "targetInfo": [
+          "object"
+        ],
+        "targetInfo.attached": [
+          "boolean"
+        ],
+        "targetInfo.browserContextId": [
+          "string"
+        ],
+        "targetInfo.canAccessOpener": [
+          "boolean"
+        ],
+        "targetInfo.openerFrameId": [
+          "string"
+        ],
+        "targetInfo.openerId": [
+          "string"
+        ],
+        "targetInfo.parentFrameId": [
+          "string"
+        ],
+        "targetInfo.parentId": [
+          "string"
+        ],
+        "targetInfo.targetId": [
+          "string"
+        ],
+        "targetInfo.title": [
+          "string"
+        ],
+        "targetInfo.type": [
+          "string"
+        ],
+        "targetInfo.url": [
+          "string"
+        ],
+        "waitingForDebugger": [
+          "boolean"
+        ]
+      }
+    },
+    "Target.detachedFromTarget": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "sessionId": [
+          "string"
+        ],
+        "targetId": [
+          "string"
+        ]
+      }
+    },
+    "Target.targetCreated": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "targetInfo": [
+          "object"
+        ],
+        "targetInfo.attached": [
+          "boolean"
+        ],
+        "targetInfo.browserContextId": [
+          "string"
+        ],
+        "targetInfo.canAccessOpener": [
+          "boolean"
+        ],
+        "targetInfo.embedderData": [
+          "object"
+        ],
+        "targetInfo.embedderData.tabActive": [
+          "boolean"
+        ],
+        "targetInfo.embedderData.tabPinned": [
+          "boolean"
+        ],
+        "targetInfo.embedderData.tabStripIndex": [
+          "number"
+        ],
+        "targetInfo.openerFrameId": [
+          "string"
+        ],
+        "targetInfo.openerId": [
+          "string"
+        ],
+        "targetInfo.parentFrameId": [
+          "string"
+        ],
+        "targetInfo.parentId": [
+          "string"
+        ],
+        "targetInfo.targetId": [
+          "string"
+        ],
+        "targetInfo.title": [
+          "string"
+        ],
+        "targetInfo.type": [
+          "string"
+        ],
+        "targetInfo.url": [
+          "string"
+        ]
+      }
+    },
+    "Target.targetDestroyed": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "targetId": [
+          "string"
+        ]
+      }
+    },
+    "Target.targetInfoChanged": {
+      "event": {
+        "": [
+          "object"
+        ],
+        "targetInfo": [
+          "object"
+        ],
+        "targetInfo.attached": [
+          "boolean"
+        ],
+        "targetInfo.browserContextId": [
+          "string"
+        ],
+        "targetInfo.canAccessOpener": [
+          "boolean"
+        ],
+        "targetInfo.openerFrameId": [
+          "string"
+        ],
+        "targetInfo.openerId": [
+          "string"
+        ],
+        "targetInfo.parentFrameId": [
+          "string"
+        ],
+        "targetInfo.parentId": [
+          "string"
+        ],
+        "targetInfo.targetId": [
+          "string"
+        ],
+        "targetInfo.title": [
+          "string"
+        ],
+        "targetInfo.type": [
+          "string"
+        ],
+        "targetInfo.url": [
+          "string"
+        ]
+      }
+    }
+  },
+  "methods": {
+    "Accessibility.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Accessibility.getFullAXTree": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "nodes": [
+          "array"
+        ],
+        "nodes[]": [
+          "object"
+        ],
+        "nodes[].backendDOMNodeId": [
+          "number"
+        ],
+        "nodes[].childIds": [
+          "array"
+        ],
+        "nodes[].childIds[]": [
+          "string"
+        ],
+        "nodes[].chromeRole": [
+          "object"
+        ],
+        "nodes[].chromeRole.type": [
+          "string"
+        ],
+        "nodes[].chromeRole.value": [
+          "number"
+        ],
+        "nodes[].frameId": [
+          "string"
+        ],
+        "nodes[].ignored": [
+          "boolean"
+        ],
+        "nodes[].ignoredReasons": [
+          "array"
+        ],
+        "nodes[].ignoredReasons[]": [
+          "object"
+        ],
+        "nodes[].ignoredReasons[].name": [
+          "string"
+        ],
+        "nodes[].ignoredReasons[].value": [
+          "object"
+        ],
+        "nodes[].ignoredReasons[].value.type": [
+          "string"
+        ],
+        "nodes[].ignoredReasons[].value.value": [
+          "boolean"
+        ],
+        "nodes[].name": [
+          "object"
+        ],
+        "nodes[].name.sources": [
+          "array"
+        ],
+        "nodes[].name.sources[]": [
+          "object"
+        ],
+        "nodes[].name.sources[].attribute": [
+          "string"
+        ],
+        "nodes[].name.sources[].nativeSource": [
+          "string"
+        ],
+        "nodes[].name.sources[].nativeSourceValue": [
+          "object"
+        ],
+        "nodes[].name.sources[].nativeSourceValue.relatedNodes": [
+          "array"
+        ],
+        "nodes[].name.sources[].nativeSourceValue.relatedNodes[]": [
+          "object"
+        ],
+        "nodes[].name.sources[].nativeSourceValue.relatedNodes[].backendDOMNodeId": [
+          "number"
+        ],
+        "nodes[].name.sources[].nativeSourceValue.relatedNodes[].text": [
+          "string"
+        ],
+        "nodes[].name.sources[].nativeSourceValue.type": [
+          "string"
+        ],
+        "nodes[].name.sources[].superseded": [
+          "boolean"
+        ],
+        "nodes[].name.sources[].type": [
+          "string"
+        ],
+        "nodes[].name.sources[].value": [
+          "object"
+        ],
+        "nodes[].name.type": [
+          "string"
+        ],
+        "nodes[].name.value": [
+          "string"
+        ],
+        "nodes[].nodeId": [
+          "string"
+        ],
+        "nodes[].parentId": [
+          "string"
+        ],
+        "nodes[].properties": [
+          "array"
+        ],
+        "nodes[].properties[]": [
+          "object"
+        ],
+        "nodes[].properties[].name": [
+          "string"
+        ],
+        "nodes[].properties[].value": [
+          "object"
+        ],
+        "nodes[].properties[].value.relatedNodes": [
+          "array"
+        ],
+        "nodes[].properties[].value.relatedNodes[]": [
+          "object"
+        ],
+        "nodes[].properties[].value.relatedNodes[].backendDOMNodeId": [
+          "number"
+        ],
+        "nodes[].properties[].value.relatedNodes[].text": [
+          "string"
+        ],
+        "nodes[].properties[].value.type": [
+          "string"
+        ],
+        "nodes[].properties[].value.value": [
+          "boolean",
+          "number",
+          "string"
+        ],
+        "nodes[].role": [
+          "object"
+        ],
+        "nodes[].role.type": [
+          "string"
+        ],
+        "nodes[].role.value": [
+          "string"
+        ],
+        "nodes[].value": [
+          "object"
+        ],
+        "nodes[].value.type": [
+          "string"
+        ],
+        "nodes[].value.value": [
+          "string"
+        ]
+      }
+    },
+    "Accessibility.getPartialAXTree": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "nodes": [
+          "array"
+        ],
+        "nodes[]": [
+          "object"
+        ],
+        "nodes[].backendDOMNodeId": [
+          "number"
+        ],
+        "nodes[].childIds": [
+          "array"
+        ],
+        "nodes[].childIds[]": [
+          "string"
+        ],
+        "nodes[].chromeRole": [
+          "object"
+        ],
+        "nodes[].chromeRole.type": [
+          "string"
+        ],
+        "nodes[].chromeRole.value": [
+          "number"
+        ],
+        "nodes[].frameId": [
+          "string"
+        ],
+        "nodes[].ignored": [
+          "boolean"
+        ],
+        "nodes[].ignoredReasons": [
+          "array"
+        ],
+        "nodes[].ignoredReasons[]": [
+          "object"
+        ],
+        "nodes[].ignoredReasons[].name": [
+          "string"
+        ],
+        "nodes[].ignoredReasons[].value": [
+          "object"
+        ],
+        "nodes[].ignoredReasons[].value.type": [
+          "string"
+        ],
+        "nodes[].ignoredReasons[].value.value": [
+          "boolean"
+        ],
+        "nodes[].name": [
+          "object"
+        ],
+        "nodes[].name.sources": [
+          "array"
+        ],
+        "nodes[].name.sources[]": [
+          "object"
+        ],
+        "nodes[].name.sources[].attribute": [
+          "string"
+        ],
+        "nodes[].name.sources[].nativeSource": [
+          "string"
+        ],
+        "nodes[].name.sources[].superseded": [
+          "boolean"
+        ],
+        "nodes[].name.sources[].type": [
+          "string"
+        ],
+        "nodes[].name.sources[].value": [
+          "object"
+        ],
+        "nodes[].name.type": [
+          "string"
+        ],
+        "nodes[].name.value": [
+          "string"
+        ],
+        "nodes[].nodeId": [
+          "string"
+        ],
+        "nodes[].parentId": [
+          "string"
+        ],
+        "nodes[].properties": [
+          "array"
+        ],
+        "nodes[].properties[]": [
+          "object"
+        ],
+        "nodes[].properties[].name": [
+          "string"
+        ],
+        "nodes[].properties[].value": [
+          "object"
+        ],
+        "nodes[].properties[].value.type": [
+          "string"
+        ],
+        "nodes[].properties[].value.value": [
+          "boolean",
+          "string"
+        ],
+        "nodes[].role": [
+          "object"
+        ],
+        "nodes[].role.type": [
+          "string"
+        ],
+        "nodes[].role.value": [
+          "string"
+        ]
+      }
+    },
+    "Browser.getVersion": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "jsVersion": [
+          "string"
+        ],
+        "product": [
+          "string"
+        ],
+        "protocolVersion": [
+          "string"
+        ],
+        "revision": [
+          "string"
+        ],
+        "userAgent": [
+          "string"
+        ]
+      }
+    },
+    "Browser.setDownloadBehavior": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "behavior": [
+          "string"
+        ],
+        "downloadPath": [
+          "string"
+        ],
+        "eventsEnabled": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "DOM.describeNode": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "depth": [
+          "number"
+        ],
+        "nodeId": [
+          "number"
+        ],
+        "objectId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "node": [
+          "object"
+        ],
+        "node.attributes": [
+          "array"
+        ],
+        "node.attributes[]": [
+          "string"
+        ],
+        "node.backendNodeId": [
+          "number"
+        ],
+        "node.childNodeCount": [
+          "number"
+        ],
+        "node.children": [
+          "array"
+        ],
+        "node.contentDocument": [
+          "object"
+        ],
+        "node.contentDocument.backendNodeId": [
+          "number"
+        ],
+        "node.contentDocument.baseURL": [
+          "string"
+        ],
+        "node.contentDocument.childNodeCount": [
+          "number"
+        ],
+        "node.contentDocument.compatibilityMode": [
+          "string"
+        ],
+        "node.contentDocument.documentURL": [
+          "string"
+        ],
+        "node.contentDocument.localName": [
+          "string"
+        ],
+        "node.contentDocument.nodeId": [
+          "number"
+        ],
+        "node.contentDocument.nodeName": [
+          "string"
+        ],
+        "node.contentDocument.nodeType": [
+          "number"
+        ],
+        "node.contentDocument.nodeValue": [
+          "string"
+        ],
+        "node.contentDocument.xmlVersion": [
+          "string"
+        ],
+        "node.frameId": [
+          "string"
+        ],
+        "node.localName": [
+          "string"
+        ],
+        "node.nodeId": [
+          "number"
+        ],
+        "node.nodeName": [
+          "string"
+        ],
+        "node.nodeType": [
+          "number"
+        ],
+        "node.nodeValue": [
+          "string"
+        ],
+        "node.shadowRoots": [
+          "array"
+        ],
+        "node.shadowRoots[]": [
+          "object"
+        ],
+        "node.shadowRoots[].backendNodeId": [
+          "number"
+        ],
+        "node.shadowRoots[].childNodeCount": [
+          "number"
+        ],
+        "node.shadowRoots[].localName": [
+          "string"
+        ],
+        "node.shadowRoots[].nodeId": [
+          "number"
+        ],
+        "node.shadowRoots[].nodeName": [
+          "string"
+        ],
+        "node.shadowRoots[].nodeType": [
+          "number"
+        ],
+        "node.shadowRoots[].nodeValue": [
+          "string"
+        ],
+        "node.shadowRoots[].shadowRootType": [
+          "string"
+        ]
+      }
+    },
+    "DOM.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "DOM.getBoxModel": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "model": [
+          "object"
+        ],
+        "model.border": [
+          "array"
+        ],
+        "model.border[]": [
+          "number"
+        ],
+        "model.content": [
+          "array"
+        ],
+        "model.content[]": [
+          "number"
+        ],
+        "model.height": [
+          "number"
+        ],
+        "model.margin": [
+          "array"
+        ],
+        "model.margin[]": [
+          "number"
+        ],
+        "model.padding": [
+          "array"
+        ],
+        "model.padding[]": [
+          "number"
+        ],
+        "model.width": [
+          "number"
+        ]
+      }
+    },
+    "DOM.getContentQuads": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "quads": [
+          "array"
+        ],
+        "quads[]": [
+          "array"
+        ],
+        "quads[][]": [
+          "number"
+        ]
+      }
+    },
+    "DOM.getDocument": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "depth": [
+          "number"
+        ],
+        "pierce": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "root": [
+          "object"
+        ],
+        "root.backendNodeId": [
+          "number"
+        ],
+        "root.baseURL": [
+          "string"
+        ],
+        "root.childNodeCount": [
+          "number"
+        ],
+        "root.children": [
+          "array"
+        ],
+        "root.children[]": [
+          "object"
+        ],
+        "root.children[].attributes": [
+          "array"
+        ],
+        "root.children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children": [
+          "array"
+        ],
+        "root.children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].attributes": [
+          "array"
+        ],
+        "root.children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].attributes": [
+          "array"
+        ],
+        "root.children[].children[].children[].attributes[]": [
+          "string"
+        ],
+        "root.children[].children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument": [
+          "object"
+        ],
+        "root.children[].children[].children[].contentDocument.backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.baseURL": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children": [
+          "array"
+        ],
+        "root.children[].children[].children[].contentDocument.children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].attributes": [
+          "array"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].attributes": [
+          "array"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].frameId": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.compatibilityMode": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.documentURL": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].contentDocument.nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].contentDocument.xmlVersion": [
+          "string"
+        ],
+        "root.children[].children[].children[].frameId": [
+          "string"
+        ],
+        "root.children[].children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots": [
+          "array"
+        ],
+        "root.children[].children[].children[].shadowRoots[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].shadowRoots[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].attributes": [
+          "array"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].childNodeCount": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children": [
+          "array"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[]": [
+          "object"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].backendNodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].localName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].children[].shadowRoots[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].children[].shadowRoots[].shadowRootType": [
+          "string"
+        ],
+        "root.children[].children[].localName": [
+          "string"
+        ],
+        "root.children[].children[].nodeId": [
+          "number"
+        ],
+        "root.children[].children[].nodeName": [
+          "string"
+        ],
+        "root.children[].children[].nodeType": [
+          "number"
+        ],
+        "root.children[].children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].children[].parentId": [
+          "number"
+        ],
+        "root.children[].frameId": [
+          "string"
+        ],
+        "root.children[].localName": [
+          "string"
+        ],
+        "root.children[].nodeId": [
+          "number"
+        ],
+        "root.children[].nodeName": [
+          "string"
+        ],
+        "root.children[].nodeType": [
+          "number"
+        ],
+        "root.children[].nodeValue": [
+          "string"
+        ],
+        "root.children[].parentId": [
+          "number"
+        ],
+        "root.children[].publicId": [
+          "string"
+        ],
+        "root.children[].systemId": [
+          "string"
+        ],
+        "root.compatibilityMode": [
+          "string"
+        ],
+        "root.documentURL": [
+          "string"
+        ],
+        "root.localName": [
+          "string"
+        ],
+        "root.nodeId": [
+          "number"
+        ],
+        "root.nodeName": [
+          "string"
+        ],
+        "root.nodeType": [
+          "number"
+        ],
+        "root.nodeValue": [
+          "string"
+        ],
+        "root.xmlVersion": [
+          "string"
+        ]
+      }
+    },
+    "DOM.getFrameOwner": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      }
+    },
+    "DOM.getNodeForLocation": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "x": [
+          "number"
+        ],
+        "y": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "frameId": [
+          "string"
+        ]
+      }
+    },
+    "DOM.querySelector": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "nodeId": [
+          "number"
+        ],
+        "selector": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      }
+    },
+    "DOM.resolveNode": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "nodeId": [
+          "number"
+        ],
+        "objectGroup": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "object": [
+          "object"
+        ],
+        "object.className": [
+          "string"
+        ],
+        "object.description": [
+          "string"
+        ],
+        "object.objectId": [
+          "string"
+        ],
+        "object.subtype": [
+          "string"
+        ],
+        "object.type": [
+          "string"
+        ]
+      }
+    },
+    "DOM.scrollIntoViewIfNeeded": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "DOM.setFileInputFiles": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "backendNodeId": [
+          "number"
+        ],
+        "files": [
+          "array"
+        ],
+        "files[]": [
+          "string"
+        ],
+        "nodeId": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Emulation.setDeviceMetricsOverride": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "deviceScaleFactor": [
+          "number"
+        ],
+        "height": [
+          "number"
+        ],
+        "mobile": [
+          "boolean"
+        ],
+        "width": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Emulation.setEmulatedMedia": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "features": [
+          "array"
+        ],
+        "features[]": [
+          "object"
+        ],
+        "features[].name": [
+          "string"
+        ],
+        "features[].value": [
+          "string"
+        ],
+        "media": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Emulation.setFocusEmulationEnabled": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "enabled": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Emulation.setLocaleOverride": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "locale": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Emulation.setTimezoneOverride": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "timezoneId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Extensions.getExtensions": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "extensions": [
+          "array"
+        ],
+        "extensions[]": [
+          "object"
+        ],
+        "extensions[].enabled": [
+          "boolean"
+        ],
+        "extensions[].id": [
+          "string"
+        ],
+        "extensions[].name": [
+          "string"
+        ],
+        "extensions[].path": [
+          "string"
+        ],
+        "extensions[].version": [
+          "string"
+        ]
+      }
+    },
+    "Extensions.loadUnpacked": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "path": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "id": [
+          "string"
+        ]
+      }
+    },
+    "Extensions.triggerAction": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "id": [
+          "string"
+        ],
+        "targetId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Fetch.disable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Fetch.enable": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "patterns": [
+          "array"
+        ],
+        "patterns[]": [
+          "object"
+        ],
+        "patterns[].urlPattern": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Fetch.fulfillRequest": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "body": [
+          "string"
+        ],
+        "requestId": [
+          "string"
+        ],
+        "responseCode": [
+          "number"
+        ],
+        "responseHeaders": [
+          "array"
+        ],
+        "responseHeaders[]": [
+          "object"
+        ],
+        "responseHeaders[].name": [
+          "string"
+        ],
+        "responseHeaders[].value": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Input.dispatchKeyEvent": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "code": [
+          "string"
+        ],
+        "commands": [
+          "array"
+        ],
+        "commands[]": [
+          "string"
+        ],
+        "key": [
+          "string"
+        ],
+        "modifiers": [
+          "number"
+        ],
+        "nativeVirtualKeyCode": [
+          "number"
+        ],
+        "text": [
+          "string"
+        ],
+        "type": [
+          "string"
+        ],
+        "windowsVirtualKeyCode": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Input.dispatchMouseEvent": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "button": [
+          "string"
+        ],
+        "buttons": [
+          "number"
+        ],
+        "clickCount": [
+          "number"
+        ],
+        "type": [
+          "string"
+        ],
+        "x": [
+          "number"
+        ],
+        "y": [
+          "number"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Input.insertText": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "text": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Inspector.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Log.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Memory.getDOMCounters": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "documents": [
+          "number"
+        ],
+        "jsEventListeners": [
+          "number"
+        ],
+        "nodes": [
+          "number"
+        ]
+      }
+    },
+    "Network.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Network.getAllCookies": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "cookies": [
+          "array"
+        ],
+        "cookies[]": [
+          "object"
+        ],
+        "cookies[].domain": [
+          "string"
+        ],
+        "cookies[].expires": [
+          "number"
+        ],
+        "cookies[].httpOnly": [
+          "boolean"
+        ],
+        "cookies[].name": [
+          "string"
+        ],
+        "cookies[].path": [
+          "string"
+        ],
+        "cookies[].priority": [
+          "string"
+        ],
+        "cookies[].sameSite": [
+          "string"
+        ],
+        "cookies[].secure": [
+          "boolean"
+        ],
+        "cookies[].session": [
+          "boolean"
+        ],
+        "cookies[].size": [
+          "number"
+        ],
+        "cookies[].sourcePort": [
+          "number"
+        ],
+        "cookies[].sourceScheme": [
+          "string"
+        ],
+        "cookies[].value": [
+          "string"
+        ]
+      }
+    },
+    "Network.getCookies": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "urls": [
+          "array"
+        ],
+        "urls[]": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "cookies": [
+          "array"
+        ],
+        "cookies[]": [
+          "object"
+        ],
+        "cookies[].domain": [
+          "string"
+        ],
+        "cookies[].expires": [
+          "number"
+        ],
+        "cookies[].httpOnly": [
+          "boolean"
+        ],
+        "cookies[].name": [
+          "string"
+        ],
+        "cookies[].path": [
+          "string"
+        ],
+        "cookies[].priority": [
+          "string"
+        ],
+        "cookies[].sameSite": [
+          "string"
+        ],
+        "cookies[].secure": [
+          "boolean"
+        ],
+        "cookies[].session": [
+          "boolean"
+        ],
+        "cookies[].size": [
+          "number"
+        ],
+        "cookies[].sourcePort": [
+          "number"
+        ],
+        "cookies[].sourceScheme": [
+          "string"
+        ],
+        "cookies[].value": [
+          "string"
+        ]
+      }
+    },
+    "Network.setCacheDisabled": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "cacheDisabled": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Network.setCookie": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "name": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ],
+        "value": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "success": [
+          "boolean"
+        ]
+      }
+    },
+    "Network.setUserAgentOverride": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "acceptLanguage": [
+          "string"
+        ],
+        "platform": [
+          "string"
+        ],
+        "userAgent": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.addScriptToEvaluateOnNewDocument": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "source": [
+          "string"
+        ],
+        "worldName": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "identifier": [
+          "string"
+        ]
+      }
+    },
+    "Page.bringToFront": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.captureScreenshot": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "captureBeyondViewport": [
+          "boolean"
+        ],
+        "format": [
+          "string"
+        ],
+        "fromSurface": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "data": [
+          "string"
+        ]
+      }
+    },
+    "Page.createIsolatedWorld": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "grantUniveralAccess": [
+          "boolean"
+        ],
+        "worldName": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "executionContextId": [
+          "number"
+        ]
+      }
+    },
+    "Page.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.getFrameTree": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "frameTree": [
+          "object"
+        ],
+        "frameTree.childFrames": [
+          "array"
+        ],
+        "frameTree.childFrames[]": [
+          "object"
+        ],
+        "frameTree.childFrames[].frame": [
+          "object"
+        ],
+        "frameTree.childFrames[].frame.adFrameStatus": [
+          "object"
+        ],
+        "frameTree.childFrames[].frame.adFrameStatus.adFrameType": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.adFrameStatus.explanations": [
+          "array"
+        ],
+        "frameTree.childFrames[].frame.crossOriginIsolatedContextType": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.domainAndRegistry": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.gatedAPIFeatures": [
+          "array"
+        ],
+        "frameTree.childFrames[].frame.id": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.loaderId": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.mimeType": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.name": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.parentId": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.secureContextType": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.securityOrigin": [
+          "string"
+        ],
+        "frameTree.childFrames[].frame.securityOriginDetails": [
+          "object"
+        ],
+        "frameTree.childFrames[].frame.securityOriginDetails.isLocalhost": [
+          "boolean"
+        ],
+        "frameTree.childFrames[].frame.url": [
+          "string"
+        ],
+        "frameTree.frame": [
+          "object"
+        ],
+        "frameTree.frame.adFrameStatus": [
+          "object"
+        ],
+        "frameTree.frame.adFrameStatus.adFrameType": [
+          "string"
+        ],
+        "frameTree.frame.adFrameStatus.explanations": [
+          "array"
+        ],
+        "frameTree.frame.crossOriginIsolatedContextType": [
+          "string"
+        ],
+        "frameTree.frame.domainAndRegistry": [
+          "string"
+        ],
+        "frameTree.frame.gatedAPIFeatures": [
+          "array"
+        ],
+        "frameTree.frame.id": [
+          "string"
+        ],
+        "frameTree.frame.loaderId": [
+          "string"
+        ],
+        "frameTree.frame.mimeType": [
+          "string"
+        ],
+        "frameTree.frame.name": [
+          "string"
+        ],
+        "frameTree.frame.parentId": [
+          "string"
+        ],
+        "frameTree.frame.secureContextType": [
+          "string"
+        ],
+        "frameTree.frame.securityOrigin": [
+          "string"
+        ],
+        "frameTree.frame.securityOriginDetails": [
+          "object"
+        ],
+        "frameTree.frame.securityOriginDetails.isLocalhost": [
+          "boolean"
+        ],
+        "frameTree.frame.url": [
+          "string"
+        ]
+      }
+    },
+    "Page.handleJavaScriptDialog": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "accept": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.navigate": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "referrerPolicy": [
+          "string"
+        ],
+        "url": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "errorText": [
+          "string"
+        ],
+        "frameId": [
+          "string"
+        ],
+        "isDownload": [
+          "boolean"
+        ],
+        "loaderId": [
+          "string"
+        ]
+      }
+    },
+    "Page.setFontFamilies": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "fontFamilies": [
+          "object"
+        ],
+        "fontFamilies.cursive": [
+          "string"
+        ],
+        "fontFamilies.fantasy": [
+          "string"
+        ],
+        "fontFamilies.fixed": [
+          "string"
+        ],
+        "fontFamilies.sansSerif": [
+          "string"
+        ],
+        "fontFamilies.serif": [
+          "string"
+        ],
+        "fontFamilies.standard": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Page.setLifecycleEventsEnabled": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "enabled": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Runtime.callFunctionOn": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "arguments": [
+          "array"
+        ],
+        "arguments[]": [
+          "object"
+        ],
+        "arguments[].objectId": [
+          "string"
+        ],
+        "arguments[].value": [
+          "boolean",
+          "number",
+          "object",
+          "string"
+        ],
+        "arguments[].value.v": [
+          "string"
+        ],
+        "awaitPromise": [
+          "boolean"
+        ],
+        "functionDeclaration": [
+          "string"
+        ],
+        "objectId": [
+          "string"
+        ],
+        "returnByValue": [
+          "boolean"
+        ],
+        "userGesture": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "result": [
+          "object"
+        ],
+        "result.type": [
+          "string"
+        ],
+        "result.value": [
+          "object",
+          "string"
+        ]
+      }
+    },
+    "Runtime.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Runtime.evaluate": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "awaitPromise": [
+          "boolean"
+        ],
+        "contextId": [
+          "number"
+        ],
+        "expression": [
+          "string"
+        ],
+        "returnByValue": [
+          "boolean"
+        ],
+        "userGesture": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "result": [
+          "object"
+        ],
+        "result.className": [
+          "string"
+        ],
+        "result.description": [
+          "string"
+        ],
+        "result.objectId": [
+          "string"
+        ],
+        "result.subtype": [
+          "string"
+        ],
+        "result.type": [
+          "string"
+        ],
+        "result.value": [
+          "array",
+          "boolean",
+          "number",
+          "object",
+          "string"
+        ]
+      }
+    },
+    "Runtime.getHeapUsage": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "backingStorageSize": [
+          "number"
+        ],
+        "embedderHeapUsedSize": [
+          "number"
+        ],
+        "totalSize": [
+          "number"
+        ],
+        "usedSize": [
+          "number"
+        ]
+      }
+    },
+    "Runtime.getProperties": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "objectId": [
+          "string"
+        ],
+        "ownProperties": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "internalProperties": [
+          "array"
+        ],
+        "internalProperties[]": [
+          "object"
+        ],
+        "internalProperties[].name": [
+          "string"
+        ],
+        "internalProperties[].value": [
+          "object"
+        ],
+        "internalProperties[].value.className": [
+          "string"
+        ],
+        "internalProperties[].value.description": [
+          "string"
+        ],
+        "internalProperties[].value.objectId": [
+          "string"
+        ],
+        "internalProperties[].value.type": [
+          "string"
+        ],
+        "result": [
+          "array"
+        ]
+      }
+    },
+    "Runtime.releaseObjectGroup": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "objectGroup": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Runtime.runIfWaitingForDebugger": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "SystemInfo.getProcessInfo": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "processInfo": [
+          "array"
+        ],
+        "processInfo[]": [
+          "object"
+        ],
+        "processInfo[].cpuTime": [
+          "number"
+        ],
+        "processInfo[].id": [
+          "number"
+        ],
+        "processInfo[].type": [
+          "string"
+        ]
+      }
+    },
+    "Target.activateTarget": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "targetId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Target.attachToTarget": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "flatten": [
+          "boolean"
+        ],
+        "targetId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "sessionId": [
+          "string"
+        ]
+      }
+    },
+    "Target.closeTarget": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "targetId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "success": [
+          "boolean"
+        ]
+      }
+    },
+    "Target.createTarget": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "background": [
+          "boolean"
+        ],
+        "url": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "targetId": [
+          "string"
+        ]
+      }
+    },
+    "Target.detachFromTarget": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "sessionId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Target.getTargetInfo": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "targetId": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "targetInfo": [
+          "object"
+        ],
+        "targetInfo.attached": [
+          "boolean"
+        ],
+        "targetInfo.browserContextId": [
+          "string"
+        ],
+        "targetInfo.canAccessOpener": [
+          "boolean"
+        ],
+        "targetInfo.targetId": [
+          "string"
+        ],
+        "targetInfo.title": [
+          "string"
+        ],
+        "targetInfo.type": [
+          "string"
+        ],
+        "targetInfo.url": [
+          "string"
+        ]
+      }
+    },
+    "Target.getTargets": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "filter": [
+          "array"
+        ],
+        "filter[]": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ],
+        "targetInfos": [
+          "array"
+        ],
+        "targetInfos[]": [
+          "object"
+        ],
+        "targetInfos[].attached": [
+          "boolean"
+        ],
+        "targetInfos[].browserContextId": [
+          "string"
+        ],
+        "targetInfos[].canAccessOpener": [
+          "boolean"
+        ],
+        "targetInfos[].embedderData": [
+          "object"
+        ],
+        "targetInfos[].embedderData.tabActive": [
+          "boolean"
+        ],
+        "targetInfos[].embedderData.tabPinned": [
+          "boolean"
+        ],
+        "targetInfos[].embedderData.tabStripIndex": [
+          "number"
+        ],
+        "targetInfos[].openerFrameId": [
+          "string"
+        ],
+        "targetInfos[].openerId": [
+          "string"
+        ],
+        "targetInfos[].parentFrameId": [
+          "string"
+        ],
+        "targetInfos[].parentId": [
+          "string"
+        ],
+        "targetInfos[].targetId": [
+          "string"
+        ],
+        "targetInfos[].title": [
+          "string"
+        ],
+        "targetInfos[].type": [
+          "string"
+        ],
+        "targetInfos[].url": [
+          "string"
+        ]
+      }
+    },
+    "Target.setAutoAttach": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "autoAttach": [
+          "boolean"
+        ],
+        "flatten": [
+          "boolean"
+        ],
+        "waitForDebuggerOnStart": [
+          "boolean"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "Target.setDiscoverTargets": {
+      "params": {
+        "": [
+          "object"
+        ],
+        "discover": [
+          "boolean"
+        ],
+        "filter": [
+          "array"
+        ],
+        "filter[]": [
+          "object"
+        ],
+        "filter[].type": [
+          "string"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    },
+    "WebMCP.enable": {
+      "params": {
+        "": [
+          "object"
+        ]
+      },
+      "result": {
+        "": [
+          "object"
+        ]
+      }
+    }
+  }
+}
