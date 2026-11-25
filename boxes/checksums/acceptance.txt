@@ -1,0 +1,16 @@
+version 1
+box checksums
+revision 1f9fdb263587477e3b20fa836c1a3e352bcfde35
+arch x86_64
+spec sha256:7213021a1161fa8a7fb38e1436dcb322e5fa6ef75dab5d1aeb5891dc919dbad9
+corpus sha256:e73e2686efe8927ab3ad12b1917a15789f39382e9a6ee407b5f21fce358bc09c seen 1688 holdout 1688
+oracle .work/tmp/checksums/oracle sha256:a3c25b561b76bf5528a8893311909acdfa2c163f96d81d7fff0efb2602af2855
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/checksums sha256:435f6df91ca04f3622d723a47e6c0b677c049ba091615980ecc4dd142f4fd84d
+dependencies cargo-lock sha256:f5934e1b95ca35298f871f3540f8e1c1bf70d6980d09b2c3b53be171731efd2d tree sha256:c4bfe269688568c621b21eb8d980430679b3479562b13380b656fc0ed2d1f98d
+run seen exit 0 items 1688 1688
+run holdout exit 0 items 1688 1688
+run fuzz exit 0 seed 1795631333633659001 requested 20000 completed 20000
+level source-harness met
+level frozen-browser pending: a frozen-browser consumer witness for these hashes has not been established
+level integration pending: arm64 evidence (assembly: LevelDB profile read and write against the frozen arm64 browser) and make closure have not run
