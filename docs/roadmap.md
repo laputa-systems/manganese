@@ -6,11 +6,12 @@ This is the single plan for this repository: all current and future work, and th
 
 - **State:** active, M0 and M1 in progress.
 - **Campaign:** [Manganese](#campaign-manganese).
-- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m1-zlib`, `m0-workloads`.
-- **In progress:** `m0-abi` (lanes under `.work/wt/`), and the `m1-source-oracle` build (`oracle/source-oracle build test-fast build-target:chrome_sandbox stage-runtime test-staged package export`, log in `.work/tmp/build.log`).
+- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`, `m1-fuzz-lane`, `m1-zlib`, `m0-workloads`, `m1-source-oracle`.
+- **In progress:** `m0-abi` (lanes under `.work/wt/`).
 - **Red or parked:** none.
 - **Owned-project branches awaiting push (N7):** zlib-rs `manganese/chromium-deflate` (cf79d59), vendored under `vendor/zlib-rs/`.
-- **Next:** `m0-cdp-trace` once the client workloads land; then `make oracle-equivalence REBUILD=.work/oracle/artifacts/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz` once the rebuild exports (the harness is merged and passes against the frozen archive itself, with an injected discrepancy as its negative control).
+- **Source oracle rebuild:** `.work/oracle/artifacts/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz`, sha256 `3a3b1863af0cdb8f663cfdfc7c9733674b6c536c8cb828930fd6a7f3aacb98d4` (capture series `9535972e6a8a`), built in its work volume `manganese-oracle-work-amd64`; it is regenerable with `oracle/source-oracle`, not published.
+- **Next:** `m0-cdp-trace` (final run in progress); then `make oracle-equivalence REBUILD=.work/oracle/artifacts/chromium-156.0.8078.79-r2-linux-x86_64-musl.tar.xz` (the harness is merged and passes against the frozen archive itself, with an injected discrepancy as its negative control).
 - **Oracle findings that later slices depend on:** a download with the default behavior is canceled (target confirmation with no file chooser); agent-browser cannot download over `--cdp`; `chrome.downloads.download` ignores the requested file name (saves `download.txt`); `/json/protocol` kills the oracle on the first request on native Linux (7.3 reports it as the expected defect); x86_64 WebGL exists only headed (ANGLE on SwiftShader Vulkan); XSLT and speculation rules are exposed, so those cuts are not compatible.
 - **Frozen archives:** both architectures' package revision 2 archives and sidecars are published by digest (`oracle/frozen/artifacts.lock`).
 
