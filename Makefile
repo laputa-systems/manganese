@@ -59,11 +59,15 @@ assembly:
 
 .PHONY: capability-probes
 capability-probes:
-	python3 -B oracle/probes/capability/run.py
+	python3 -B oracle/probes/capability/run.py $(PROBE_ARGS)
 
 .PHONY: persona-inventory
 persona-inventory:
-	python3 -B oracle/probes/persona/run.py
+	python3 -B oracle/probes/persona/run.py $(PROBE_ARGS)
+
+.PHONY: oracle-equivalence
+oracle-equivalence:
+	python3 -B oracle/probes/equivalence/run.py --rebuild '$(REBUILD)' $(EQUIVALENCE_ARGS)
 
 .PHONY: zlib-harness
 zlib-harness:

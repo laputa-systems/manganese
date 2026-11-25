@@ -63,6 +63,10 @@ Goldens come from rebuilt and instrumented builds, so three builds are tied toge
 
 Each box also has an anchor check that ties its harness to the frozen archive through a public surface: for example, decoding a corpus image through the harness and through `getImageData` on the frozen browser. A rebuilt or instrumented oracle carries its own identity in every receipt.
 
+Run `make oracle-equivalence REBUILD=/absolute/path/to/archive.tar.xz` with the archive's `.sha256`, `.acceptance.json` and `test-fast.json` beside it. The report and probe outputs are written under `.work/tmp/equivalence/`; the frozen contract report is cached by the `oracle/launch` tree revision. Persona capture validates the declared wire and debugger relationships before comparing the normalized exact fields. The ignored `test-fast` fields and substitutions are listed in `oracle/probes/equivalence/test-fast-ignored.json` and `test-fast-normalize.json`. ABI census and CDP trace remain pending until their comparers are supplied; this partial check does not establish full U17 equivalence.
+
+For a negative control, pass `EQUIVALENCE_ARGS='--inject /absolute/path/to/injection.json'`. The JSON object names `inventory` (`capability` or `persona`), `file` (a JSON filename), and `content` (the replacement evidence object); the driver substitutes it after capture and before comparison.
+
 ### arm64 evidence
 
 The source oracle is x86_64-only, but F16 is per architecture. Each architecture-sensitive box records one evidence path in `box.toml`:

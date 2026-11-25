@@ -1,0 +1,8 @@
+[
+  {"path":"*.sandbox.renderers.*.cmdline", "pattern":"(--(?:crashpad-handler-pid|user-data-dir|remote-debugging-port|launch-time-ticks|field-trial-handle|metrics-shmem-handle|pseudonymization-salt-handle|trace-process-track-uuid))=[^ ]+", "replacement":"\\1=<varying>"},
+  {"path":"sandbox.renderers.*.cmdline", "pattern":"(--(?:crashpad-handler-pid|user-data-dir|remote-debugging-port|launch-time-ticks|field-trial-handle|metrics-shmem-handle|pseudonymization-salt-handle|trace-process-track-uuid))=[^ ]+", "replacement":"\\1=<varying>"},
+  {"path":"headless.command.*", "pattern":"--user-data-dir=.*", "replacement":"--user-data-dir=<path>"},
+  {"path":"*.webSocketDebuggerUrl", "pattern":"ws://127\\.0\\.0\\.1:[0-9]+/devtools/browser/[0-9a-f-]+", "replacement":"ws://127.0.0.1:<port>/devtools/browser/<uuid>"},
+  {"path":"headless.devtools_endpoint", "pattern":"ws://127\\.0\\.0\\.1:[0-9]+/devtools/browser/[0-9a-f-]+", "replacement":"ws://127.0.0.1:<port>/devtools/browser/<uuid>"},
+  {"path":"headless.page.url", "pattern":"http://127\\.0\\.0\\.1:[0-9]+/", "replacement":"http://127.0.0.1:<port>/"}
+]

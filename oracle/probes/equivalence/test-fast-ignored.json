@@ -1,0 +1,15 @@
+[
+  "duration_seconds",
+  "cleanup.initial_descendants",
+  "cleanup.process_group",
+  "cleanup.root_pid",
+  "headless.exit.exited_unreaped",
+  "headless.sandbox.renderers.*.nspid",
+  "headless.sandbox.renderers.*.pid",
+  "sandbox.renderers.*.nspid",
+  "sandbox.renderers.*.pid",
+  "window.pid",
+  "browser",
+  "compositor.path",
+  "screenshot.path"
+]

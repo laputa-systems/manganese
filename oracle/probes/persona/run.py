@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 import sys
@@ -12,9 +13,9 @@ from normalize import wire
 DIRECTORY = Path(__file__).resolve().parent
 
 
-def capture(mode, iteration):
+def capture(mode, iteration, archive_path):
     run_dir = launch.new_run_dir('persona', mode + '-' + str(iteration))
-    archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
+    archive = launch.resolve_archive(run_dir, 'x86_64', archive_path, None)
     session = launch.open_session(run_dir, archive)
     browser = None
     try:
@@ -49,26 +50,38 @@ def capture(mode, iteration):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archive', type=Path)
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--capability', type=Path, default=ROOT / 'oracle/frozen/capability')
+    args = parser.parse_args()
+    if args.output is not None and args.output.resolve().is_relative_to((ROOT / 'oracle/frozen').resolve()):
+        parser.error('--output must be outside oracle/frozen')
     lock = ROOT / 'oracle/frozen/artifacts.lock'
     row = next(line.split() for line in lock.read_text().splitlines() if line.endswith('manganese/oracle-inputs:hydrogen-r2-amd64') and '.tar.xz ' in line)
     identity = {'oci_tag':row[3], 'sha256':row[0]}
+    if args.archive is not None:
+        with args.archive.open('rb') as source:
+            identity = {'sha256':hashlib.file_digest(source, 'sha256').hexdigest()}
     captures = {}
     for mode in ('headless', 'headed'):
-        a = capture(mode, 1)
-        b = capture(mode, 2)
+        a = capture(mode, 1, args.archive)
+        b = capture(mode, 2, args.archive)
         for key in a:
             if a[key] != b[key]:
                 print(json.dumps({'mode':mode, 'surface':key, 'first':a[key], 'second':b[key]}, sort_keys=True), file=sys.stderr)
                 raise RuntimeError('exact surface differs')
         captures[mode] = a
         print(mode + ' matched across fresh profiles', flush=True)
-    output = ROOT / 'oracle/frozen/persona'
+    output = args.output or ROOT / 'oracle/frozen/persona'
     files = {}
     for mode, areas in captures.items():
-        inventory = ROOT / ('oracle/frozen/capability/' + ('headed-' if mode == 'headed' else '') + 'inventory.json')
-        areas['global-inventory'] = {'path':inventory.relative_to(ROOT).as_posix(), 'sha256':hashlib.sha256(inventory.read_bytes()).hexdigest()}
-        gl = ROOT / 'oracle/frozen/capability/headed-webgl.json'
-        areas['webgl']['capabilityReference'] = {'path':gl.relative_to(ROOT).as_posix(), 'sha256':hashlib.sha256(gl.read_bytes()).hexdigest()}
+        inventory = args.capability / (('headed-' if mode == 'headed' else '') + 'inventory.json')
+        inventory_path = 'oracle/frozen/capability/' + inventory.name if args.output is None else str(inventory.resolve())
+        areas['global-inventory'] = {'path':inventory_path, 'sha256':hashlib.sha256(inventory.read_bytes()).hexdigest()}
+        gl = args.capability / 'headed-webgl.json'
+        gl_path = 'oracle/frozen/capability/' + gl.name if args.output is None else str(gl.resolve())
+        areas['webgl']['capabilityReference'] = {'path':gl_path, 'sha256':hashlib.sha256(gl.read_bytes()).hexdigest()}
         if areas['webgl']['available'] != (mode == 'headed'):
             raise RuntimeError('unexpected WebGL availability: ' + mode)
         for name, value in areas.items():
@@ -78,6 +91,12 @@ def main():
             if name == 'wire':
                 content['varying'] = {'tls':value['tls']['varying'],'http':{'class':'tolerance','bound':'WebSocket key decodes to exactly 16 bytes; fixture cookie and referer match their declared structure'}}
             files[output / (mode + '-' + name + '.json')] = (json.dumps(content, sort_keys=True, indent=2, ensure_ascii=True) + '\n').encode()
+    if args.output is not None:
+        output.mkdir(parents=True, exist_ok=True)
+        for path, content in files.items():
+            path.write_bytes(content)
+        print('recorded ' + str(len(files)) + ' persona files')
+        return
     manifest = ROOT / 'oracle/frozen/SHA256SUMS'
     lines = manifest.read_text().splitlines()
     for path, content in sorted(files.items()):

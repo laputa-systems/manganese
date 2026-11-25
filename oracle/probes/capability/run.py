@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import json
 import sys
@@ -12,9 +13,9 @@ OUTPUT = ROOT / 'oracle/frozen/capability'
 LOCK = ROOT / 'oracle/frozen/artifacts.lock'
 
 
-def capture(mode):
+def capture(mode, archive_path):
     run_dir = launch.new_run_dir('capability', mode)
-    archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
+    archive = launch.resolve_archive(run_dir, 'x86_64', archive_path, None)
     session = launch.open_session(run_dir, archive)
     browser = None
     try:
@@ -89,13 +90,23 @@ def cuts(captures):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--archive', type=Path)
+    parser.add_argument('--output', type=Path)
+    args = parser.parse_args()
+    if args.output is not None and args.output.resolve().is_relative_to((ROOT / 'oracle/frozen').resolve()):
+        parser.error('--output must be outside oracle/frozen')
     row = next(line.split() for line in LOCK.read_text().splitlines() if line.endswith('manganese/oracle-inputs:hydrogen-r2-amd64') and '.tar.xz ' in line)
     identity = {'oci_tag':row[3], 'sha256':row[0]}
-    captures = {mode: capture(mode) for mode in ('headless', 'headed')}
+    if args.archive is not None:
+        with args.archive.open('rb') as source:
+            identity = {'sha256':hashlib.file_digest(source, 'sha256').hexdigest()}
+    captures = {mode: capture(mode, args.archive) for mode in ('headless', 'headed')}
     for mode, captured in captures.items():
         if captured['inventory']['modelContext'] != 'undefined':
             raise RuntimeError(f'document.modelContext unexpectedly exists ({mode})')
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+    output = args.output or OUTPUT
+    output.mkdir(parents=True, exist_ok=True)
     files = {}
     for mode, captured in captures.items():
         areas = {k:v for k,v in captured.items() if k not in ('sandbox','processes','sandbox_helper')}
@@ -104,7 +115,10 @@ def main():
             files[('headed-' if mode == 'headed' else '') + name + '.json'] = {'archive':identity, 'mode':mode, 'result':values}
     files['cuts.json'] = {'archive':identity, 'modes':['headless', 'headed'], 'result':cuts(captures)}
     for name, content in files.items():
-        (OUTPUT / name).write_text(json.dumps(content, sort_keys=True, indent=2, ensure_ascii=True) + '\n')
+        (output / name).write_text(json.dumps(content, sort_keys=True, indent=2, ensure_ascii=True) + '\n')
+    if args.output is not None:
+        print('recorded ' + str(len(files)) + ' capability files')
+        return
     manifest = ROOT / 'oracle/frozen/SHA256SUMS'
     current = manifest.read_text().splitlines()
     existing = {line.split(maxsplit=1)[1].removeprefix('./') for line in current}
