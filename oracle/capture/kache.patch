@@ -1,23 +1,19 @@
 --- a/Dockerfile
 +++ b/Dockerfile
-@@ -218,5 +218,19 @@
+@@ -218,5 +218,15 @@
      python3 /opt/chromium-build/scripts/preflight-system-libraries.py \
      --lock "/opt/chromium-build/$PACKAGE_LOCK" \
      --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY"
-+ARG KACHE_BASE=https://github.com/joshuarli/kache/releases/download/release-8d78da5c10cf741966733d5cf494b982e9f41d31
-+ADD --checksum=sha256:c4f0101461a84642ffb0512b91056782be6f415458b48e59ea2550fdfb0faa40 \
-+    ${KACHE_BASE}/kache-x86_64-unknown-linux-musl-static.tar.xz /tmp/kache.tar.xz
-+ADD --checksum=sha256:e85bf20cc4d3b10af86a672cb9678d4508869f73abeb2c298d985dce034cf1a9 \
-+    ${KACHE_BASE}/kache-engine-x86_64-unknown-linux-musl-static.tar.xz /tmp/kache-engine.tar.xz
++COPY capture-kache/ /opt/kache/
 +RUN set -eux; \
 +    test "$TARGET_ARCH" = amd64; \
-+    for name in kache kache-engine; do \
-+        tar -xJf "/tmp/$name.tar.xz" -C /tmp; \
-+        install -m 0755 "/tmp/$name-x86_64-unknown-linux-musl-static" "/usr/local/bin/$name"; \
-+        rm -f "/tmp/$name.tar.xz" "/tmp/$name-x86_64-unknown-linux-musl-static"; \
-+    done
++    (cd /opt/kache && sha256sum -c SHA256SUMS); \
++    install -m 0755 /opt/kache/kache /opt/kache/kache-engine /usr/local/bin/; \
++    rm -rf /opt/kache
 +ENV KACHE_CACHE_DIR=/ccache/kache \
-+    KACHE_MAX_SIZE=40GiB
++    KACHE_MAX_SIZE=40GiB \
++    KACHE_CC_PATH_NORMALIZE=0 \
++    KACHE_RUSTC_PATH_NORMALIZE=0
  
  WORKDIR /work
 --- a/config/patches/capture-kache-rustc-wrapper.patch

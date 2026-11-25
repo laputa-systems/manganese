@@ -6,12 +6,18 @@
 #                                      build-target:NAME builds one Ninja target, export copies the packaged
 #                                      archive out of the work volume and qualifies it with the frozen
 #                                      qualify-package.py into .work/oracle/artifacts
+#   oracle/source-oracle kache-report  classify the kache events of the last build; fails when over 1% of its
+#                                      C/C++ compiles were not cached
+#   oracle/source-oracle kache         build the kache commit in oracle/capture/kache.lock from KACHE_REPO
+#                                      (default ~/repos/kache) into the artifact store
 set -eu
 
 fail() { printf 'source-oracle: %s\n' "$*" >&2; exit 1; }
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 capture=$root/oracle/capture
+kache_lock=$capture/kache.lock
 tree=$root/.work/oracle/build
+store=${MANGANESE_STORE:-$HOME/.local/share/manganese/store}
 [ "$(uname -m)" = x86_64 ] || fail "the source oracle builds only on x86_64"
 
 series_digest() {
@@ -25,15 +31,58 @@ series_digest() {
     } | sha256sum | cut -d' ' -f1
 }
 
+# The source tree depends on the series alone, so a kache change rebuilds the image but keeps the
+# prepared source and its build output.
 digest=$(series_digest)
-short=$(printf '%s' "$digest" | cut -c1-12)
+image_digest=$( { printf '%s\n' "$digest"; cat "$kache_lock"; } | sha256sum | cut -d' ' -f1)
+short=$(printf '%s' "$image_digest" | cut -c1-12)
 export CHROMIUM_BUILDER_IMAGE="manganese-oracle-builder:156.0.8078.79-amd64-$short"
 export CHROMIUM_WORK_VOLUME=manganese-oracle-work-amd64
 export CHROMIUM_CACHE_VOLUME=manganese-oracle-cache-amd64
 export JOBS="${JOBS:-$(nproc)}"
 
+kache_binaries() {
+    awk '$0 !~ /^#/ && NF == 2 && $1 ~ /^[0-9a-f]+$/ && length($1) == 64 { print $1, $2 }' "$kache_lock"
+}
+
+kache_field() {
+    awk -v key="$1" '$1 == key && NF == 2 { print $2 }' "$kache_lock"
+}
+
+stage_kache() {
+    mkdir -p "$tree/capture-kache"
+    kache_binaries | while read -r sha name; do
+        file=$store/sha256/$sha
+        printf '%s  %s\n' "$sha" "$file" | sha256sum -c -s 2>/dev/null \
+            || fail "kache $name ($sha) is not in $store; run oracle/source-oracle kache"
+        cp "$file" "$tree/capture-kache/$name"
+        printf '%s  %s\n' "$sha" "$name"
+    done > "$tree/capture-kache/SHA256SUMS"
+    [ "$(wc -l < "$tree/capture-kache/SHA256SUMS")" = 2 ] || fail "kache.lock must list kache and kache-engine"
+}
+
+# Build the locked kache commit in a detached worktree of KACHE_REPO and store the binaries by digest.
+# A build whose digests differ from the lock fails; update the lock only from a reviewed build.
+build_kache() {
+    repo=${KACHE_REPO:-$HOME/repos/kache}
+    commit=$(kache_field commit)
+    [ -n "$commit" ] || fail "kache.lock has no commit"
+    worktree=$repo/.work/wt/manganese-oracle-$(printf '%s' "$commit" | cut -c1-12)
+    [ -e "$worktree" ] || git -C "$repo" worktree add --detach "$worktree" "$commit" >/dev/null
+    [ "$(git -C "$worktree" rev-parse HEAD)" = "$commit" ] || fail "$worktree is not at $commit"
+    (cd "$worktree" && TMPDIR=/tmp make release TARGET=x86_64-unknown-linux-musl) >&2
+    dist=$worktree/target/x86_64-unknown-linux-musl/dist
+    mkdir -p "$store/sha256"
+    kache_binaries | while read -r sha name; do
+        actual=$(sha256sum "$dist/$name" | cut -d' ' -f1)
+        [ "$actual" = "$sha" ] || fail "built $name is $actual, kache.lock pins $sha"
+        cp "$dist/$name" "$store/sha256/$sha"
+        printf 'source-oracle: stored kache %s %s\n' "$name" "$sha"
+    done
+}
+
 make_tree() {
-    if [ "$(cat "$tree/.capture-series" 2>/dev/null || true)" = "$digest" ]; then
+    if [ "$(cat "$tree/.capture-series" 2>/dev/null || true)" = "$image_digest" ]; then
         return 0
     fi
     rm -rf "$tree"
@@ -43,7 +92,8 @@ make_tree() {
         [ -n "$patch" ] || continue
         patch --batch --fuzz=0 -p1 -d "$tree" -i "$capture/$patch" >/dev/null || fail "cannot apply $patch"
     done < "$capture/series"
-    printf '%s\n' "$digest" > "$tree/.capture-series"
+    stage_kache
+    printf '%s\n' "$image_digest" > "$tree/.capture-series"
 }
 
 # A prepared source tree records the series it was prepared with; a different series re-prepares it.
@@ -82,7 +132,11 @@ export_archive() {
     printf '%s\n' "$digest" > "$artifacts/capture-series"
 }
 
-[ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | PHASE..."
+[ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | kache | PHASE..."
+if [ "$1" = kache ]; then
+    build_kache
+    exit 0
+fi
 make_tree
 [ "$1" = tree ] && exit 0
 for phase in "$@"; do
@@ -99,6 +153,10 @@ for phase in "$@"; do
             ;;
         export)
             export_archive
+            ;;
+        kache-report)
+            docker run --rm --network=none -v "$CHROMIUM_WORK_VOLUME:/work" -v "$CHROMIUM_CACHE_VOLUME:/ccache" \
+                -v "$capture/kache-report.py:/kache-report.py:ro" "$CHROMIUM_BUILDER_IMAGE" python3 -I /kache-report.py
             ;;
         *)
             (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release \
