@@ -25,7 +25,8 @@ def close(session, browser):
     result = session.probe('--close')
     code = browser.wait(timeout=15)
     if not result['shutdown']['ok'] or code != 0:
-        raise RuntimeError(f'Browser.close failed: {result}, exit {code}')
+        log = (session.run_dir / 'browser.log').read_text(errors='replace').splitlines()[-25:]
+        raise RuntimeError(f"Browser.close failed: shutdown {result.get('shutdown')}, exit {code}, log {log}")
 
 
 def expected(value):
