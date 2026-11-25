@@ -31,7 +31,7 @@ def replay(segments: list[list[object]], idle_ms: int) -> dict[str, object]:
         while True:
             try:
                 chunk = connection.recv(1 << 20)
-            except TimeoutError:
+            except (TimeoutError, BlockingIOError):
                 break
             except ConnectionResetError:
                 closed = True

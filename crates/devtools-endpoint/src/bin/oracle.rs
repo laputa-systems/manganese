@@ -21,15 +21,7 @@ fn relay(request: &[u8]) -> io::Result<Vec<u8>> {
 }
 
 fn main() -> ExitCode {
-    let mut failure = None;
-    let result = wire::serve_box(|request| match relay(request) {
-        Ok(reply) => reply,
-        Err(error) => {
-            failure.get_or_insert(error);
-            Vec::new()
-        }
-    });
-    if let Some(error) = failure.or(result.err()) {
+    if let Err(error) = wire::serve_box(relay) {
         let _ = writeln!(io::stderr(), "devtools-endpoint-oracle: {error}");
         return ExitCode::FAILURE;
     }

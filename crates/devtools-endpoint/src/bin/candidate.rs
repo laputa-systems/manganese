@@ -64,15 +64,7 @@ fn answer(request: &[u8]) -> std::io::Result<Vec<u8>> {
 }
 
 fn main() -> ExitCode {
-    let mut failure = None;
-    let result = serve_box(|request| match answer(request) {
-        Ok(reply) => reply,
-        Err(error) => {
-            failure.get_or_insert(error);
-            Vec::new()
-        }
-    });
-    if let Some(error) = failure.or(result.err()) {
+    if let Err(error) = serve_box(answer) {
         let _ = writeln!(std::io::stderr(), "devtools-endpoint: {error}");
         return ExitCode::FAILURE;
     }

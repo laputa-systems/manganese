@@ -77,7 +77,9 @@ pub fn write_frame(output: &mut impl Write, frame: &[u8]) -> io::Result<()> {
     output.flush()
 }
 
-pub fn serve_box(mut answer: impl FnMut(&[u8]) -> Vec<u8>) -> io::Result<()> {
+/// Serve MGB1 requests until stdin closes. A failed request stops the adapter before it answers, so
+/// the runner reports the failure instead of comparing an empty reply.
+pub fn serve_box(mut answer: impl FnMut(&[u8]) -> io::Result<Vec<u8>>) -> io::Result<()> {
     let mut stdin = io::stdin().lock();
     let mut stdout = io::stdout().lock();
     let mut magic = [0; 4];
@@ -88,7 +90,7 @@ pub fn serve_box(mut answer: impl FnMut(&[u8]) -> Vec<u8>) -> io::Result<()> {
     stdout.write_all(b"MGB1")?;
     stdout.flush()?;
     while let Some(request) = read_frame(&mut stdin)? {
-        write_frame(&mut stdout, &answer(&request))?;
+        write_frame(&mut stdout, &answer(&request)?)?;
     }
     Ok(())
 }
