@@ -1,7 +1,7 @@
 # kache for the source oracle's builder image, built with `make release TARGET=x86_64-unknown-linux-musl`
-# from a local commit of the owned kache repository; the branch is not pushed (docs/roadmap.md, N7).
+# from a commit on the owned kache repository's main branch.
 repository https://github.com/joshuarli/kache
-branch feat/cc-chromium-linux-flags
-commit 91ae65be6e045e42cf6faa2b6047cd36cffe34c9
+branch main
+commit 017443627f046a2787a6b1b1b329900867e373e3
 3ee6fd4115432fd6ca6f1a2923fd3c2fa2bd66ee8d77b25991385485b8a644e1 kache
 b5d64427046e619324cc3a37fcfc41eb0c56de6cfad823d560cebaa8814b4f94 kache-engine
