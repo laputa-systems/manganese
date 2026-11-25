@@ -1,0 +1,107 @@
+//third_party/zlib	third_party/zlib	compression	target	reuse	Q01
+//third_party/libpng	third_party/libpng	PNG	target	reuse	M03
+//third_party/harfbuzz	third_party/harfbuzz	text shaping	target	reuse	H01
+//third_party/blink	third_party/blink	web platform	target	port	F01
+//third_party/crashpad	third_party/crashpad	crash reporting	target	remove	A05
+//third_party/breakpad	third_party/breakpad	crash reporting	target	remove	A05
+//third_party/pdfium	third_party/pdfium	PDF	target	remove	A05
+//third_party/vulkan-	{family}	Vulkan infrastructure	target	remove	I07
+//third_party/angle	third_party/angle	graphics	target	extend	I07
+//third_party/swiftshader	third_party/swiftshader	graphics	target	extend	I09
+//third_party/dawn	third_party/dawn	graphics	target	extend	I11
+//third_party/ffmpeg	third_party/ffmpeg	media	target	port	K02
+//third_party/icu	third_party/icu	internationalization	target	port	H07
+//third_party/skia	third_party/skia	raster	target	port	I01
+//third_party/rust/	third_party/rust	Rust dependencies	target	reuse	A10
+//third_party/libjpeg_turbo	third_party/libjpeg_turbo	JPEG	target	reuse	M02
+//third_party/libwebp	third_party/libwebp	WebP	target	reuse	M04
+//third_party/libavif	third_party/libavif	AVIF	target	reuse	M06
+//third_party/freetype	third_party/freetype	font rasterization	target	extend	H03
+//third_party/woff2	third_party/woff2	web fonts	target	reuse	H05
+//third_party/ots	third_party/ots	font sanitization	target	port	H05
+//third_party/brotli	third_party/brotli	compression	target	reuse	Q02
+//third_party/zstd	third_party/zstd	compression	target	reuse	Q03
+//third_party/leveldatabase	third_party/leveldatabase	storage	target	reuse	P02
+//third_party/sqlite	third_party/sqlite	storage	target	extend	P01
+//third_party/re2	third_party/re2	regular expressions	target	reuse	Q06
+//third_party/	{family}	third-party dependency	target	port	A05
+//third_party:	{family}	third-party dependency	target	port	A05
+//v8/	v8	JavaScript engine	target	port	E01
+//v8:	v8	JavaScript engine	target	port	E01
+//net/	net	networking	target	port	N01
+//net:	net	networking	target	port	N01
+//build/	build	oracle build	host	retain-oracle-only	A03
+//build:	build	oracle build	host	retain-oracle-only	A03
+//buildtools/	buildtools	oracle build	host	retain-oracle-only	A03
+//buildtools:	buildtools	oracle build	host	retain-oracle-only	A03
+//tools/	tools	oracle build	host	retain-oracle-only	A03
+//tools:	tools	oracle build	host	retain-oracle-only	A03
+//testing/	testing	tests	test-only	retain-oracle-only	A03
+//testing:	testing	tests	test-only	retain-oracle-only	A03
+//sandbox/	sandbox	process isolation	target	port	B04
+//sandbox:	sandbox	process isolation	target	port	B04
+//pdf/	pdf	PDF	target	remove	A05
+//pdf:	pdf	PDF	target	remove	A05
+//printing/	printing	printing	target	remove	A05
+//printing:	printing	printing	target	remove	A05
+//base/	base	browser infrastructure	target	port	B01
+//base:	base	browser infrastructure	target	port	B01
+//chrome/	chrome	browser shell	target	port	A05
+//chrome:	chrome	browser shell	target	port	A05
+//components/	components	browser features	target	port	A05
+//components:	components	browser features	target	port	A05
+//content/	content	browser engine	target	port	F01
+//content:	content	browser engine	target	port	F01
+//services/	services	browser services	target	port	A05
+//services:	services	browser services	target	port	A05
+//ui/	ui	browser user interface	target	port	A05
+//ui:	ui	browser user interface	target	port	A05
+//media/	media	media	target	port	K01
+//media:	media	media	target	port	K01
+//extensions/	extensions	extensions	target	port	R05
+//extensions:	extensions	extensions	target	port	R05
+//gpu/	gpu	graphics	target	extend	I06
+//gpu:	gpu	graphics	target	extend	I06
+//device/	device	device APIs	target	port	A05
+//device:	device	device APIs	target	port	A05
+//mojo/	mojo	IPC	target	port	B01
+//mojo:	mojo	IPC	target	port	B01
+//skia/	skia	raster	target	port	I01
+//skia:	skia	raster	target	port	I01
+//url/	url	URL parsing	target	port	N01
+//url:	url	URL parsing	target	port	N01
+//cc/	cc	compositing	target	port	I01
+//cc:	cc	compositing	target	port	I01
+//ipc/	ipc	IPC	target	port	B01
+//ipc:	ipc	IPC	target	port	B01
+//storage/	storage	storage	target	port	P03
+//storage:	storage	storage	target	port	P03
+//google_apis/	google_apis	Google services	target	remove	A05
+//google_apis:	google_apis	Google services	target	remove	A05
+//crypto/	crypto	cryptography	target	port	N01
+//crypto:	crypto	cryptography	target	port	N01
+//chromeos/	chromeos	ChromeOS	target	remove	A05
+//chromeos:	chromeos	ChromeOS	target	remove	A05
+//apps/	apps	browser apps	target	port	A05
+//apps:	apps	browser apps	target	port	A05
+//sql/	sql	storage	target	extend	P01
+//sql:	sql	storage	target	extend	P01
+//gin/	gin	JavaScript bindings	target	port	E01
+//gin:	gin	JavaScript bindings	target	port	E01
+//rlz/	rlz	Google services	target	remove	A05
+//rlz:	rlz	Google services	target	remove	A05
+builder/font-noto	{package}	embedded fonts	data	reuse	H04
+builder/fontconfig	{package}	font configuration	data	remove	H04
+builder/zlib-	{package}	compression	target	reuse	Q01
+builder/nss-	{package}	TLS and certificates	target	reuse	N01
+builder/nspr-	{package}	TLS and certificates	target	reuse	N01
+builder/sqlite-	{package}	storage	target	extend	P01
+builder/libexpat-	{package}	XML	target	extend	F01
+builder/libxkbcommon-	{package}	keyboard input	target	reuse	R01
+builder/wayland-	{package}	Wayland session	target	reuse	R01
+builder/musl-	{package}	C runtime	target	reuse	B04
+builder/	{package}	platform runtime closure	target	remove	A04
+oracle/packaging	oracle packaging	archive layout	data	retain-oracle-only	A03
+//.rustfmt.toml	build	oracle build configuration	build-tool	retain-oracle-only	A03
+//package.json	build	oracle build configuration	build-tool	retain-oracle-only	A03
+toolchain/chromium-llvm	chromium-llvm	compiler and linker	build-tool	retain-oracle-only	A03

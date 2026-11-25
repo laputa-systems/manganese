@@ -24,10 +24,13 @@ oracle-launch:
 oracle-gate-a:
 	sh oracle/source-oracle image ensure-source gate-a
 
+census:
+	python3 -B oracle/probes/census/census.py
+
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
 
 assembly:
 	sh scripts/assembly "$(A)"
 
-.PHONY: setup check lint test artifact-selftest oracle-launch oracle-gate-a box assembly
+.PHONY: setup check lint test artifact-selftest oracle-launch oracle-gate-a census box assembly

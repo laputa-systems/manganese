@@ -9,3 +9,6 @@ c39950c8558ab5517b7ff6e4e9c4817e45cdad996b6241c6bb9ace57830b5c7e  ./arm64-r2/arc
 244953d6ef795ebc946d3f9bc3a0af7b9cc9767a3c2660dd665505c51ae1f420  ./arm64-r2/package-manifest.json
 82007d3df2da918133025268a8989fcb7028103f1bbc9a538cbb2767a86ac784  ./arm64-r2/test-fast.json
 c8a6832a0e35604fad47d061fa323daa60537ec264fbbceb797e3d0df825c903  ./artifacts.lock
+8394e31fe14ed6e829ee758ae7e0e17ef535e63e1d0838c7b449d54b9f32bdce  ./census/staged.json
+a8b70acfdf0aeae0ee61a8371072aeebe4be842ca9254917a2028edc8987366d  ./census/store-manifest.txt
+e5e9f5d56dde0ca10d1a93e13e96edcfbc87627f17c77882c95e4d1fdfc272be  ./census/summary.json
