@@ -110,5 +110,6 @@ pub use mem_env::MemEnv;
 pub use options::{in_memory, CompressorList, Options, ReadOptions};
 pub use repair::repair_db;
 pub use skipmap::SkipMap;
+pub use snapshot::Snapshot;
 pub use types::LdbIterator;
 pub use write_batch::WriteBatch;

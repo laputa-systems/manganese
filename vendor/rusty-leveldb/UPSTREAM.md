@@ -13,3 +13,5 @@ Lock failures retain the `std::io::Error` returned by the operating-system lock 
 Disk locks use POSIX record locks on Unix, with a process-wide file-identity table, so they exclude Chromium's file locks as well as other instances in the same process. Other platforms use the standard library's file lock.
 
 A deletion encountered during table lookup hides an older value only when its user key matches the requested key.
+
+`Options::filter_policy` is optional: without a policy no filter block is written or read, as in LevelDB. Table opening verifies the index block checksum only under `paranoid_checks`, reads the metaindex only when a policy is set, and a damaged metaindex or filter block disables filtering instead of failing the table. Malformed filter blocks and Bloom filters shorter than two bytes follow LevelDB's matching rules instead of panicking. `Snapshot` is exported so callers can hold snapshots by name.

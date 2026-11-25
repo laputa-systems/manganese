@@ -146,8 +146,8 @@ impl FilterPolicy for BloomPolicy {
         filter
     }
     fn key_may_match(&self, key: &[u8], filter: &[u8]) -> bool {
-        if filter.is_empty() {
-            return true;
+        if filter.len() < 2 {
+            return false;
         }
 
         let bits = (filter.len() - 1) as u32 * 8;
@@ -271,6 +271,13 @@ mod tests {
         });
 
         fpol.create_filter(&intdata, &intoffs)
+    }
+
+    #[test]
+    fn a_bloom_filter_shorter_than_two_bytes_matches_nothing() {
+        let policy = BloomPolicy::new(10);
+        assert!(!policy.key_may_match(b"key", &[]));
+        assert!(!policy.key_may_match(b"key", &[6]));
     }
 
     #[test]

@@ -110,6 +110,7 @@ pub struct FilterBlockReader {
     block: Rc<BlockContents>,
 
     offsets_offset: usize,
+    filters: usize,
     filter_base_lg2: u32,
 }
 
@@ -118,23 +119,33 @@ impl FilterBlockReader {
         FilterBlockReader::new(pol, Rc::new(data.into()))
     }
 
+    /// Parses a filter block. Like LevelDB, a block too short for its trailer or whose offset
+    /// array lies outside the block holds no filters, so every key may match.
     pub fn new(pol: BoxedFilterPolicy, data: Rc<BlockContents>) -> FilterBlockReader {
-        assert!(data.len() >= 5);
-
-        let fbase = data[data.len() - 1] as u32;
-        let offset = u32::decode_fixed(&data[data.len() - 5..data.len() - 1]) as usize;
-
-        FilterBlockReader {
+        let mut reader = FilterBlockReader {
             policy: pol,
             block: data,
-            filter_base_lg2: fbase,
-            offsets_offset: offset,
+            filter_base_lg2: 0,
+            offsets_offset: 0,
+            filters: 0,
+        };
+        let n = reader.block.len();
+        if n < 5 {
+            return reader;
         }
+        reader.filter_base_lg2 = reader.block[n - 1] as u32;
+        let offsets_offset = u32::decode_fixed(&reader.block[n - 5..n - 1]) as usize;
+        if offsets_offset > n - 5 {
+            return reader;
+        }
+        reader.offsets_offset = offsets_offset;
+        reader.filters = (n - 5 - offsets_offset) / 4;
+        reader
     }
 
     /// Returns number of filters
     pub fn num(&self) -> u32 {
-        ((self.block.len() - self.offsets_offset - 5) / 4) as u32
+        self.filters as u32
     }
 
     /// Returns the offset of the offset with index i.
@@ -145,19 +156,22 @@ impl FilterBlockReader {
 
     /// blk_offset is the offset of the block containing key. Returns whether the key matches the
     /// filter for the block at blk_offset.
+    ///
+    /// As in LevelDB, an out-of-range index or a malformed filter range may match, and an empty
+    /// filter matches nothing.
     pub fn key_may_match(&self, blk_offset: usize, key: &[u8]) -> bool {
-        if get_filter_index(blk_offset, self.filter_base_lg2) > self.num() {
+        let index = (blk_offset as u64).wrapping_shr(self.filter_base_lg2);
+        if index >= self.filters as u64 {
             return true;
         }
-
-        let filter_begin = self.offset_of(get_filter_index(blk_offset, self.filter_base_lg2));
-        let filter_end = self.offset_of(get_filter_index(blk_offset, self.filter_base_lg2) + 1);
-
-        assert!(filter_begin < filter_end);
-        assert!(filter_end <= self.offsets_offset);
-
-        self.policy
-            .key_may_match(key, &self.block[filter_begin..filter_end])
+        let index = index as u32;
+        let filter_begin = self.offset_of(index);
+        let filter_end = self.offset_of(index + 1);
+        if filter_begin <= filter_end && filter_end <= self.offsets_offset {
+            self.policy.key_may_match(key, &self.block[filter_begin..filter_end])
+        } else {
+            filter_begin != filter_end
+        }
     }
 }
 
@@ -212,6 +226,32 @@ mod tests {
                 0, 0, 0, 17, 0, 0, 0, 17, 0, 0, 0, 34, 0, 0, 0, 11,
             ]
         );
+    }
+
+    #[test]
+    fn malformed_filter_blocks_match_every_key() {
+        let policy: BoxedFilterPolicy = Rc::new(Box::new(BloomPolicy::new(32)));
+        for block in [vec![], vec![0; 4], vec![0, 0, 0, 0xff, 11], vec![1, 2, 3, 0xff, 0xff, 0xff, 0xff, 11]] {
+            let reader = FilterBlockReader::new_owned(policy.clone(), block);
+            assert_eq!(reader.num(), 0);
+            assert!(reader.key_may_match(0, b"abcd"));
+        }
+        let mut reversed = produce_filter_block();
+        let offsets = u32::decode_fixed(&reversed[reversed.len() - 5..reversed.len() - 1]) as usize;
+        reversed[offsets..offsets + 4].copy_from_slice(&40u32.to_le_bytes());
+        let reader = FilterBlockReader::new_owned(policy, reversed);
+        assert!(reader.key_may_match(0, b"xsb"));
+    }
+
+    #[test]
+    fn an_empty_filter_matches_no_key() {
+        let mut bld = FilterBlockBuilder::new(Rc::new(Box::new(BloomPolicy::new(32))));
+        bld.start_block(0);
+        bld.start_block(5000);
+        bld.add_key(b"abcd");
+        let reader = FilterBlockReader::new_owned(Rc::new(Box::new(BloomPolicy::new(32))), bld.finish());
+        assert!(!reader.key_may_match(0, b"abcd"));
+        assert!(reader.key_may_match(5000, b"abcd"));
     }
 
     #[test]

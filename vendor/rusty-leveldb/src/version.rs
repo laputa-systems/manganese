@@ -896,7 +896,7 @@ mod tests {
             (b"aaz", b"new", ValueType::TypeValue),
         ], 31, 10);
         version.files[0].push(newer);
-        opt.filter_policy = Rc::new(Box::new(crate::filter::NoFilterPolicy::new()));
+        opt.filter_policy = None;
         version.table_cache = share(crate::table_cache::TableCache::new(
             "db", opt, share(crate::cache::Cache::new(128)), 100));
         let key = LookupKey::new(b"aab", 100);

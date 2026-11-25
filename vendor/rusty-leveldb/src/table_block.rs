@@ -3,42 +3,11 @@ use crate::blockhandle::BlockHandle;
 use crate::crc;
 use crate::env::RandomAccess;
 use crate::error::{err, Result, StatusCode};
-use crate::filter;
-use crate::filter_block::FilterBlockReader;
 use crate::log::unmask_crc;
 use crate::options::Options;
 use crate::table_builder;
 
 use integer_encoding::FixedInt;
-
-/// Reads the data for the specified block handle from a file.
-fn read_bytes_from_file(f: &dyn RandomAccess, offset: usize, size: usize) -> Result<Vec<u8>> {
-    let mut buf = vec![0; size];
-    let bytes_read = f.read_at(offset, &mut buf)?;
-    if bytes_read != size {
-        return err(
-            StatusCode::IOError,
-            "Failed to read complete data from file",
-        );
-    }
-    Ok(buf)
-}
-
-/// Reads a serialized filter block from a file and returns a FilterBlockReader.
-pub fn read_filter_block(
-    src: &dyn RandomAccess,
-    location: &BlockHandle,
-    policy: filter::BoxedFilterPolicy,
-) -> Result<FilterBlockReader> {
-    if location.size() == 0 {
-        return err(
-            StatusCode::InvalidArgument,
-            "no filter block in empty location",
-        );
-    }
-    let buf = read_bytes_from_file(src, location.offset(), location.size())?;
-    Ok(FilterBlockReader::new_owned(policy, buf))
-}
 
 /// Reads a table block from a random-access source.
 /// A table block consists of [bytes..., compress (1B), checksum (4B)]; the handle only refers to
@@ -57,6 +26,18 @@ pub(crate) fn read_table_block_with_checksum(
     location: &BlockHandle,
     verify_checksum: bool,
 ) -> Result<Block> {
+    let contents = read_block_contents(&opt, f, location, verify_checksum)?;
+    Block::try_new(opt, contents.into())
+}
+
+/// Reads a block and its trailer, verifies the trailer checksum when requested, and returns the
+/// decompressed contents.
+pub(crate) fn read_block_contents(
+    opt: &Options,
+    f: &dyn RandomAccess,
+    location: &BlockHandle,
+    verify_checksum: bool,
+) -> Result<Vec<u8>> {
     let data_size = location.size();
     let trailer_size =
         table_builder::TABLE_BLOCK_COMPRESS_LEN + table_builder::TABLE_BLOCK_CKSUM_LEN;
@@ -93,11 +74,7 @@ pub(crate) fn read_table_block_with_checksum(
 
     // The compressor's decode method expects a Vec<u8>.
     // If block_data_slice is empty, to_vec() is fine.
-    let decoded_data = compressor_list
-        .get(compress_type)?
-        .decode(block_data_slice.to_vec())?;
-
-    Block::try_new(opt, decoded_data.into())
+    compressor_list.get(compress_type)?.decode(block_data_slice.to_vec())
 }
 
 /// Verify checksum of block

@@ -9,7 +9,6 @@ use crate::db_iter::DBIterator;
 use crate::cmp::{Cmp, InternalKeyCmp};
 use crate::env::{Env, FileLock, WritableFile};
 use crate::error::{err, Result, Status, StatusCode};
-use crate::filter::{BoxedFilterPolicy, InternalFilterPolicy};
 use crate::infolog::Logger;
 use crate::key_types::{parse_internal_key, InternalKey, LookupKey, ValueType};
 use crate::log::{LogReader, LogWriter};
@@ -47,7 +46,6 @@ pub struct DB {
     lock: Option<FileLock>,
 
     internal_cmp: Rc<Box<dyn Cmp>>,
-    fpol: InternalFilterPolicy<BoxedFilterPolicy>,
     opt: Options,
 
     mem: MemTable,
@@ -90,7 +88,6 @@ impl DB {
             path,
             lock: None,
             internal_cmp: Rc::new(Box::new(InternalKeyCmp(opt.cmp.clone()))),
-            fpol: InternalFilterPolicy::new(opt.filter_policy.clone()),
 
             mem: MemTable::new(opt.cmp.clone()),
             imm: None,

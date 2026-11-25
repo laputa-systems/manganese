@@ -40,7 +40,9 @@ pub struct Options {
     pub compressor_list: Rc<CompressorList>,
     pub reuse_logs: bool,
     pub reuse_manifest: bool,
-    pub filter_policy: filter::BoxedFilterPolicy,
+    /// The filter policy for new tables and for reading table filters; `None` writes and reads
+    /// no filter, as LevelDB does without a policy.
+    pub filter_policy: Option<filter::BoxedFilterPolicy>,
 }
 
 /// Per-read checksum and block-cache policy.
@@ -87,7 +89,7 @@ impl Default for Options {
             reuse_manifest: true,
             compressor: 0,
             compressor_list: Rc::new(CompressorList::default()),
-            filter_policy: Rc::new(Box::new(filter::BloomPolicy::new(DEFAULT_BITS_PER_KEY))),
+            filter_policy: Some(Rc::new(Box::new(filter::BloomPolicy::new(DEFAULT_BITS_PER_KEY)))),
         }
     }
 }

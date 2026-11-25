@@ -1,7 +1,7 @@
 use crate::block::{Block, BlockIter};
 use crate::blockhandle::BlockHandle;
 use crate::cache::{self, Cache};
-use crate::cmp::InternalKeyCmp;
+use crate::cmp::{DefaultCmp, InternalKeyCmp};
 use crate::env::RandomAccess;
 use crate::error::{self, err, Result, Status};
 use crate::filter;
@@ -71,14 +71,13 @@ impl Table {
     ) -> Result<Table> {
         let footer = read_footer(file.as_ref().as_ref(), size)?;
         validate_location(&footer.index, size)?;
-        validate_location(&footer.meta_index, size)?;
-        let indexblock =
-            table_block::read_table_block(opt.clone(), file.as_ref().as_ref(), &footer.index)?;
-        let metaindexblock =
-            table_block::read_table_block(opt.clone(), file.as_ref().as_ref(), &footer.meta_index)?;
-
-        let filter_block_reader =
-            Table::read_filter_block(&metaindexblock, file.as_ref().as_ref(), &opt, size)?;
+        let indexblock = table_block::read_table_block_with_checksum(
+            opt.clone(),
+            file.as_ref().as_ref(),
+            &footer.index,
+            opt.paranoid_checks,
+        )?;
+        let filter_block_reader = Table::read_filter_block(&footer, file.as_ref().as_ref(), &opt, size);
         let cache_id = block_cache.borrow_mut().new_cache_id();
 
         Ok(Table {
@@ -93,42 +92,43 @@ impl Table {
         })
     }
 
+    /// Reads the filter for the configured policy. As in LevelDB, a table without a policy reads
+    /// no metadata, and a damaged metaindex or filter block only disables filtering, because
+    /// lookups do not need it.
     fn read_filter_block(
-        metaix: &Block,
+        footer: &Footer,
         file: &dyn RandomAccess,
         options: &Options,
         file_size: usize,
-    ) -> Result<Option<FilterBlockReader>> {
-        // Open filter block for reading
-        let filter_name = format!("filter.{}", options.filter_policy.name())
-            .as_bytes()
-            .to_vec();
-
-        let mut metaindexiter = metaix.iter();
-        metaindexiter.seek(&filter_name);
-        metaindexiter.status()?;
-
-        if let Some((_key, val)) = current_key_val(&metaindexiter) {
-            let fbl = BlockHandle::decode(&val);
-            let filter_block_location = match fbl {
-                None => {
-                    return err(
-                        error::StatusCode::Corruption,
-                        &format!("Couldn't decode corrupt blockhandle {:?}", val),
-                    )
-                }
-                Some(ok) => ok.0,
-            };
-            if filter_block_location.size() > 0 {
-                validate_location(&filter_block_location, file_size)?;
-                return Ok(Some(table_block::read_filter_block(
-                    file,
-                    &filter_block_location,
-                    options.filter_policy.clone(),
-                )?));
-            }
+    ) -> Option<FilterBlockReader> {
+        let policy = options.filter_policy.as_ref()?;
+        validate_location(&footer.meta_index, file_size).ok()?;
+        let mut meta_options = options.clone();
+        meta_options.cmp = Rc::new(Box::new(DefaultCmp));
+        let metaindex = table_block::read_table_block_with_checksum(
+            meta_options,
+            file,
+            &footer.meta_index,
+            options.paranoid_checks,
+        )
+        .ok()?;
+        let filter_name = format!("filter.{}", policy.name());
+        let mut metaindexiter = metaindex.iter();
+        metaindexiter.seek(filter_name.as_bytes());
+        let (key, value) = current_key_val(&metaindexiter)?;
+        if key != filter_name.as_bytes() {
+            return None;
         }
-        Ok(None)
+        let (location, _) = BlockHandle::decode(&value)?;
+        validate_location(&location, file_size).ok()?;
+        let contents = table_block::read_block_contents(
+            options,
+            file,
+            &location,
+            options.paranoid_checks,
+        )
+        .ok()?;
+        Some(FilterBlockReader::new_owned(policy.clone(), contents))
     }
 
     /// Creates a new table reader operating on internal keys (i.e., InternalKey). This means that
@@ -141,9 +141,9 @@ impl Table {
         size: usize,
     ) -> Result<Table> {
         opt.cmp = Rc::new(Box::new(InternalKeyCmp(opt.cmp.clone())));
-        opt.filter_policy = Rc::new(Box::new(filter::InternalFilterPolicy::new(
-            opt.filter_policy,
-        )));
+        opt.filter_policy = opt.filter_policy.map(|policy| -> filter::BoxedFilterPolicy {
+            Rc::new(Box::new(filter::InternalFilterPolicy::new(policy)))
+        });
         Table::new_raw(opt, block_cache, file, size)
     }
 
@@ -504,7 +504,7 @@ mod tests {
         let mut opt = options::for_test();
         opt.block_restart_interval = 1;
         opt.block_size = 32;
-        opt.filter_policy = Rc::new(Box::new(BloomPolicy::new(4)));
+        opt.filter_policy = Some(Rc::new(Box::new(BloomPolicy::new(4))));
 
         let mut i = 1_u64;
         let data: Vec<(Vec<u8>, &'static str)> = build_data()
@@ -875,6 +875,84 @@ mod tests {
             assert!(filter_reader.key_may_match(iter.current_block_off, userkey));
             assert!(!filter_reader.key_may_match(iter.current_block_off, b"somerandomkey"));
         }
+    }
+
+    fn build_table_with(opt: Options) -> Vec<u8> {
+        let mut contents = Vec::new();
+        {
+            let mut builder = TableBuilder::new_raw(opt, &mut contents);
+            for &(k, v) in build_data().iter() {
+                builder.add(k.as_bytes(), v.as_bytes()).unwrap();
+            }
+            builder.finish().unwrap();
+        }
+        contents
+    }
+
+    #[test]
+    fn a_table_without_a_filter_policy_has_no_filter_and_reads_back() {
+        let mut opt = options::for_test();
+        opt.filter_policy = None;
+        opt.block_size = 32;
+        let contents = build_table_with(opt.clone());
+        let size = contents.len();
+
+        let mut bloom = options::for_test();
+        bloom.block_size = 32;
+        let filtered = Table::new_raw(bloom, share(Cache::new(16)), wrap_buffer(contents.clone()), size).unwrap();
+        assert!(filtered.filters.is_none());
+
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        assert!(table.filters.is_none());
+        for &(k, v) in build_data().iter() {
+            let (key, value) = table.get(k.as_bytes()).unwrap().unwrap();
+            assert_eq!((key.as_ref(), value.as_ref()), (k.as_bytes(), v.as_bytes()));
+        }
+    }
+
+    #[test]
+    fn a_table_with_a_damaged_filter_block_still_answers_lookups() {
+        let mut opt = options::for_test();
+        opt.block_size = 32;
+        opt.compressor = compressor::NoneCompressor::ID;
+        let mut contents = build_table_with(opt.clone());
+        let size = contents.len();
+        let footer = read_footer(&contents, size).unwrap();
+        let metaindex = table_block::read_table_block(opt.clone(), &contents, &footer.meta_index).unwrap();
+        let mut iter = metaindex.iter();
+        iter.seek_to_first();
+        let (_, handle) = current_key_val(&iter).unwrap();
+        let (location, _) = BlockHandle::decode(&handle).unwrap();
+        contents[location.offset() + location.size() - 3] ^= 0x80;
+
+        let table = Table::new_raw(opt.clone(), share(Cache::new(16)), wrap_buffer(contents.clone()), size).unwrap();
+        assert!(table.filters.is_some());
+        for &(k, v) in build_data().iter() {
+            assert_eq!(table.get(k.as_bytes()).unwrap().unwrap().1.as_ref(), v.as_bytes());
+        }
+
+        opt.paranoid_checks = true;
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        assert!(table.filters.is_none());
+        for &(k, v) in build_data().iter() {
+            assert_eq!(table.get(k.as_bytes()).unwrap().unwrap().1.as_ref(), v.as_bytes());
+        }
+    }
+
+    #[test]
+    fn the_index_checksum_is_verified_only_under_paranoid_checks() {
+        let mut opt = options::for_test();
+        opt.block_size = 32;
+        opt.compressor = compressor::NoneCompressor::ID;
+        let mut contents = build_table_with(opt.clone());
+        let size = contents.len();
+        let footer = read_footer(&contents, size).unwrap();
+        contents[footer.index.offset() + footer.index.size() + 1] ^= 1;
+
+        assert!(Table::new_raw(opt.clone(), share(Cache::new(16)), wrap_buffer(contents.clone()), size).is_ok());
+        opt.paranoid_checks = true;
+        let error = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).err().unwrap();
+        assert_eq!(error.code, error::StatusCode::Corruption);
     }
 
     #[test]

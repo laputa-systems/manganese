@@ -5,7 +5,7 @@ use crate::cmp::InternalKeyCmp;
 use crate::compressor::{self, Compressor, CompressorId};
 use crate::crc;
 use crate::error::Result;
-use crate::filter::{InternalFilterPolicy, NoFilterPolicy};
+use crate::filter::{BoxedFilterPolicy, InternalFilterPolicy};
 use crate::filter_block::FilterBlockBuilder;
 use crate::key_types::InternalKey;
 use crate::log::mask_crc;
@@ -94,7 +94,7 @@ pub struct TableBuilder<Dst: Write> {
 
 impl<Dst: Write> TableBuilder<Dst> {
     pub fn new_no_filter(mut opt: Options, dst: Dst) -> TableBuilder<Dst> {
-        opt.filter_policy = Rc::new(Box::new(NoFilterPolicy::new()));
+        opt.filter_policy = None;
         TableBuilder::new(opt, dst)
     }
 }
@@ -107,7 +107,9 @@ impl<Dst: Write> TableBuilder<Dst> {
     /// in an InternalFilterPolicy.
     pub fn new(mut opt: Options, dst: Dst) -> TableBuilder<Dst> {
         opt.cmp = Rc::new(Box::new(InternalKeyCmp(opt.cmp.clone())));
-        opt.filter_policy = Rc::new(Box::new(InternalFilterPolicy::new(opt.filter_policy)));
+        opt.filter_policy = opt
+            .filter_policy
+            .map(|policy| -> BoxedFilterPolicy { Rc::new(Box::new(InternalFilterPolicy::new(policy))) });
         TableBuilder::new_raw(opt, dst)
     }
 
@@ -120,7 +122,7 @@ impl<Dst: Write> TableBuilder<Dst> {
             prev_block_last_key: vec![],
             num_entries: 0,
             data_block: Some(BlockBuilder::new(opt.clone())),
-            filter_block: Some(FilterBlockBuilder::new(opt.filter_policy.clone())),
+            filter_block: opt.filter_policy.clone().map(FilterBlockBuilder::new),
             index_block: Some(BlockBuilder::new(opt)),
         }
     }
