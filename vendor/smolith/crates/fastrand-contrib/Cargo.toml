@@ -1,0 +1,26 @@
+[package]
+name = "laputa-fastrand-contrib"
+version.workspace = true
+authors = ["John Nunley <dev@notgull.net>", "Petr Nevyhoštěný <petr.nevyhosteny@gmail.com>"]
+edition = "2018"
+rust-version.workspace = true
+description = "Extension functionality for fastrand"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["simple", "fast", "rand", "random", "wyrand"]
+categories = ["algorithms"]
+exclude = ["/.*"]
+
+[lib]
+name = "fastrand_contrib"
+
+[dependencies]
+fastrand = { workspace = true, default-features = false }
+libm_dep = { package = "libm", version = "0.2.7", optional = true }
+
+[features]
+default = ["std"]
+std = ["alloc", "fastrand/std"]
+alloc = ["fastrand/alloc"]
+# The `dep:` syntax was added in Rust 1.60. Our current MSRV is 1.43.
+libm = ["libm_dep"]

@@ -1,0 +1,32 @@
+[package]
+name = "laputa-event-listener-strategy"
+version.workspace = true
+edition = "2021"
+authors = ["John Nunley <dev@notgull.net>"]
+rust-version.workspace = true
+description = "Block or poll on event_listener easily"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["condvar", "envcount", "wake", "blocking", "park"]
+categories = ["asynchronous", "concurrency"]
+exclude = ["/.*"]
+
+[lib]
+name = "event_listener_strategy"
+
+[dependencies]
+event-listener = { workspace = true, default-features = false }
+pin-project-lite = "0.2.12"
+
+[features]
+default = ["std"]
+loom = ["event-listener/loom"]
+std = ["event-listener/std"]
+portable-atomic = ["event-listener/portable-atomic"]
+
+[dev-dependencies]
+futures-lite = { package = "laputa-futures-lite", path = "../futures-lite" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,8 @@
+[package]
+name = "runtime"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+smol = { package = "laputa-smol", path = "../../vendor/smolith/crates/smol" }
+async-task = { package = "laputa-async-task", path = "../../vendor/smolith/crates/async-task" }

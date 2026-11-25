@@ -1,0 +1,33 @@
+[package]
+name = "laputa-async-channel"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2021"
+rust-version.workspace = true
+description = "Async multi-producer multi-consumer channel"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["mpmc", "mpsc", "spmc", "chan", "futures"]
+categories = ["asynchronous", "concurrency"]
+exclude = ["/.*"]
+
+[lib]
+name = "async_channel"
+
+[dependencies]
+concurrent-queue = { workspace = true, default-features = false }
+event-listener-strategy = { workspace = true, default-features = false }
+futures-core = { version = "0.3.5", default-features = false }
+pin-project-lite = "0.2.11"
+
+portable-atomic = { version = "1", default-features = false, features = ["require-cas"], optional = true }
+portable-atomic-util = { version = "0.2", default-features = false, features = ["alloc"], optional = true }
+
+[dev-dependencies]
+easy-parallel = { package = "laputa-easy-parallel", path = "../easy-parallel" }
+futures-lite = { package = "laputa-futures-lite", path = "../futures-lite" }
+
+[features]
+default = ["std"]
+std = ["concurrent-queue/std", "event-listener-strategy/std"]
+portable-atomic = ["concurrent-queue/portable-atomic", "event-listener-strategy/portable-atomic", "dep:portable-atomic-util", "dep:portable-atomic"]

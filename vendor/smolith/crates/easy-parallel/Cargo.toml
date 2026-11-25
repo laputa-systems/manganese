@@ -1,0 +1,16 @@
+[package]
+name = "laputa-easy-parallel"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2021"
+rust-version.workspace = true
+description = "Run closures in parallel"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+homepage = "https://github.com/smol-rs/easy-parallel"
+keywords = ["scope", "thread", "scoped", "spawn"]
+categories = ["concurrency"]
+exclude = ["/.*"]
+
+[lib]
+name = "easy_parallel"

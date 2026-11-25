@@ -1,0 +1,40 @@
+[package]
+name = "laputa-async-process"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2021"
+rust-version.workspace = true
+description = "Async interface for working with processes"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["process", "spawn", "command", "subprocess", "child"]
+categories = ["asynchronous", "os"]
+exclude = ["/.*"]
+
+[lib]
+name = "async_process"
+
+[dependencies]
+async-io = { workspace = true }
+cfg-if = "1.0"
+event-listener = { workspace = true, features = ["std"] }
+futures-lite = { workspace = true, features = ["race", "std"] }
+tracing = { version = "0.1.40", default-features = false, optional = true }
+
+[target.'cfg(unix)'.dependencies]
+async-lock = { workspace = true }
+async-signal = { workspace = true }
+rustix = { version = "1.0", default-features = false, features = ["std", "fs", "process"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+async-channel = { workspace = true }
+async-task = { workspace = true }
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(target_os,values("qnx"))', # 1.98+ https://github.com/rust-lang/rust/pull/129490
+    'cfg(async_process_force_signal_backend)',
+] }
+
+[dev-dependencies]
+async-executor = { package = "laputa-async-executor", path = "../async-executor" }
