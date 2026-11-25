@@ -1,0 +1,244 @@
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -218,5 +218,19 @@
+     python3 /opt/chromium-build/scripts/preflight-system-libraries.py \
+     --lock "/opt/chromium-build/$PACKAGE_LOCK" \
+     --policy "/opt/chromium-build/$SYSTEM_LIBRARY_POLICY"
++ARG KACHE_BASE=https://github.com/joshuarli/kache/releases/download/release-8d78da5c10cf741966733d5cf494b982e9f41d31
++ADD --checksum=sha256:c4f0101461a84642ffb0512b91056782be6f415458b48e59ea2550fdfb0faa40 \
++    ${KACHE_BASE}/kache-x86_64-unknown-linux-musl-static.tar.xz /tmp/kache.tar.xz
++ADD --checksum=sha256:e85bf20cc4d3b10af86a672cb9678d4508869f73abeb2c298d985dce034cf1a9 \
++    ${KACHE_BASE}/kache-engine-x86_64-unknown-linux-musl-static.tar.xz /tmp/kache-engine.tar.xz
++RUN set -eux; \
++    test "$TARGET_ARCH" = amd64; \
++    for name in kache kache-engine; do \
++        tar -xJf "/tmp/$name.tar.xz" -C /tmp; \
++        install -m 0755 "/tmp/$name-x86_64-unknown-linux-musl-static" "/usr/local/bin/$name"; \
++        rm -f "/tmp/$name.tar.xz" "/tmp/$name-x86_64-unknown-linux-musl-static"; \
++    done
++ENV KACHE_CACHE_DIR=/ccache/kache \
++    KACHE_MAX_SIZE=40GiB
+ 
+ WORKDIR /work
+--- a/config/patches/capture-kache-rustc-wrapper.patch
++++ b/config/patches/capture-kache-rustc-wrapper.patch
+@@ -0,0 +1,47 @@
++--- a/build/config/rust.gni
+++++ b/build/config/rust.gni
++@@ -121,6 +121,12 @@
++   enable_rust_cxx = enable_rust
++ }
++ 
+++declare_args() {
+++  # A compiler cache placed in front of rustc, as cc_wrapper is in front of the
+++  # C and C++ compilers. Empty runs rustc directly.
+++  rust_compiler_wrapper = ""
+++}
+++
++ # Use the Rust toolchain built in-tree. When false, we use the prebuilt Rust
++ # stdlibs that come with the specified custom toolchain.
++ use_chromium_rust_toolchain = rust_sysroot_absolute == ""
++--- a/build/rust/gni_impl/rustc_wrapper.py
+++++ b/build/rust/gni_impl/rustc_wrapper.py
++@@ -353,6 +353,7 @@
++     parser = argparse.ArgumentParser()
++ 
++     parser.add_argument('--rustc', required=True, type=pathlib.Path)
+++    parser.add_argument('--rustc-wrapper', type=pathlib.Path)
++     parser.add_argument('--depfile', required=True, type=pathlib.Path)
++     parser.add_argument('--rsp', type=pathlib.Path, required=True)
++     parser.add_argument('--target-windows', action='store_true')
++@@ -432,7 +433,8 @@
++             args.rustc,
++             shlex.join(rustc_args),
++         )
++-    r = subprocess.run([args.rustc, *rustc_args], env=rustenv, check=False)
+++    wrapper = [args.rustc_wrapper] if args.rustc_wrapper else []
+++    r = subprocess.run([*wrapper, args.rustc, *rustc_args], env=rustenv, check=False)
++     HandleReturnCode(r, args.dump_rustc_env_and_flags)
++ 
++     final_depfile_lines = []
++--- a/build/toolchain/gcc_toolchain.gni
+++++ b/build/toolchain/gcc_toolchain.gni
++@@ -760,6 +760,9 @@
++       rustc_bin = "$rust_sysroot_relative/bin/rustc"
++       rustc = "$rust_compiler_prefix${rustc_bin}"
++       rustc_wrapper += " --rustc=$rustc"
+++      if (rust_compiler_wrapper != "") {
+++        rustc_wrapper += " --rustc-wrapper=$rust_compiler_wrapper"
+++      }
++ 
++       # RSP manipulation due to https://bugs.ch40m1um.qjz9zk/p/gn/issues/detail?id=249
++       tool("rust_staticlib") {
+--- a/config/profiles/chromium-wayland-release.gn
++++ b/config/profiles/chromium-wayland-release.gn
+@@ -13,7 +13,8 @@
+ clang_use_chrome_plugins = false
+ custom_toolchain = "//build/toolchain/linux/unbundle:default"
+ host_toolchain = "//build/toolchain/linux/unbundle:default"
+-cc_wrapper = "/usr/bin/ccache"
++cc_wrapper = "/usr/local/bin/kache"
++rust_compiler_wrapper = "/usr/local/bin/kache"
+ 
+ is_component_build = false
+ is_debug = false
+--- a/scripts/audit-chrome-graph.py
++++ b/scripts/audit-chrome-graph.py
+@@ -10,7 +10,7 @@
+ from pathlib import Path
+ 
+ TOOLCHAIN = "/opt/chromium-llvm"
+-CCACHE = "/usr/bin/ccache"
++CCACHE = "/usr/local/bin/kache"
+ 
+ 
+ def ffmpeg_bundled(unbundle_report):
+--- a/scripts/build.py
++++ b/scripts/build.py
+@@ -57,6 +57,9 @@
+     report = metadata / f"build-{profile}.json"
+     ccache = os.environ.get("CCACHE", "ccache")
+     before.write_text(run([ccache, "--show-stats"], check=False, capture_output=True).stdout or "", encoding="utf-8")
++    kache_before = metadata / "build-kache-before.json"
++    kache_after = metadata / "build-kache-after.json"
++    kache_before.write_text(run(["/usr/local/bin/kache", "stats", "--json"], check=False, capture_output=True).stdout or "", encoding="utf-8")
+     command = [ninja, "-C", str(out), "-j", str(jobs)]
+     load_limit = os.environ.get("NINJA_LOAD_LIMIT", "")
+     if load_limit:
+@@ -70,6 +73,7 @@
+         raise ScriptFailure(f"Ninja failed; output preserved in {log}")
+     end = int(time.time())
+     after.write_text(run([ccache, "--show-stats"], check=False, capture_output=True).stdout or "", encoding="utf-8")
++    kache_after.write_text(run(["/usr/local/bin/kache", "stats", "--json"], check=False, capture_output=True).stdout or "", encoding="utf-8")
+     run(["df", "-Pk", str(work)], check=False)
+     resolver = root / "scripts/resolve-output.py"
+     resolved = run(["python3", str(resolver), str(out), "//chrome:chrome"], capture_output=True).stdout.strip()
+@@ -94,6 +98,8 @@
+             "duration_seconds": end - start,
+             "ccache_before": str(before),
+             "ccache_after": str(after),
++            "kache_before": str(kache_before),
++            "kache_after": str(kache_after),
+         },
+     )
+     print(f"build: Chrome built successfully in {end - start}s: {chrome}")
+--- a/scripts/prepare-source-driver.py
++++ b/scripts/prepare-source-driver.py
+@@ -187,6 +187,7 @@
+     "adblock-review-fixes.patch",
+     "adblock-native-cosmetic-css.patch",
+     "adblock-offline-desktop.patch",
++    "capture-kache-rustc-wrapper.patch",
+ )
+ 
+ 
+--- a/scripts/verify-environment.py
++++ b/scripts/verify-environment.py
+@@ -7,6 +7,7 @@
+ import json
+ import os
+ import platform
++import subprocess
+ import tempfile
+ from pathlib import Path
+ 
+@@ -48,26 +49,47 @@
+         raise ScriptFailure(f"RUST_HOST_LINKER must be unset on {arch}, got {host_linker!r}")
+ 
+ 
+-def verify_ccache_hit(ccache: Path, cc: str, cxx: str) -> None:
+-    """Prove both GN compilers are selected and served by the mounted cache."""
+-    with tempfile.TemporaryDirectory(prefix="chromium-ccache-gate-a-") as directory:
++KACHE = Path("/usr/local/bin/kache")
++KACHE_CACHE_DIR = "/ccache/kache"
++
++
++def kache_local_hits() -> int:
++    report = json.loads(run([str(KACHE), "stats", "--json"], capture_output=True).stdout)
++    return int(report.get("local_hits", 0))
++
++
++def verify_kache_hits(cc: str, cxx: str, rustc: str) -> None:
++    """Prove kache serves an unchanged C, C++ and rustc compile from the mounted cache.
++
++    rustc is named by the relative path GN passes to rustc_wrapper.py, as kache sees it in the build.
++    """
++    require_file(KACHE, "missing kache")
++    require_file(KACHE.with_name("kache-engine"), "missing kache-engine")
++    if os.environ.get("KACHE_CACHE_DIR") != KACHE_CACHE_DIR:
++        raise ScriptFailure(f"KACHE_CACHE_DIR must be {KACHE_CACHE_DIR}")
++    with tempfile.TemporaryDirectory(prefix="chromium-kache-gate-a-") as directory:
+         probe = Path(directory)
+-        for compiler, suffix in ((cc, "c"), (cxx, "cc")):
+-            source = probe / f"probe.{suffix}"
+-            output = probe / f"probe-{suffix}.o"
+-            log = probe / f"ccache-{suffix}.log"
+-            source.write_text("int chromium_ccache_probe(void) { return 153; }\n", encoding="utf-8")
+-            command = [str(ccache), compiler, "-c", str(source), "-o", str(output)]
+-            environment = {**os.environ, "CCACHE_LOGFILE": str(log)}
+-            run(command, env=environment)
+-            if f"Executing {compiler} " not in log.read_text(encoding="utf-8"):
+-                raise ScriptFailure(f"ccache did not invoke the selected {suffix} compiler")
++        relative_rustc = os.path.relpath(rustc, probe)
++        cases = (
++            ("c", "probe.c", "int chromium_kache_probe(void) { return 156; }\n",
++             [str(KACHE), cc, "-c", "probe.c", "-o", "probe-c.o"], probe / "probe-c.o"),
++            ("cc", "probe.cc", "int chromium_kache_probe() { return 156; }\n",
++             [str(KACHE), cxx, "-c", "probe.cc", "-o", "probe-cc.o"], probe / "probe-cc.o"),
++            ("rust", "probe.rs", "pub fn chromium_kache_probe() -> u32 { 156 }\n",
++             [str(KACHE), relative_rustc, "--crate-type=rlib", "--crate-name=probe", "--edition=2021", "probe.rs",
++              "--emit=link", "-o", "libprobe.rlib"], probe / "libprobe.rlib"),
++        )
++        for label, name, text, command, output in cases:
++            (probe / name).write_text(text, encoding="utf-8")
++            subprocess.run(command, cwd=probe, check=True)
++            first = output.read_bytes()
+             output.unlink()
+-            before = dict(line.split("\t", 1) for line in run([str(ccache), "--print-stats"], capture_output=True).stdout.splitlines())
+-            run(command, env=environment)
+-            after = dict(line.split("\t", 1) for line in run([str(ccache), "--print-stats"], capture_output=True).stdout.splitlines())
+-            if int(after.get("direct_cache_hit", "0")) <= int(before.get("direct_cache_hit", "0")):
+-                raise ScriptFailure(f"ccache did not return a direct hit for an unchanged {suffix} compile")
++            before = kache_local_hits()
++            subprocess.run(command, cwd=probe, check=True)
++            if kache_local_hits() <= before:
++                raise ScriptFailure(f"kache did not return a local hit for an unchanged {label} compile")
++            if output.read_bytes() != first:
++                raise ScriptFailure(f"kache restored a different {label} output than the compiler wrote")
+ 
+ 
+ def main() -> None:
+@@ -184,8 +206,7 @@
+     for text in ("compiler = \n", "compiler_check = content", "compression = true", f"namespace = {namespace}"):
+         if text not in ccache_config:
+             raise ScriptFailure(f"ccache config does not report {text}")
+-    verify_ccache_hit(ccache, cc, os.environ["CXX"])
+-    run([str(ccache), "-z"])
++    verify_kache_hits(cc, os.environ["CXX"], str(work / "src/third_party/rust-toolchain/bin/rustc"))
+     package_lock = Path(os.environ.get("PACKAGE_LOCK", root / f"config/packages.{arch}.lock"))
+     package_manifest = Path(os.environ.get("APK_MANIFEST", metadata / f"packages.{arch}.txt"))
+     run(["python3", str(root / "scripts/lockcheck.py"), "packages", str(package_lock), str(package_manifest)])
+--- a/scripts/verify-gn-args.py
++++ b/scripts/verify-gn-args.py
+@@ -69,6 +69,12 @@
+ }
+ 
+ 
++KACHE_WRAPPERS = {
++    "cc_wrapper": "/usr/local/bin/kache",
++    "rust_compiler_wrapper": "/usr/local/bin/kache",
++}
++
++
+ def helium_expected(args):
+     pure_arm64 = args.target_cpu == "arm64"
+     return {
+@@ -155,7 +161,7 @@
+     if args.profile == HELIUM_PROFILE:
+         expected = helium_expected(args)
+     elif args.profile == CHROMIUM_WAYLAND_PROFILE:
+-        expected = helium_expected(args) | LEAN_DESKTOP
++        expected = helium_expected(args) | LEAN_DESKTOP | KACHE_WRAPPERS
+     else:
+         expected = {
+             "target_os": "linux",

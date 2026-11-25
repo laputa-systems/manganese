@@ -4,7 +4,7 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** active. Accepted: `p0-ground`, `p0-artifacts`, `p0-launch`.
+- **State:** active. Accepted: `p0-ground`, `p0-artifacts`, `p0-launch`, `m1-kache-oracle`.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Last accepted revision:** the scaffold on `main` (local, not pushed); `make check lint` is green in pristine Alpine capsules on x86_64 and aarch64 (see Baseline).
 - **Red or parked:** none.
@@ -297,7 +297,7 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
   | `sh scripts/setup-dev`, rerun | 0 s | 0 s |
 
   `git status --porcelain` is empty after the gates. Reproduce with a privileged `alpine:3.24` container that clones the repository as a uid 1000 user in the `wheel` and `docker` groups and times each step through `su -l`.
-- **Campaign host, 2026-11-25.** The host is a shared workstation, not a dedicated machine, so `scripts/setup-dev` is not run on it directly: it would replace the host's newer kache (a descendant of the pinned release) and rerun `kache init`. The host instead has the additive parts (`mold`, the static unwinder alias, the pinned toolchain), and `make check lint` passes there in 2 s with the host's kache.
+- **Campaign host, 2026-11-25.** The host is a shared workstation, not a dedicated machine, so `scripts/setup-dev` is not run on it directly: it would replace the host's own kache build (`kache 1.0.0`; the pin is `2.0.0-rc.2`) and rerun `kache init` for the host's other projects. The host instead has the additive parts (`mold`, the static unwinder alias, the pinned toolchain), and `make check lint` passes there in 2 s with the host's kache. The oracle builder image carries the pinned kache release itself.
 
 ### Acceptance
 

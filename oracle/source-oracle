@@ -1,0 +1,75 @@
+#!/bin/sh
+# Drive the source oracle: oracle/build with the capture series (oracle/capture/series) applied,
+# in its own builder image and Docker volumes.
+#   oracle/source-oracle tree          apply the series to a fresh copy under .work/oracle/build
+#   oracle/source-oracle PHASE...      run chromium-build phases (image, ensure-source, gate-a, poc, build, ...)
+set -eu
+
+fail() { printf 'source-oracle: %s\n' "$*" >&2; exit 1; }
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+capture=$root/oracle/capture
+tree=$root/.work/oracle/build
+[ "$(uname -m)" = x86_64 ] || fail "the source oracle builds only on x86_64"
+
+series_digest() {
+    {
+        cat "$root/oracle/build.sha256"
+        while IFS= read -r patch; do
+            [ -n "$patch" ] || continue
+            printf '%s\n' "$patch"
+            cat "$capture/$patch"
+        done < "$capture/series"
+    } | sha256sum | cut -d' ' -f1
+}
+
+digest=$(series_digest)
+short=$(printf '%s' "$digest" | cut -c1-12)
+export CHROMIUM_BUILDER_IMAGE="manganese-oracle-builder:156.0.8078.79-amd64-$short"
+export CHROMIUM_WORK_VOLUME=manganese-oracle-work-amd64
+export CHROMIUM_CACHE_VOLUME=manganese-oracle-cache-amd64
+export JOBS="${JOBS:-$(nproc)}"
+
+make_tree() {
+    if [ "$(cat "$tree/.capture-series" 2>/dev/null || true)" = "$digest" ]; then
+        return 0
+    fi
+    rm -rf "$tree"
+    mkdir -p "$(dirname -- "$tree")"
+    cp -a "$root/oracle/build" "$tree"
+    while IFS= read -r patch; do
+        [ -n "$patch" ] || continue
+        patch --batch --fuzz=0 -p1 -d "$tree" -i "$capture/$patch" >/dev/null || fail "cannot apply $patch"
+    done < "$capture/series"
+    printf '%s\n' "$digest" > "$tree/.capture-series"
+}
+
+# A prepared source tree records the series it was prepared with; a different series re-prepares it.
+reset_stale_source() {
+    docker volume create "$CHROMIUM_WORK_VOLUME" >/dev/null
+    docker run --rm --network=none -v "$CHROMIUM_WORK_VOLUME:/work" "$CHROMIUM_BUILDER_IMAGE" sh -c '
+        [ -e /work/metadata/source-complete.stamp ] || exit 0
+        [ "$(cat /work/metadata/capture-series 2>/dev/null)" = "$1" ] && exit 0
+        echo "source-oracle: source was prepared with another capture series; re-preparing" >&2
+        rm -rf /work/src /work/metadata/source-complete.stamp' sh "$digest"
+}
+
+record_source() {
+    docker run --rm --network=none -v "$CHROMIUM_WORK_VOLUME:/work" "$CHROMIUM_BUILDER_IMAGE" \
+        sh -c 'printf "%s\n" "$1" > /work/metadata/capture-series' sh "$digest"
+}
+
+[ $# -ge 1 ] || fail "usage: oracle/source-oracle tree | PHASE..."
+make_tree
+[ "$1" = tree ] && exit 0
+for phase in "$@"; do
+    case $phase in
+        ensure-source)
+            reset_stale_source
+            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release ensure-source)
+            record_source
+            ;;
+        *)
+            (cd "$tree" && ./chromium-build --product chromium --arch amd64 --profile chromium-wayland-release "$phase")
+            ;;
+    esac
+done
