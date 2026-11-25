@@ -10,10 +10,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import launch
 import durability
 import checks
+import profile
 
 HERE = Path(__file__).resolve().parent
 ALL = ('5.1', '5.2', '5.4', '6.1', '6.2', '6.3', '6.4', '7.1', '7.2', '7.3', '7.4', '7.5', '7.6', '7.7', '8.1', '8.2', '8.3', '8.4')
-PENDING = {'5.4', '7.5', '7.6'}
+PENDING = {'7.5', '7.6'}
 EXCLUDED = {'8.2', '8.3'}
 
 
@@ -81,6 +82,8 @@ def main():
         path = Path(args.archive)
         archive = launch.resolve_archive(run_dir, platform.machine(), path if path.exists() else None,
                                          None if path.exists() else args.archive)
+        if '5.4' in selected:
+            results['5.4'] = profile.run(run_dir, archive, preferences)
         if selected & {'5.1', '5.2', '6.1', '6.2', '6.3', '6.4'}:
             observed = egress(run_dir, archive)
             for clause in ('5.1','5.2','6.1','6.2','6.3','6.4'):

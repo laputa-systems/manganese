@@ -64,6 +64,13 @@ def storage(value):
     return value == {'indexeddb':'persisted', 'service_worker':True, 'cache':'persisted'}
 
 
+def profile_modes(observed):
+    cookie = {'name':'contract_profile', 'value':'persisted', 'httpOnly':True}
+    return (len(observed) == 3 and [item['mode'] for item in observed] == ['headed', 'headless', 'headed']
+            and all(item['storage'] == 'persisted' and cookie in item['cookies'] for item in observed)
+            and observed[0].get('download') == 'headed download evidence')
+
+
 def durability(cases):
     disk = cases['full_disk']
     return storage(cases['restart']) and storage(cases['interrupted']) and (disk.get('preserved') is True or disk.get('explicit_failure') is True)

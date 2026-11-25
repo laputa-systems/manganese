@@ -23,6 +23,20 @@ def evidence():
 
 
 class NegativeControls(unittest.TestCase):
+    def test_profile_modes(self):
+        cookie = {'name':'contract_profile', 'value':'persisted', 'httpOnly':True}
+        good = [{'mode':mode, 'storage':'persisted', 'cookies':[cookie]} for mode in ('headed', 'headless', 'headed')]
+        good[0]['download'] = 'headed download evidence'
+        self.assertTrue(checks.profile_modes(good))
+        for index in range(3):
+            for key, value in (('storage',None), ('cookies',[]), ('mode','wrong')):
+                bad = copy.deepcopy(good)
+                bad[index][key] = value
+                self.assertFalse(checks.profile_modes(bad))
+        bad = copy.deepcopy(good)
+        bad[0]['download'] = 'wrong'
+        self.assertFalse(checks.profile_modes(bad))
+
     def test_preferences_atomic_and_preserved(self):
         scratch = Path(__file__).resolve().parents[3] / '.work/tmp'
         scratch.mkdir(parents=True, exist_ok=True)

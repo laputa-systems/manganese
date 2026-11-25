@@ -16,12 +16,22 @@ class HTTP(http.server.BaseHTTPRequestHandler):
         if self.path == '/sw.js':
             body = b'self.addEventListener("fetch",()=>{});'
             content_type = 'text/javascript'
+        elif self.path in ('/profile', '/profile?seed'):
+            body = b'<!doctype html><title>profile fixture</title><a id="download" href="/profile-download">download</a>'
+            content_type = 'text/html'
+        elif self.path == '/profile-download':
+            body = b'headed download evidence'
+            content_type = 'application/octet-stream'
         else:
             body = b'<!doctype html><title>fixture</title><input id="field"><iframe src="http://frame.test/"></iframe>' if self.headers.get('Host', '').startswith('forms.test') else b'<!doctype html><title>frame</title>'
             content_type = 'text/html'
         self.send_response(200)
         self.send_header('Content-Type', content_type)
         self.send_header('Content-Length', str(len(body)))
+        if self.path == '/profile?seed':
+            self.send_header('Set-Cookie', 'contract_profile=persisted; Max-Age=86400; Path=/; HttpOnly; SameSite=Lax')
+        if self.path == '/profile-download':
+            self.send_header('Content-Disposition', 'attachment; filename="contract-profile.txt"')
         self.end_headers()
         self.wfile.write(body)
 
