@@ -1,3 +1,4 @@
+#!/usr/bin/env -S python3 -B
 import os
 import pathlib
 import random
@@ -19,11 +20,14 @@ for row in pathlib.Path('goldens.lock').read_text().splitlines():
         data = (store / fields[3]).read_bytes()
         if int.from_bytes(data[5:7], 'big') == 1:
             seeds.append(data[12:])
-rng = random.Random(7211)
-a = peer('.work/tmp/zlib/oracle')
-b = peer('.work/tmp/target/x86_64-unknown-linux-musl/debug/zlib')
+seed = int(os.environ.get('SEED') or 7211)
+cases = int(os.environ.get('CASES') or 10000)
+rng = random.Random(seed)
+a = peer(os.environ['FUZZ_ORACLE'])
+b = peer(os.environ['FUZZ_CANDIDATE'])
 start = time.monotonic()
-for i in range(10000):
+print(f'fuzz box=zlib seed={seed} cases={cases}', flush=True)
+for i in range(cases):
     data = bytearray(rng.choice(seeds))
     if len(data) > 32768: data = data[:32768]
     for _ in range(rng.randrange(1, 5)):
@@ -48,9 +52,9 @@ for i in range(10000):
     rec = request(op, level, window, mem, strategy, [(data[:cut], flush), (data[cut:], 4)])
     expected, actual = ask(a, rec), ask(b, rec)
     if expected != actual:
-        print('divergence case', i, 'request', rec.hex(), 'oracle', expected.hex(), 'candidate', actual.hex(), flush=True)
+        print('divergence seed', seed, 'case', i, 'request', rec.hex(), 'oracle', expected.hex(), 'candidate', actual.hex(), flush=True)
         raise SystemExit(1)
 for process in (a, b):
     process.stdin.close()
     if process.wait(): raise SystemExit('peer failed')
-print(f'fuzz seed=7211 cases=10000 elapsed={time.monotonic()-start:.2f}s')
+print(f'fuzz passed {cases} cases seed={seed} elapsed={time.monotonic()-start:.2f}s')

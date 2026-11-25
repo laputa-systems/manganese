@@ -165,6 +165,8 @@ string of seen item IDs in `goldens.lock`. It mutates those inputs with bit
 flips, insertions, deletions, splices and truncations. Holdout items cannot be
 used as seeds.
 
+A box whose wire records carry structure that byte mutation would only break declares `fuzz = "driver"` and `fuzz_driver = "<executable>"` instead, with no `fuzz_max_len`. The runner starts the driver with `FUZZ_ORACLE` and `FUZZ_CANDIDATE` naming the two programs and passes `SEED` and `CASES` through; the driver generates, sends and compares the records itself, prints its seed and the diverging case, and exits nonzero on a divergence. The zlib box's driver, `oracle/harness/zlib/fuzz.py`, mutates seen deflate inputs and invalid streams and samples the declared level, window, memLevel, strategy and flush matrix.
+
 `boxes/<id>/scoreboard.toml` records version 1 and the set of passing seen
 items. A previously passing item that fails is a regression. Run
 `make box BOX=<id> LANE=ratchet` to atomically record newly passing items;

@@ -21,7 +21,7 @@ pub enum Arm64Evidence {
 }
 
 #[derive(Debug)]
-pub enum Fuzz { Bytes { max_len: usize }, Corpus { seeds: Vec<String>, max_len: usize } }
+pub enum Fuzz { Bytes { max_len: usize }, Corpus { seeds: Vec<String>, max_len: usize }, Driver { program: String } }
 
 #[derive(Debug)]
 pub struct Spec {
@@ -163,15 +163,20 @@ impl Spec {
         let oracle = take(&mut values, "oracle")?;
         let candidate = take(&mut values, "candidate")?;
         let fuzz_kind = take(&mut values, "fuzz")?;
-        let max_len = integer(&mut values, "fuzz_max_len")?.parse::<usize>().map_err(|_| "invalid fuzz_max_len")?;
-        if max_len == 0 || max_len > 1_048_576 { return Err("fuzz_max_len must be 1..1048576".into()); }
+        let mut max_len = || -> Result<usize, String> {
+            let max_len = integer(&mut values, "fuzz_max_len")?.parse::<usize>().map_err(|_| "invalid fuzz_max_len")?;
+            if max_len == 0 || max_len > 1_048_576 { return Err("fuzz_max_len must be 1..1048576".into()); }
+            Ok(max_len)
+        };
         let fuzz = match fuzz_kind.as_str() {
-            "bytes" => Fuzz::Bytes { max_len },
+            "bytes" => Fuzz::Bytes { max_len: max_len()? },
             "corpus" => {
+                let max_len = max_len()?;
                 let seeds = take(&mut values, "fuzz_seeds")?.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
                 if seeds.is_empty() || seeds.iter().any(|s| !super::name(s)) { return Err("invalid fuzz_seeds".into()); }
                 Fuzz::Corpus { seeds, max_len }
             }
+            "driver" => Fuzz::Driver { program: take(&mut values, "fuzz_driver")? },
             _ => return Err("invalid fuzz generator".into()),
         };
         if !values.is_empty() { return Err(format!("unknown keys: {:?}", values.keys())); }

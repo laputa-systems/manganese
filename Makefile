@@ -70,12 +70,6 @@ zlib-harness:
 	mkdir -p .work/tmp/zlib
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zlib manganese-oracle-builder:156.0.8078.79-amd64-9535972e6a8a python3 -B /lane/oracle/harness/zlib/build.py
 
-.PHONY: box-fuzz
-box-fuzz:
-	test "$(BOX)" = zlib
-	RUSTC_WRAPPER=kache CARGO_TARGET_DIR=$(CURDIR)/.work/tmp/target TMPDIR=$(CURDIR)/.work/tmp cargo build --locked --offline --target x86_64-unknown-linux-musl -p zlib
-	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/fuzz.py
-
 .PHONY: zlib-anchor
 zlib-anchor:
 	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/anchor.py

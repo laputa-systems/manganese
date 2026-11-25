@@ -107,8 +107,12 @@ fn hex(bytes: &[u8]) -> String { bytes.iter().map(|b| format!("{b:02x}")).collec
 pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Result<(), String> {
     if !name(id) { return Err("invalid box id".into()); }
     let spec = Spec::parse(&fs::read_to_string(Path::new("boxes").join(id).join("box.toml")).map_err(|e| format!("box spec: {e}"))?)?;
+    if let Fuzz::Driver { program } = &spec.fuzz {
+        return drive(program, &spec, candidate_override);
+    }
     let (seeds, max) = match &spec.fuzz {
         Fuzz::Bytes { max_len } => (Vec::new(), *max_len),
+        Fuzz::Driver { .. } => unreachable!("handled above"),
         Fuzz::Corpus { seeds, max_len } => {
             let items = lock_items(&fs::read_to_string("goldens.lock").map_err(|e| format!("goldens.lock: {e}"))?, id)?;
             let mut loaded = Vec::new();
@@ -157,4 +161,16 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     candidate.finish()?;
     println!("fuzz passed {cases} cases seed={seed}");
     Ok(())
+}
+
+/// A box whose inputs are structured records generates and compares them in its own driver, which
+/// receives the box's oracle and candidate paths and the SEED and CASES the lane was given.
+fn drive(program: &str, spec: &Spec, candidate_override: Option<PathBuf>) -> Result<(), String> {
+    let candidate = candidate_override.unwrap_or_else(|| PathBuf::from(&spec.candidate));
+    let status = Command::new(program)
+        .env("FUZZ_ORACLE", &spec.oracle)
+        .env("FUZZ_CANDIDATE", candidate)
+        .status()
+        .map_err(|e| format!("fuzz driver {program}: {e}"))?;
+    if status.success() { Ok(()) } else { Err(format!("fuzz driver {program} reported a divergence or failed ({status})")) }
 }
