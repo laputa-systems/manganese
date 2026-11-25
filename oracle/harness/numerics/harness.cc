@@ -1,0 +1,334 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "base/third_party/double_conversion/double-conversion/double-conversion.h"
+#include "third_party/simdutf/simdutf.h"
+#include "base/strings/string_number_conversions_internal.h"
+#include "base/strings/string_util_impl_helpers.h"
+#include "base/strings/utf_string_conversion_utils.h"
+#include "base/strings/utf_string_conversions.h"
+#include "third_party/blink/renderer/platform/wtf/dtoa.h"
+#include "third_party/blink/renderer/platform/wtf/text/integer_to_string_conversion.h"
+#include "base/strings/string_number_conversions.h"
+#include <optional>
+#include <string>
+#include <variant>
+#include "base/json/json_common.h"
+#include "base/values.h"
+#define private public
+#include "base/json/json_writer.h"
+#undef private
+
+struct JsonNumber { unsigned char tag; unsigned char size; unsigned char data[8]; };
+extern "C" size_t css_format(double value, char* output);
+extern "C" JsonNumber json_number(const unsigned char* input, uint32_t len);
+
+using double_conversion::DoubleToStringConverter;
+using double_conversion::StringBuilder;
+using double_conversion::StringToDoubleConverter;
+
+static uint32_t read_u32(const unsigned char* p) {
+  return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+}
+
+static void write_u32(unsigned char* p, uint32_t v) {
+  p[0] = v >> 24; p[1] = v >> 16; p[2] = v >> 8; p[3] = v;
+}
+
+template <typename T, int base>
+static void parse_integer(const unsigned char* input, size_t length, unsigned char* output) {
+  std::string_view text(reinterpret_cast<const char*>(input), length);
+  auto result = base::internal::StringToNumber<T, base>(text);
+  output[0] = result.valid;
+  uint64_t value = static_cast<uint64_t>(result.value);
+  for (int i = 0; i < 8; ++i) output[1 + i] = value >> (56 - 8 * i);
+}
+
+template <typename T, int base>
+static void parse_integer_wide(const char16_t* input, size_t length, unsigned char* output) {
+  std::u16string_view text(input, length);
+  auto result = base::internal::StringToNumber<T, base>(text);
+  output[0] = result.valid;
+  uint64_t value = static_cast<uint64_t>(result.value);
+  for (int i = 0; i < 8; ++i) output[1 + i] = value >> (56 - 8 * i);
+}
+
+template <typename T>
+static size_t format_integer(T value, unsigned char op, unsigned char* output) {
+  if (op == 23) {
+    std::string text = base::NumberToString(value);
+    memcpy(output, text.data(), text.size());
+    return text.size();
+  }
+  if (op == 24) {
+    std::u16string text = base::NumberToString16(value);
+    for (size_t i = 0; i < text.size(); ++i) { output[2 * i] = text[i] >> 8; output[2 * i + 1] = text[i]; }
+    return text.size() * 2;
+  }
+  blink::IntegerToStringConverter<T> converter(value);
+  auto text = converter.Span();
+  memcpy(output, text.data(), text.size());
+  return text.size();
+}
+
+int main() {
+  char magic[4];
+  if (fread(magic, 1, 4, stdin) != 4 || memcmp(magic, "MGB1", 4)) return 1;
+  if (fwrite("MGB1", 1, 4, stdout) != 4) return 1;
+  fflush(stdout);
+  unsigned char header[4];
+  while (fread(header, 1, 4, stdin) == 4) {
+    uint32_t length = read_u32(header);
+    if (length > 65536 || length < 1) return 1;
+    unsigned char* input = static_cast<unsigned char*>(malloc(length));
+    if (!input || fread(input, 1, length, stdin) != length) return 1;
+    unsigned char output[262144] = {};
+    size_t out_len = 0;
+    if (input[0] <= 4 && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      int digits = int(input[9]) * 256 + input[10] - 1;
+      char text[1024];
+      StringBuilder builder(text, sizeof(text));
+      DoubleToStringConverter base(DoubleToStringConverter::EMIT_POSITIVE_EXPONENT_SIGN, nullptr, nullptr, 'e', -6, 12, 0, 0);
+      const auto& ecma = DoubleToStringConverter::EcmaScriptConverter();
+      bool success = false;
+      if (input[0] == 0) success = base.ToShortest(value, &builder);
+      if (input[0] == 1 && digits >= 0) success = base.ToFixed(value, digits, &builder);
+      if (input[0] == 2) success = ecma.ToShortest(value, &builder);
+      if (input[0] == 3) success = ecma.ToPrecision(value, digits, &builder);
+      if (input[0] == 4) success = ecma.ToExponential(value, digits, &builder);
+      output[0] = success;
+      out_len = 1 + builder.position();
+      memcpy(output + 1, text, out_len - 1);
+      builder.Finalize();
+    } else if (input[0] == 26 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      std::u16string_view text(units, count);
+      double value;
+      output[0] = base::internal::StringToDoubleImpl(text, reinterpret_cast<const uint16_t*>(units), value);
+      StringToDoubleConverter converter(StringToDoubleConverter::ALLOW_LEADING_SPACES | StringToDoubleConverter::ALLOW_TRAILING_JUNK, 0.0, 0.0, nullptr, nullptr);
+      int consumed = 0;
+      converter.StringToDouble(reinterpret_cast<const uint16_t*>(units), count, &consumed);
+      write_u32(output + 1, consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      for (int i = 0; i < 8; ++i) output[5 + i] = bits >> (56 - 8 * i);
+      out_len = 13;
+      free(units);
+    } else if (input[0] == 27 && length >= 2 && length % 2 == 0) {
+      size_t count = (length - 2) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[2 + i * 2]) << 8) | input[3 + i * 2];
+      switch (input[1]) {
+        case 0: parse_integer_wide<int32_t, 10>(units, count, output); break;
+        case 1: parse_integer_wide<uint32_t, 10>(units, count, output); break;
+        case 2: parse_integer_wide<int64_t, 10>(units, count, output); break;
+        case 3: parse_integer_wide<uint64_t, 10>(units, count, output); break;
+        case 4: parse_integer_wide<int32_t, 16>(units, count, output); break;
+        case 5: parse_integer_wide<uint32_t, 16>(units, count, output); break;
+        case 6: parse_integer_wide<int64_t, 16>(units, count, output); break;
+        case 7: parse_integer_wide<uint64_t, 16>(units, count, output); break;
+        default: return 1;
+      }
+      out_len = 9;
+      free(units);
+    } else if (input[0] >= 23 && input[0] <= 25 && length == 10) {
+      uint64_t bits = 0;
+      for (int i = 2; i < 10; ++i) bits = (bits << 8) | input[i];
+      switch (input[1]) {
+        case 0: out_len = format_integer(static_cast<int32_t>(bits), input[0], output); break;
+        case 1: out_len = format_integer(static_cast<uint32_t>(bits), input[0], output); break;
+        case 2: out_len = format_integer(static_cast<int64_t>(bits), input[0], output); break;
+        case 3: out_len = format_integer(static_cast<uint64_t>(bits), input[0], output); break;
+        default: return 1;
+      }
+    } else if (input[0] == 19) {
+      std::wstring text;
+      bool success = base::UTF8ToWide(reinterpret_cast<const char*>(input + 1), length - 1, &text);
+      output[0] = success;
+      out_len = 1 + text.size() * 4;
+      for (size_t i = 0; i < text.size(); ++i) write_u32(output + 1 + 4 * i, static_cast<uint32_t>(text[i]));
+    } else if ((input[0] == 20 || input[0] == 21) && length % 4 == 1) {
+      size_t count = (length - 1) / 4;
+      auto* units = static_cast<wchar_t*>(malloc((count + 1) * sizeof(wchar_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = static_cast<wchar_t>(read_u32(input + 1 + 4 * i));
+      if (input[0] == 20) {
+        std::string text;
+        output[0] = base::WideToUTF8(units, count, &text);
+        out_len = 1 + text.size();
+        memcpy(output + 1, text.data(), text.size());
+      } else {
+        std::u16string text;
+        output[0] = base::WideToUTF16(units, count, &text);
+        out_len = 1 + 2 * text.size();
+        for (size_t i = 0; i < text.size(); ++i) { output[1 + 2 * i] = text[i] >> 8; output[2 + 2 * i] = text[i]; }
+      }
+      free(units);
+    } else if (input[0] == 22 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      std::wstring text;
+      output[0] = base::UTF16ToWide(units, count, &text);
+      out_len = 1 + 4 * text.size();
+      for (size_t i = 0; i < text.size(); ++i) write_u32(output + 1 + 4 * i, static_cast<uint32_t>(text[i]));
+      free(units);
+    } else if (input[0] == 17) {
+      std::u16string text;
+      bool success = base::UTF8ToUTF16(reinterpret_cast<const char*>(input + 1), length - 1, &text);
+      output[0] = success;
+      out_len = 1 + text.size() * 2;
+      for (size_t i = 0; i < text.size(); ++i) { output[1 + 2 * i] = text[i] >> 8; output[2 + 2 * i] = text[i]; }
+    } else if (input[0] == 18 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + 2 * i]) << 8) | input[2 + 2 * i];
+      std::string text;
+      bool success = base::UTF16ToUTF8(units, count, &text);
+      output[0] = success;
+      out_len = 1 + text.size();
+      memcpy(output + 1, text.data(), text.size());
+      free(units);
+    } else if ((input[0] == 15 || input[0] == 16) && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      if (input[0] == 15) {
+        if (input[9] || input[10]) return 1;
+        out_len = css_format(value, reinterpret_cast<char*>(output));
+      } else {
+        unsigned mode = input[9];
+        unsigned digits = input[10];
+        if (mode > 3 || digits > 20) return 1;
+        if (mode == 3) {
+          int count = snprintf(reinterpret_cast<char*>(output), sizeof(output), "%.*f", int(digits), value);
+          if (count < 0 || size_t(count) >= sizeof(output)) return 1;
+          out_len = count;
+        } else {
+          int flags = DoubleToStringConverter::EMIT_POSITIVE_EXPONENT_SIGN;
+          if (mode < 2) flags |= DoubleToStringConverter::NO_TRAILING_ZERO;
+          DoubleToStringConverter converter(flags, "inf", "nan", 'e', -4, 12, 6, 0, 2);
+          char text[1024];
+          StringBuilder builder(text, sizeof(text));
+          bool success = mode == 0 ? converter.ToShortest(value, &builder) : mode == 1 ? converter.ToPrecision(value, digits ? digits : 1, &builder) : converter.ToExponential(value, digits, &builder);
+          if (!success) return 1;
+          out_len = builder.position();
+          memcpy(output, text, out_len);
+          builder.Finalize();
+        }
+      }
+    } else if (input[0] == 14 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      size_t consumed = 0;
+      double value = blink::ParseDouble(base::span<const char16_t>(units, count), consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      write_u32(output, consumed);
+      for (int i = 0; i < 8; ++i) output[4 + i] = bits >> (56 - 8 * i);
+      out_len = 12;
+      free(units);
+    } else if (input[0] == 13 && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      if (input[9] > 1 || input[10] != 0) return 1;
+      std::string text;
+      base::JSONWriter writer(input[9] ? base::OPTIONS_OMIT_DOUBLE_TYPE_PRESERVATION : 0, &text, 0);
+      bool success = writer.BuildJSONString(value, 0);
+      output[0] = success;
+      out_len = 1 + text.size();
+      memcpy(output + 1, text.data(), text.size());
+    } else if (input[0] == 12) {
+      unsigned char buffer[65536] = {};
+      memcpy(buffer, input + 1, length - 1);
+      JsonNumber result = json_number(buffer, length - 1);
+      output[0] = result.tag;
+      memcpy(output + 1, result.data, result.size);
+      out_len = 1 + result.size;
+    } else if ((input[0] == 10 || input[0] == 11) && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      unsigned digits = (unsigned(input[9]) << 8) | input[10];
+      if (digits > 20 || (input[0] == 10 && digits == 0)) return 1;
+      blink::DoubleToStringConverter converter;
+      auto result = input[0] == 10 ? converter.ToStringWithFixedPrecision(value, digits) : converter.ToStringWithFixedWidth(value, digits);
+      out_len = result.size();
+      memcpy(output, result.data(), out_len);
+    } else if (input[0] == 9) {
+      std::string_view text(reinterpret_cast<char*>(input + 1), length - 1);
+      output[0] = base::internal::DoIsStringUTF8<base::IsValidCharacter>(text);
+      output[1] = base::internal::DoIsStringUTF8<base::IsValidCodepoint>(text);
+      out_len = 2;
+    } else if (input[0] == 7 && length >= 2) {
+      switch (input[1]) {
+        case 0: parse_integer<int32_t, 10>(input + 2, length - 2, output); break;
+        case 1: parse_integer<uint32_t, 10>(input + 2, length - 2, output); break;
+        case 2: parse_integer<int64_t, 10>(input + 2, length - 2, output); break;
+        case 3: parse_integer<uint64_t, 10>(input + 2, length - 2, output); break;
+        case 4: parse_integer<int32_t, 16>(input + 2, length - 2, output); break;
+        case 5: parse_integer<uint32_t, 16>(input + 2, length - 2, output); break;
+        case 6: parse_integer<int64_t, 16>(input + 2, length - 2, output); break;
+        case 7: parse_integer<uint64_t, 16>(input + 2, length - 2, output); break;
+        default: return 1;
+      }
+      out_len = 9;
+    } else if (input[0] == 8) {
+      std::string_view text(reinterpret_cast<char*>(input + 1), length - 1);
+      double value;
+      output[0] = base::internal::StringToDoubleImpl(text, text.data(), value);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      for (int i = 0; i < 8; ++i) output[1 + i] = bits >> (56 - 8 * i);
+      out_len = 9;
+    } else if (input[0] == 6 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      char16_t* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      simdutf::result result = simdutf::convert_utf16_to_utf8_with_errors(units, count, reinterpret_cast<char*>(output + 8));
+      write_u32(output, result.error);
+      write_u32(output + 4, result.count);
+      if (result.error == simdutf::SUCCESS) out_len = 8 + result.count;
+      else {
+        size_t prefix = simdutf::convert_utf16_to_utf8(units, result.count, reinterpret_cast<char*>(output + 8));
+        out_len = 8 + prefix;
+      }
+      free(units);
+    } else if (input[0] == 5) {
+      StringToDoubleConverter converter(StringToDoubleConverter::ALLOW_LEADING_SPACES | StringToDoubleConverter::ALLOW_TRAILING_JUNK, 0.0, 0.0, nullptr, nullptr);
+      int consumed = 0;
+      double value = converter.StringToDouble(reinterpret_cast<char*>(input + 1), length - 1, &consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      write_u32(output, consumed);
+      for (int i = 0; i < 8; ++i) output[4 + i] = bits >> (56 - 8 * i);
+      out_len = 12;
+    } else {
+      free(input);
+      return 1;
+    }
+    free(input);
+    write_u32(header, out_len);
+    if (fwrite(header, 1, 4, stdout) != 4 || fwrite(output, 1, out_len, stdout) != out_len) return 1;
+    fflush(stdout);
+  }
+  return feof(stdin) ? 0 : 1;
+}

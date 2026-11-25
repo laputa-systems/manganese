@@ -1,0 +1,16 @@
+version 1
+box numerics
+revision dc810458695ef6e677dbf2fe7de2a25d4042bb86
+arch x86_64
+spec sha256:0f370c5e88f51582540caa24bd29066e18727cd4d17c7e33c739426b65244246
+corpus sha256:73cef094cc554282628096b296d9e49c253145390e4925d08e414516a8902413 seen 6731 holdout 6669
+oracle .work/tmp/numerics/oracle sha256:c2e4efdcd52f94510f8e2177465f3d6954df8872cd9ffcf05a7ca43261a2a24e
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/numerics sha256:123756b93cb90847249e5e05c048aa1cf3ceadf436219eb6765b438b046883bd
+dependencies cargo-lock sha256:8fc3bfeb74222da9e853fc2ed75a5a67c33af60886c23971f6cfeb899d50b307 tree sha256:95aaed98aececcae9926983a08644a7e7e69217612b64a91b934a526ad692ea4
+run seen exit 0 items 6731 6731
+run holdout exit 0 items 6669 6669
+run fuzz exit 0 seed 1795636557887005188 requested 20000 completed 20000
+level source-harness met
+level frozen-browser pending: frozen-browser CSS and SVG numeric serialization witness is not yet built
+level integration pending: arm64 evidence (assembly: numeric and string conversion against the frozen arm64 browser) and make closure have not run
