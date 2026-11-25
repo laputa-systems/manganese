@@ -73,14 +73,19 @@ impl TableCache {
 
     /// Open a table on the file system and read it.
     fn open_table(&mut self, file_num: FileNum) -> Result<Table> {
-        let name = table_file_name(&self.dbname, file_num);
-        let path = Path::new(&name);
-        let file_size = self.opts.env.size_of(path)?;
+        let mut name = table_file_name(&self.dbname, file_num);
+        let file = match self.opts.env.open_random_access_file(&name) {
+            Ok(file) => file,
+            Err(_) => {
+                name.set_extension("sst");
+                self.opts.env.open_random_access_file(&name)?
+            }
+        };
+        let file_size = self.opts.env.size_of(&name)?;
         if file_size == 0 {
             return err(StatusCode::InvalidData, "file is empty");
         }
-        let file = Rc::new(self.opts.env.open_random_access_file(path)?);
-        // No SSTable file name compatibility.
+        let file = Rc::new(file);
         let table = Table::new(self.opts.clone(), self.block_cache.clone(), file, file_size)?;
         self.cache.insert(&filenum_to_key(file_num), table.clone());
         Ok(table)
