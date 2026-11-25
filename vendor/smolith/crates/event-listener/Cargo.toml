@@ -1,0 +1,58 @@
+[package]
+name = "laputa-event-listener"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>", "John Nunley <dev@notgull.net>"]
+edition = "2021"
+rust-version.workspace = true
+description = "Notify async tasks or threads"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["condvar", "eventcount", "wake", "blocking", "park"]
+categories = ["asynchronous", "concurrency"]
+exclude = ["/.*"]
+
+[features]
+default = ["std"]
+std = ["parking"]
+portable-atomic = [
+  "portable-atomic-util",
+  "portable_atomic_crate",
+]
+loom = ["parking?/loom", "dep:loom"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
+
+[dependencies]
+critical-section = { version = "1.2.0", default-features = false, optional = true }
+pin-project-lite = "0.2.12"
+portable-atomic-util = { version = "0.2.0", default-features = false, optional = true, features = ["alloc"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+parking = { workspace = true, optional = true }
+
+[target.'cfg(loom)'.dependencies]
+loom = { version = "0.7", optional = true }
+
+[dependencies.portable_atomic_crate]
+package = "portable-atomic"
+version = "1.2.0"
+default-features = false
+optional = true
+
+[dev-dependencies]
+critical-section = { version = "1.2.0", features = ["std"] }
+futures-lite = { package = "laputa-futures-lite", path = "../futures-lite" }
+try-lock = "0.2.5"
+waker-fn = { package = "laputa-waker-fn", path = "../waker-fn" }
+
+[dev-dependencies.rustybench]
+version = "0.4"
+
+[[bench]]
+name = "bench"
+harness = false
+
+[lib]
+name = "event_listener"
+bench = false

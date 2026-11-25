@@ -1,0 +1,34 @@
+[package]
+name = "laputa-fastrand"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2018"
+rust-version.workspace = true
+description = "A simple and fast random number generator"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+keywords = ["simple", "fast", "rand", "random", "wyrand"]
+categories = ["algorithms"]
+exclude = ["/.*"]
+
+[lib]
+name = "fastrand"
+
+[features]
+default = ["std"]
+alloc = []
+std = ["alloc"]
+js = ["std", "getrandom"]
+
+[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"], optional = true }
+
+[target.'cfg(all(any(target_arch = "wasm32", target_arch = "wasm64"), target_os = "unknown"))'.dev-dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
+
+[dev-dependencies]
+getrandom = "0.4"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

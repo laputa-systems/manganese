@@ -1,0 +1,38 @@
+[package]
+name = "laputa-async-broadcast"
+version.workspace = true
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/laputa-systems/smolith"
+documentation = "https://docs.rs/laputa-async-broadcast"
+description = "Async broadcast channels"
+edition = "2021"
+rust-version.workspace = true
+keywords = []
+categories = []
+authors = [
+    "Stjepan Glavina <stjepang@gmail.com>",
+    "Yoshua Wuyts <yoshuawuyts@gmail.com>",
+    "Zeeshan Ali Khan <zeeshanak@gnome.org>",
+]
+
+
+[lib]
+name = "async_broadcast"
+
+[[bench]]
+harness = false
+name = "broadcast_bench"
+
+[features]
+
+[dependencies]
+event-listener = { workspace = true, features = ["std"] }
+event-listener-strategy = { workspace = true, features = ["std"] }
+futures-core = "0.3.21"
+pin-project-lite = "0.2.13"
+
+[dev-dependencies]
+rustybench = "0.4"
+doc-comment = "0.3.3"
+easy-parallel = { package = "laputa-easy-parallel", path = "../easy-parallel" }
+futures-lite = { package = "laputa-futures-lite", path = "../futures-lite" }

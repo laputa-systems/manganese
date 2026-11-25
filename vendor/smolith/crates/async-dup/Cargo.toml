@@ -1,0 +1,24 @@
+[package]
+name = "laputa-async-dup"
+version.workspace = true
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2021"
+rust-version.workspace = true
+description = "Duplicate an async I/O handle"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/laputa-systems/smolith"
+homepage = "https://github.com/smol-rs/async-dup"
+documentation = "https://docs.rs/laputa-async-dup"
+keywords = ["asynchronous", "duplicate", "clone", "split", "share"]
+categories = ["asynchronous", "concurrency"]
+exclude = ["/.*"]
+
+[lib]
+name = "async_dup"
+
+[dependencies]
+async-lock = { workspace = true }
+futures-io = "0.3.5"
+
+[dev-dependencies]
+smol = { package = "laputa-smol", path = "../smol" }
