@@ -23,7 +23,7 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
     directory.mkdir(parents=True)
     switch_dir = directory / 'switch'
     switch_dir.mkdir()
-    session = launch.Session(switch_dir, browser_root, f'manganese-extension-switch-{directory.parent.name}')
+    session = launch.Session(switch_dir, browser_root, f'manganese-extension-switch-{directory.parent.parent.name}')
     try:
         trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
@@ -56,7 +56,7 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
         session.close()
     cdp_dir = directory / 'cdp'
     cdp_dir.mkdir()
-    session = launch.Session(cdp_dir, browser_root, f'manganese-extension-cdp-{directory.parent.name}')
+    session = launch.Session(cdp_dir, browser_root, f'manganese-extension-cdp-{directory.parent.parent.name}')
     try:
         trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)

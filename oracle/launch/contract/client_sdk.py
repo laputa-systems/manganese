@@ -12,7 +12,7 @@ def outcome(ok, evidence):
 
 def run(directory, browser_root, image, preferences, endpoint="http://127.0.0.1:9221"):
     directory.mkdir(parents=True)
-    session = launch.Session(directory, browser_root, f'manganese-client-sdk-{directory.parent.name}')
+    session = launch.Session(directory, browser_root, f'manganese-client-sdk-{directory.parent.parent.name}')
     workload = launch.ROOT / 'oracle/workloads/clients/shadowdriver'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:

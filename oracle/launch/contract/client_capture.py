@@ -32,7 +32,7 @@ def run(directory: Path, browser_root: Path, image: str, preferences: Callable[[
     if client not in ('extension-cli', 'shadowdriver-crawler'):
         raise ValueError(client)
     directory.mkdir(parents=True)
-    session = launch.Session(directory, browser_root, f'manganese-{client}-{directory.parent.name}')
+    session = launch.Session(directory, browser_root, f'manganese-{client}-{directory.parent.parent.name}')
     try:
         trace.start(session, session.run_dir, endpoint, directory.name)
         preferences(session.profile, True)
