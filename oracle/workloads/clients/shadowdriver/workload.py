@@ -39,6 +39,12 @@ async def main():
         submitted = any(item['path'] == '/submit' and item['body'] == 'text=shadowdriver+submission' for item in requests)
         await tab.navigate('http://forms.test/workload', wait='load')
         await tab.document_ready()
+        for _ in range(100):
+            if await tab.evaluate('window.crossReady === true'):
+                break
+            await asyncio.sleep(0.1)
+        else:
+            raise RuntimeError('cross-origin frame did not become ready')
         same_frame = await tab.evaluate("document.querySelector('#same').contentDocument.querySelector('#same-text').textContent")
         await browser.command('Target.setDiscoverTargets', {'discover':True})
         frame_targets = await browser.command('Target.getTargets')
