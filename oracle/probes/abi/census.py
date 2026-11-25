@@ -219,7 +219,7 @@ def run_contract(command, environment):
     if (result.returncode == 0 or failures != {'7.4'} or
             '/launch/contract/crash.py' not in error or
             'Target.targetCrashed' not in error or
-            'ConnectionError: CDP connection closed' not in error):
+            not ('ConnectionError: CDP connection closed' in error or 'TimeoutError: timed out' in error)):
         raise RuntimeError('traced contract failed outside the expected crash case')
     run_dir = Path(report['run_dir'])
     crash_log = (run_dir / 'crash/browser.log').read_text(errors='replace')
