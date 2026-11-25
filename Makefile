@@ -84,6 +84,11 @@ numerics-harness:
 	set -e; image=$$(sh oracle/source-oracle image-tag); docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/numerics "$$image" python3 -B /lane/oracle/harness/numerics/build_json.py
 	set -e; image=$$(sh oracle/source-oracle image-tag); docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/numerics "$$image" python3 -B /lane/oracle/harness/numerics/build.py
 
+.PHONY: url-harness
+url-harness:
+	mkdir -p .work/tmp/url
+	set -e; image=$$(sh oracle/source-oracle image-tag); docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/url "$$image" python3 -B /lane/oracle/harness/url/build.py
+
 .PHONY: checksums-harness
 checksums-harness:
 	mkdir -p .work/tmp/checksums
