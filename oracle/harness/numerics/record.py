@@ -4,7 +4,8 @@ import pathlib
 import random
 import struct
 import subprocess
-from cases import generate_base, generate_blink, generate_json, generate_json_writer, generate_blink_wide, generate_format, generate_base_utf
+import tempfile
+from cases import generate_base, generate_blink, generate_json, generate_json_writer, generate_blink_wide, generate_format, generate_base_utf, generate_wide, generate_int_format, generate_wide_number
 
 root = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(root)
@@ -23,8 +24,23 @@ def blob(data: bytes) -> tuple[str, int]:
     path = store / digest
     if path.exists():
         if path.read_bytes() != data: raise RuntimeError(f'corrupt existing blob {digest}')
-    else:
-        path.write_bytes(data)
+        return digest, len(data)
+    with tempfile.NamedTemporaryFile(dir='.work/tmp/numerics', prefix='blob-', delete=False) as temporary:
+        temporary_path = pathlib.Path(temporary.name)
+        try:
+            temporary.write(data)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        except BaseException:
+            temporary_path.unlink()
+            raise
+    try:
+        try:
+            os.link(temporary_path, path)
+        except FileExistsError:
+            if path.read_bytes() != data: raise RuntimeError(f'corrupt existing blob {digest}')
+    finally:
+        temporary_path.unlink()
     return digest, len(data)
 
 
@@ -113,9 +129,49 @@ for lane, seed in [('seen', 101101), ('holdout', 101102)]:
     count = 0
     while count < 500:
         count += add(lane, generate_base_utf(rng))
+for lane, seed in [('seen', 111101), ('holdout', 111102)]:
+    rng = random.Random(seed)
+    suffix = 65 if lane == 'seen' else 66
+    for value in (0, 0x7f, 0x80, 0xd7ff, 0xd800, 0xdfff, 0xe000, 0xffff, 0x10000, 0x10ffff, 0x110000, 0xffffffff):
+        for op in (20, 21): add(lane, bytes([op]) + struct.pack('>II', value, suffix))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_wide(rng))
+for lane, seed in [('seen', 121101), ('holdout', 121102)]:
+    rng = random.Random(seed)
+    for value in (0, 1, 0x7fffffff, 0x80000000, 0xffffffff, 0x7fffffffffffffff, 0x8000000000000000, 0xffffffffffffffff):
+        value ^= (1 << 63) if lane == 'holdout' else 0
+        for op in range(23, 26):
+            for kind in range(4): add(lane, struct.pack('>BBQ', op, kind, value))
+    count = 0
+    while count < 500:
+        count += add(lane, generate_int_format(rng))
+for lane, seed in [('seen', 131101), ('holdout', 131102)]:
+    rng = random.Random(seed)
+    for whitespace in (0x09, 0x20, 0x85, 0xa0, 0x1680, 0x180e, 0x2000, 0x2028, 0x205f, 0x3000, 0xfeff):
+        digits = [0x31] if lane == 'seen' else [0x32]
+        data = b''.join(struct.pack('>H', value) for value in [whitespace, *digits])
+        add(lane, b'\x1a' + data)
+        for kind in range(8): add(lane, b'\x1b' + bytes([kind]) + data)
+    count = 0
+    while count < 500:
+        count += add(lane, generate_wide_number(rng))
 proc.stdin.close()
 if proc.wait(): raise SystemExit('oracle failed')
 lock = pathlib.Path('goldens.lock')
 existing = [line for line in lock.read_text().splitlines() if not line.startswith('numerics ')]
-lock.write_text('\n'.join(existing + rows) + '\n')
+with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', dir='.work/tmp/numerics', prefix='goldens-', delete=False) as temporary:
+    temporary_path = pathlib.Path(temporary.name)
+    try:
+        temporary.write('\n'.join(existing + rows) + '\n')
+        os.fchmod(temporary.fileno(), lock.stat().st_mode & 0o777)
+        temporary.flush()
+        os.fsync(temporary.fileno())
+    except BaseException:
+        temporary_path.unlink()
+        raise
+try:
+    os.replace(temporary_path, lock)
+finally:
+    temporary_path.unlink(missing_ok=True)
 print('recorded', len(rows), 'items')

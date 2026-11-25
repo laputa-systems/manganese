@@ -76,12 +76,37 @@ def generate_base_utf(rng: random.Random) -> bytes:
     return b'\x12' + b''.join(struct.pack('>H', unit) for unit in units)
 
 
+def generate_wide(rng: random.Random) -> bytes:
+    op = rng.randrange(19, 23)
+    if op == 19: data = rng.randbytes(rng.randrange(70))
+    elif op in (20, 21):
+        values = [rng.choice((rng.randrange(0x110000), rng.getrandbits(32), 0xd800, 0x10ffff, 0x110000)) for _ in range(rng.randrange(40))]
+        data = b''.join(struct.pack('>I', value) for value in values)
+    else: data = b''.join(struct.pack('>H', rng.randrange(65536)) for _ in range(rng.randrange(70)))
+    return bytes([op]) + data
+
+
+def generate_int_format(rng: random.Random) -> bytes:
+    return struct.pack('>BBQ', rng.randrange(23, 26), rng.randrange(4), rng.getrandbits(64))
+
+
+def generate_wide_number(rng: random.Random) -> bytes:
+    alphabet = [*b'0123456789abcdefABCDEFxX+-.eE !\t', 0x85, 0xa0, 0x1680, 0x180e, 0x2000, 0x2028, 0x205f, 0x3000, 0xfeff, 0xd800]
+    if rng.randrange(2): units = list(str(rng.randrange(-(1 << 70), 1 << 70)).encode()) + [rng.choice(alphabet) for _ in range(rng.randrange(5))]
+    else: units = [rng.choice(alphabet) for _ in range(rng.randrange(35))]
+    data = b''.join(struct.pack('>H', unit) for unit in units)
+    return b'\x1a' + data if rng.randrange(2) else b'\x1b' + bytes([rng.randrange(8)]) + data
+
+
 def generate(rng: random.Random) -> bytes:
-    selected = rng.randrange(11)
+    selected = rng.randrange(14)
     if selected == 0: return generate_blink(rng)
     if selected == 1: return generate_json(rng)
     if selected == 2: return generate_json_writer(rng)
     if selected == 3: return generate_blink_wide(rng)
     if selected == 4: return generate_format(rng)
     if selected == 5: return generate_base_utf(rng)
+    if selected == 6: return generate_wide(rng)
+    if selected == 7: return generate_int_format(rng)
+    if selected == 8: return generate_wide_number(rng)
     return generate_base(rng)

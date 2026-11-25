@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, parse_wide_double, precision, shortest, shortest_exponential, utf16_to_utf8, utf16_to_wide, utf8_to_wide, validate_utf8, wide_to_string, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,71 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 26 && length % 2 == 1 {
+            let units: Vec<u16> = request[1..].chunks_exact(2).map(|part| u16::from_be_bytes([part[0], part[1]])).collect();
+            let (value, consumed, valid) = parse_wide_double(&units);
+            output.write_all(&13u32.to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(&(consumed as u32).to_be_bytes())?;
+            output.write_all(&value.to_bits().to_be_bytes())?;
+            output.flush()?;
+            continue;
+        }
+        if request[0] == 27 && length >= 2 && length % 2 == 0 {
+            let kind = match request[1] % 4 {
+                0 => IntegerKind::I32, 1 => IntegerKind::U32,
+                2 => IntegerKind::I64, _ => IntegerKind::U64,
+            };
+            if request[1] > 7 { return Err(io::ErrorKind::InvalidData.into()); }
+            let radix = if request[1] < 4 { IntegerRadix::Decimal } else { IntegerRadix::Hexadecimal };
+            let chars: Vec<u8> = request[2..].chunks_exact(2).map(|pair| if pair[0] == 0 { pair[1] } else { 0 }).collect();
+            let (value, valid) = parse_integer(&chars, kind, radix);
+            output.write_all(&9u32.to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(&value.to_be_bytes())?;
+            output.flush()?;
+            continue;
+        }
+        if (23..=25).contains(&request[0]) && length == 10 {
+            let bits = u64::from_be_bytes(request[2..10].try_into().unwrap());
+            let text = match request[1] {
+                0 => (bits as i32).to_string(), 1 => (bits as u32).to_string(),
+                2 => (bits as i64).to_string(), 3 => bits.to_string(),
+                _ => return Err(io::ErrorKind::InvalidData.into()),
+            };
+            let bytes: Vec<u8> = if request[0] == 24 { text.encode_utf16().flat_map(u16::to_be_bytes).collect() } else { text.into_bytes() };
+            output.write_all(&(bytes.len() as u32).to_be_bytes())?;
+            output.write_all(&bytes)?;
+            output.flush()?;
+            continue;
+        }
+        if request[0] == 19 {
+            let (units, valid) = utf8_to_wide(&request[1..]);
+            output.write_all(&((1 + units.len() * 4) as u32).to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            for unit in units { output.write_all(&unit.to_be_bytes())?; }
+            output.flush()?;
+            continue;
+        }
+        if matches!(request[0], 20 | 21) && length % 4 == 1 {
+            let units: Vec<u32> = request[1..].chunks_exact(4).map(|part| u32::from_be_bytes(part.try_into().unwrap())).collect();
+            let (text, valid) = wide_to_string(&units);
+            let bytes = if request[0] == 20 { text.into_bytes() } else { text.encode_utf16().flat_map(u16::to_be_bytes).collect() };
+            output.write_all(&((1 + bytes.len()) as u32).to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(&bytes)?;
+            output.flush()?;
+            continue;
+        }
+        if request[0] == 22 && length % 2 == 1 {
+            let units: Vec<u16> = request[1..].chunks_exact(2).map(|part| u16::from_be_bytes([part[0], part[1]])).collect();
+            let (wide, valid) = utf16_to_wide(&units);
+            output.write_all(&((1 + wide.len() * 4) as u32).to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            for unit in wide { output.write_all(&unit.to_be_bytes())?; }
+            output.flush()?;
+            continue;
+        }
         if request[0] == 17 {
             let (text, valid) = base_utf8_to_utf16(&request[1..]);
             output.write_all(&((1 + text.len() * 2) as u32).to_be_bytes())?;

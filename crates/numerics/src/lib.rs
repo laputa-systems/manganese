@@ -81,7 +81,21 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{base_utf8_to_utf16, base_utf16_to_utf8, blink_fixed, blink_format, blink_precision, css_number, fixed, parse_double, parse_integer, parse_json_number, parse_wide_double, precision, shortest, shortest_exponential, utf16_to_utf8, utf16_to_wide, utf8_to_wide, validate_utf8, wide_to_string, write_json_double, BlinkFormat, IntegerKind, IntegerRadix, JsonDoubleStyle, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn wide_double_preserves_distinct_whitespace_rules() {
+        assert_eq!(parse_wide_double(&[0x00a0, 0x31]), (1.0, 2, false));
+        assert_eq!(parse_wide_double(&[0xfeff, 0x31]), (1.0, 2, true));
+        assert_eq!(parse_wide_double(&[0x85, 0x31]), (0.0, 0, false));
+    }
+
+    #[test]
+    fn wide_conversions_replace_non_scalars() {
+        assert_eq!(wide_to_string(&[0x41, 0x110000, 0xd800]), ("A��".into(), false));
+        assert_eq!(utf8_to_wide("A😀".as_bytes()), (vec![0x41, 0x1f600], true));
+        assert_eq!(utf16_to_wide(&[0xd83d, 0xde00, 0xdc00]), (vec![0x1f600, 0xfffd], false));
+    }
 
     #[test]
     fn base_transcoding_replaces_invalid_units_and_reports_failure() {
@@ -575,4 +589,35 @@ pub fn base_utf8_to_utf16(input: &[u8]) -> (Vec<u16>, bool) {
 pub fn base_utf16_to_utf8(input: &[u16]) -> (String, bool) {
     let valid = std::char::decode_utf16(input.iter().copied()).all(|value| value.is_ok());
     (String::from_utf16_lossy(input), valid)
+}
+
+pub fn utf8_to_wide(input: &[u8]) -> (Vec<u32>, bool) {
+    let valid = std::str::from_utf8(input).is_ok();
+    (String::from_utf8_lossy(input).chars().map(u32::from).collect(), valid)
+}
+
+pub fn utf16_to_wide(input: &[u16]) -> (Vec<u32>, bool) {
+    let (text, valid) = base_utf16_to_utf8(input);
+    (text.chars().map(u32::from).collect(), valid)
+}
+
+pub fn wide_to_string(input: &[u32]) -> (String, bool) {
+    let mut valid = true;
+    let text = input.iter().map(|&value| match char::from_u32(value) {
+        Some(c) => c,
+        None => { valid = false; '\u{fffd}' }
+    }).collect();
+    (text, valid)
+}
+
+pub fn parse_wide_double(input: &[u16]) -> (f64, usize, bool) {
+    let characters: Vec<u8> = input.iter().map(|&value| match value {
+        0..=127 => value as u8,
+        0x00a0 | 0x1680 | 0x180e | 0x2000..=0x200a | 0x2028 | 0x2029 | 0x202f | 0x205f | 0x3000 | 0xfeff => b' ',
+        _ => 0,
+    }).collect();
+    let (value, consumed) = parse_double(&characters);
+    let whitespace = input.first().is_some_and(|&c| matches!(c, 0x09..=0x0d | 0x20 | 0x85 | 0x00a0 | 0x1680 | 0x2000..=0x200a | 0x2028 | 0x2029 | 0x202f | 0x205f | 0x3000));
+    let valid = !input.is_empty() && value.is_finite() && consumed == input.len() && !whitespace;
+    (value, consumed, valid)
 }

@@ -9,6 +9,8 @@
 #include "base/strings/utf_string_conversion_utils.h"
 #include "base/strings/utf_string_conversions.h"
 #include "third_party/blink/renderer/platform/wtf/dtoa.h"
+#include "third_party/blink/renderer/platform/wtf/text/integer_to_string_conversion.h"
+#include "base/strings/string_number_conversions.h"
 #include <optional>
 #include <string>
 #include <variant>
@@ -43,6 +45,33 @@ static void parse_integer(const unsigned char* input, size_t length, unsigned ch
   for (int i = 0; i < 8; ++i) output[1 + i] = value >> (56 - 8 * i);
 }
 
+template <typename T, int base>
+static void parse_integer_wide(const char16_t* input, size_t length, unsigned char* output) {
+  std::u16string_view text(input, length);
+  auto result = base::internal::StringToNumber<T, base>(text);
+  output[0] = result.valid;
+  uint64_t value = static_cast<uint64_t>(result.value);
+  for (int i = 0; i < 8; ++i) output[1 + i] = value >> (56 - 8 * i);
+}
+
+template <typename T>
+static size_t format_integer(T value, unsigned char op, unsigned char* output) {
+  if (op == 23) {
+    std::string text = base::NumberToString(value);
+    memcpy(output, text.data(), text.size());
+    return text.size();
+  }
+  if (op == 24) {
+    std::u16string text = base::NumberToString16(value);
+    for (size_t i = 0; i < text.size(); ++i) { output[2 * i] = text[i] >> 8; output[2 * i + 1] = text[i]; }
+    return text.size() * 2;
+  }
+  blink::IntegerToStringConverter<T> converter(value);
+  auto text = converter.Span();
+  memcpy(output, text.data(), text.size());
+  return text.size();
+}
+
 int main() {
   char magic[4];
   if (fread(magic, 1, 4, stdin) != 4 || memcmp(magic, "MGB1", 4)) return 1;
@@ -54,7 +83,7 @@ int main() {
     if (length > 65536 || length < 1) return 1;
     unsigned char* input = static_cast<unsigned char*>(malloc(length));
     if (!input || fread(input, 1, length, stdin) != length) return 1;
-    unsigned char output[196608] = {};
+    unsigned char output[262144] = {};
     size_t out_len = 0;
     if (input[0] <= 4 && length == 11) {
       uint64_t bits = 0;
@@ -76,6 +105,84 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 26 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      std::u16string_view text(units, count);
+      double value;
+      output[0] = base::internal::StringToDoubleImpl(text, reinterpret_cast<const uint16_t*>(units), value);
+      StringToDoubleConverter converter(StringToDoubleConverter::ALLOW_LEADING_SPACES | StringToDoubleConverter::ALLOW_TRAILING_JUNK, 0.0, 0.0, nullptr, nullptr);
+      int consumed = 0;
+      converter.StringToDouble(reinterpret_cast<const uint16_t*>(units), count, &consumed);
+      write_u32(output + 1, consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      for (int i = 0; i < 8; ++i) output[5 + i] = bits >> (56 - 8 * i);
+      out_len = 13;
+      free(units);
+    } else if (input[0] == 27 && length >= 2 && length % 2 == 0) {
+      size_t count = (length - 2) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[2 + i * 2]) << 8) | input[3 + i * 2];
+      switch (input[1]) {
+        case 0: parse_integer_wide<int32_t, 10>(units, count, output); break;
+        case 1: parse_integer_wide<uint32_t, 10>(units, count, output); break;
+        case 2: parse_integer_wide<int64_t, 10>(units, count, output); break;
+        case 3: parse_integer_wide<uint64_t, 10>(units, count, output); break;
+        case 4: parse_integer_wide<int32_t, 16>(units, count, output); break;
+        case 5: parse_integer_wide<uint32_t, 16>(units, count, output); break;
+        case 6: parse_integer_wide<int64_t, 16>(units, count, output); break;
+        case 7: parse_integer_wide<uint64_t, 16>(units, count, output); break;
+        default: return 1;
+      }
+      out_len = 9;
+      free(units);
+    } else if (input[0] >= 23 && input[0] <= 25 && length == 10) {
+      uint64_t bits = 0;
+      for (int i = 2; i < 10; ++i) bits = (bits << 8) | input[i];
+      switch (input[1]) {
+        case 0: out_len = format_integer(static_cast<int32_t>(bits), input[0], output); break;
+        case 1: out_len = format_integer(static_cast<uint32_t>(bits), input[0], output); break;
+        case 2: out_len = format_integer(static_cast<int64_t>(bits), input[0], output); break;
+        case 3: out_len = format_integer(static_cast<uint64_t>(bits), input[0], output); break;
+        default: return 1;
+      }
+    } else if (input[0] == 19) {
+      std::wstring text;
+      bool success = base::UTF8ToWide(reinterpret_cast<const char*>(input + 1), length - 1, &text);
+      output[0] = success;
+      out_len = 1 + text.size() * 4;
+      for (size_t i = 0; i < text.size(); ++i) write_u32(output + 1 + 4 * i, static_cast<uint32_t>(text[i]));
+    } else if ((input[0] == 20 || input[0] == 21) && length % 4 == 1) {
+      size_t count = (length - 1) / 4;
+      auto* units = static_cast<wchar_t*>(malloc((count + 1) * sizeof(wchar_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = static_cast<wchar_t>(read_u32(input + 1 + 4 * i));
+      if (input[0] == 20) {
+        std::string text;
+        output[0] = base::WideToUTF8(units, count, &text);
+        out_len = 1 + text.size();
+        memcpy(output + 1, text.data(), text.size());
+      } else {
+        std::u16string text;
+        output[0] = base::WideToUTF16(units, count, &text);
+        out_len = 1 + 2 * text.size();
+        for (size_t i = 0; i < text.size(); ++i) { output[1 + 2 * i] = text[i] >> 8; output[2 + 2 * i] = text[i]; }
+      }
+      free(units);
+    } else if (input[0] == 22 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      auto* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      std::wstring text;
+      output[0] = base::UTF16ToWide(units, count, &text);
+      out_len = 1 + 4 * text.size();
+      for (size_t i = 0; i < text.size(); ++i) write_u32(output + 1 + 4 * i, static_cast<uint32_t>(text[i]));
+      free(units);
     } else if (input[0] == 17) {
       std::u16string text;
       bool success = base::UTF8ToUTF16(reinterpret_cast<const char*>(input + 1), length - 1, &text);
