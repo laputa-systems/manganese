@@ -83,6 +83,11 @@ zstd-harness:
 	mkdir -p .work/tmp/zstd
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zstd $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/zstd/build.py
 
+.PHONY: png-harness
+png-harness:
+	mkdir -p .work/tmp/png
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/png $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/png/build.py
+
 .PHONY: zlib-anchor
 zlib-anchor:
 	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/anchor.py
