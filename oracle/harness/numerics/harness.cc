@@ -4,6 +4,7 @@
 #include <string.h>
 #include "base/third_party/double_conversion/double-conversion/double-conversion.h"
 #include "third_party/simdutf/simdutf.h"
+#include "base/strings/string_number_conversions_internal.h"
 
 using double_conversion::DoubleToStringConverter;
 using double_conversion::StringBuilder;
@@ -15,6 +16,15 @@ static uint32_t read_u32(const unsigned char* p) {
 
 static void write_u32(unsigned char* p, uint32_t v) {
   p[0] = v >> 24; p[1] = v >> 16; p[2] = v >> 8; p[3] = v;
+}
+
+template <typename T, int base>
+static void parse_integer(const unsigned char* input, size_t length, unsigned char* output) {
+  std::string_view text(reinterpret_cast<const char*>(input), length);
+  auto result = base::internal::StringToNumber<T, base>(text);
+  output[0] = result.valid;
+  uint64_t value = static_cast<uint64_t>(result.value);
+  for (int i = 0; i < 8; ++i) output[1 + i] = value >> (56 - 8 * i);
 }
 
 int main() {
@@ -50,6 +60,27 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 7 && length >= 2) {
+      switch (input[1]) {
+        case 0: parse_integer<int32_t, 10>(input + 2, length - 2, output); break;
+        case 1: parse_integer<uint32_t, 10>(input + 2, length - 2, output); break;
+        case 2: parse_integer<int64_t, 10>(input + 2, length - 2, output); break;
+        case 3: parse_integer<uint64_t, 10>(input + 2, length - 2, output); break;
+        case 4: parse_integer<int32_t, 16>(input + 2, length - 2, output); break;
+        case 5: parse_integer<uint32_t, 16>(input + 2, length - 2, output); break;
+        case 6: parse_integer<int64_t, 16>(input + 2, length - 2, output); break;
+        case 7: parse_integer<uint64_t, 16>(input + 2, length - 2, output); break;
+        default: return 1;
+      }
+      out_len = 9;
+    } else if (input[0] == 8) {
+      std::string_view text(reinterpret_cast<char*>(input + 1), length - 1);
+      double value;
+      output[0] = base::internal::StringToDoubleImpl(text, text.data(), value);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      for (int i = 0; i < 8; ++i) output[1 + i] = bits >> (56 - 8 * i);
+      out_len = 9;
     } else if (input[0] == 6 && length % 2 == 1) {
       size_t count = (length - 1) / 2;
       char16_t* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));

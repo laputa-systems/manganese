@@ -16,6 +16,15 @@ args = [arg for arg in args if not arg.startswith('-fcrash-diagnostics-dir=')]
 env = dict(os.environ, TMPDIR=str(scratch))
 compiler = '/opt/chromium-llvm/bin/clang++'
 objects = []
+harness_flags = {}
+for line in (out / 'obj/base/base.ninja').read_text().splitlines():
+    for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc'):
+        if line.startswith(key + ' = '):
+            harness_flags[key] = shlex.split(line.split(' = ', 1)[1])
+harness_args = sum((harness_flags[key] for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc')), [])
+harness_args = [arg for arg in harness_args if not arg.startswith('-fcrash-diagnostics-dir=')]
+obj = scratch / 'harness.o'
+subprocess.run([compiler, *harness_args, '-c', '/lane/oracle/harness/numerics/harness.cc', '-o', str(obj)], cwd=out, env=env, check=True)
 for path in sorted(source.glob('*.cc')):
     obj = scratch / (path.name + '.o')
     subprocess.run([compiler, *args, '-c', str(path), '-o', str(obj)], cwd=out, env=env, check=True)
@@ -46,6 +55,4 @@ for target in ('libc++', 'libc++abi'):
         obj = scratch / (target + '-' + str(index) + '.o')
         subprocess.run([compiler, *target_args, '-c', path, '-o', str(obj)], cwd=out, env=env, check=True)
         objects.append(str(obj))
-obj = scratch / 'harness.o'
-subprocess.run([compiler, *args, '-c', '/lane/oracle/harness/numerics/harness.cc', '-o', str(obj)], cwd=out, env=env, check=True)
-subprocess.run(['/opt/chromium-llvm/bin/clang', '--target=x86_64-alpine-linux-musl', '-flto=thin', '-fuse-ld=lld', '-Wl,--gc-sections', '-pthread', str(obj), *objects, '/usr/lib/libstdc++.so.6', '/usr/lib/libgcc_s.so.1', '-o', str(scratch / 'oracle')], cwd=out, env=env, check=True)
+subprocess.run(['/opt/chromium-llvm/bin/clang', '--target=x86_64-alpine-linux-musl', '-flto=thin', '-fuse-ld=lld', '-Wl,--gc-sections', '-pthread', str(scratch / 'harness.o'), *objects, '/usr/lib/libstdc++.so.6', '/usr/lib/libgcc_s.so.1', '-o', str(scratch / 'oracle')], cwd=out, env=env, check=True)

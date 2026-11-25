@@ -81,7 +81,16 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, parse_double, precision, shortest, shortest_exponential, utf16_to_utf8, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn integer_parsing_preserves_partial_value_and_saturation() {
+        assert_eq!(parse_integer(b" 123", IntegerKind::I32, IntegerRadix::Decimal), (123, false));
+        assert_eq!(parse_integer(b"-12x", IntegerKind::I32, IntegerRadix::Decimal), ((-12i64) as u64, false));
+        assert_eq!(parse_integer(b"2147483648", IntegerKind::I32, IntegerRadix::Decimal), (2147483647, false));
+        assert_eq!(parse_integer(b"-1", IntegerKind::U32, IntegerRadix::Decimal), (0, false));
+        assert_eq!(parse_integer(b"0xff", IntegerKind::U32, IntegerRadix::Hexadecimal), (255, true));
+    }
 
     #[test]
     fn utf16_reports_the_first_unpaired_surrogate() {
@@ -311,4 +320,45 @@ pub fn utf16_to_utf8(input: &[u16]) -> Utf16Conversion {
         prefix.push(char::from_u32(scalar).expect("valid UTF-16 scalar"));
     }
     Utf16Conversion::Complete(prefix)
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum IntegerKind { I32, U32, I64, U64 }
+
+#[derive(Clone, Copy, Debug)]
+pub enum IntegerRadix { Decimal, Hexadecimal }
+
+pub fn parse_integer(input: &[u8], kind: IntegerKind, radix: IntegerRadix) -> (u64, bool) {
+    let mut cursor = 0;
+    while cursor < input.len() && matches!(input[cursor], b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c) { cursor += 1; }
+    let leading_space = cursor != 0;
+    let signed = matches!(kind, IntegerKind::I32 | IntegerKind::I64);
+    let negative = input.get(cursor) == Some(&b'-');
+    if negative && !signed { return (0, false); }
+    if matches!(input.get(cursor), Some(b'+' | b'-')) { cursor += 1; }
+    let base = match radix { IntegerRadix::Decimal => 10u128, IntegerRadix::Hexadecimal => 16u128 };
+    if base == 16 && input.len().saturating_sub(cursor) > 2 && input[cursor] == b'0' && matches!(input[cursor + 1], b'x' | b'X') { cursor += 2; }
+    if cursor == input.len() { return (0, false); }
+    let limit = match (kind, negative) {
+        (IntegerKind::I32, false) => i32::MAX as u128,
+        (IntegerKind::I32, true) => 1u128 << 31,
+        (IntegerKind::U32, _) => u32::MAX as u128,
+        (IntegerKind::I64, false) => i64::MAX as u128,
+        (IntegerKind::I64, true) => 1u128 << 63,
+        (IntegerKind::U64, _) => u64::MAX as u128,
+    };
+    let mut value = 0u128;
+    let mut valid = !leading_space;
+    for &byte in &input[cursor..] {
+        let digit = match byte {
+            b'0'..=b'9' => u128::from(byte - b'0'),
+            b'a'..=b'f' if base == 16 => u128::from(byte - b'a' + 10),
+            b'A'..=b'F' if base == 16 => u128::from(byte - b'A' + 10),
+            _ => { valid = false; break; }
+        };
+        if value > (limit - digit) / base { value = limit; valid = false; break; }
+        value = value * base + digit;
+    }
+    let value = value as u64;
+    (if negative { value.wrapping_neg() } else { value }, valid)
 }

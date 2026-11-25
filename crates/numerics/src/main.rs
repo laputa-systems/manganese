@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, parse_double, precision, shortest, shortest_exponential, utf16_to_utf8, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,30 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 7 && length >= 2 {
+            let kind = match request[1] % 4 {
+                0 => IntegerKind::I32, 1 => IntegerKind::U32,
+                2 => IntegerKind::I64, _ => IntegerKind::U64,
+            };
+            if request[1] > 7 { return Err(io::ErrorKind::InvalidData.into()); }
+            let radix = if request[1] < 4 { IntegerRadix::Decimal } else { IntegerRadix::Hexadecimal };
+            let (value, valid) = parse_integer(&request[2..], kind, radix);
+            output.write_all(&9u32.to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(&value.to_be_bytes())?;
+            output.flush()?;
+            continue;
+        }
+        if request[0] == 8 {
+            let (value, consumed) = parse_double(&request[1..]);
+            let first_is_space = request.get(1).is_some_and(|b| matches!(b, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c));
+            let valid = length > 1 && value.is_finite() && consumed == length - 1 && !first_is_space;
+            output.write_all(&9u32.to_be_bytes())?;
+            output.write_all(&[u8::from(valid)])?;
+            output.write_all(&value.to_bits().to_be_bytes())?;
+            output.flush()?;
+            continue;
+        }
         if request[0] == 6 && length % 2 == 1 {
             let units: Vec<u16> = request[1..].chunks_exact(2).map(|pair| u16::from_be_bytes([pair[0], pair[1]])).collect();
             let (error, count, text) = match utf16_to_utf8(&units) {
