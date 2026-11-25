@@ -122,3 +122,7 @@ brotli-anchor:
 encoding-harness:
 	mkdir -p .work/tmp/encoding
 	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/encoding "$$tag" python3 -B /lane/oracle/harness/encoding/build.py
+
+.PHONY: zstd-anchor
+zstd-anchor:
+	PYTHONPATH=oracle/harness/zstd python3 -B oracle/harness/zstd/anchor.py
