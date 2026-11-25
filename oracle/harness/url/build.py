@@ -16,7 +16,7 @@ clang = '/opt/chromium-llvm/bin/clang'
 clangxx = '/opt/chromium-llvm/bin/clang++'
 
 sources = {}
-roots = ('obj/url', 'obj/base', 'obj/net', 'obj/third_party/icu', 'obj/buildtools/third_party/libc++', 'obj/buildtools/third_party/libc++abi', 'obj/third_party/perfetto', 'obj/third_party/abseil-cpp', 'obj/third_party/boringssl', 'obj/third_party/zlib')
+roots = ('obj/url', 'obj/base', 'obj/net', 'obj/third_party/icu', 'obj/buildtools/third_party/libc++', 'obj/buildtools/third_party/libc++abi', 'obj/third_party/perfetto', 'obj/third_party/abseil-cpp', 'obj/third_party/boringssl', 'obj/third_party/zlib', 'obj/third_party/blink/renderer/platform', 'obj/third_party/simdutf', 'obj/third_party/crashpad')
 for ninja in (path for root in roots for path in (out / root).rglob('*.ninja')):
     values = {}
     for line in ninja.read_text(errors='replace').splitlines():
@@ -33,7 +33,9 @@ for ninja in (path for root in roots for path in (out / root).rglob('*.ninja')):
 
 archives = [out / 'obj/url/liburl.a', out / 'obj/base/libbase.a', out / 'obj/net/libnet.a',
             out / 'obj/buildtools/third_party/libc++/libc++.a', out / 'obj/buildtools/third_party/libc++abi/libc++abi.a',
-            out / 'obj/third_party/boringssl/libboringssl.a', out / 'obj/third_party/zlib/libchrome_zlib.a']
+            out / 'obj/third_party/boringssl/libboringssl.a', out / 'obj/third_party/zlib/libchrome_zlib.a',
+            out / 'obj/third_party/blink/renderer/platform/libblink_platform.a',
+            out / 'obj/third_party/blink/renderer/platform/wtf/libblink_platform_wtf.a']
 archives += sorted((out / 'obj/base/allocator/partition_allocator/src/partition_alloc').glob('*.a'))
 archives += sorted((out / 'obj/third_party/icu').glob('*.a'))
 symbols = {}
@@ -50,7 +52,7 @@ for archive in archives:
             symbols.setdefault(symbol, obj)
     print('indexed', archive.name, flush=True)
 
-source_objects = [obj for obj in sources if obj.startswith(('obj/third_party/perfetto/', 'obj/third_party/abseil-cpp/')) and (out / obj).is_file()]
+source_objects = [obj for obj in sources if obj.startswith(('obj/third_party/perfetto/', 'obj/third_party/abseil-cpp/', 'obj/third_party/simdutf/', 'obj/third_party/crashpad/', 'obj/base/third_party/double_conversion/')) and (out / obj).is_file()]
 for start in range(0, len(source_objects), 100):
     batch = source_objects[start:start + 100]
     result = subprocess.run(['/opt/chromium-llvm/bin/llvm-nm', '-g', '--defined-only', '-A', *batch], cwd=out, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
@@ -62,7 +64,7 @@ for start in range(0, len(source_objects), 100):
 print('indexed source-set objects', len(source_objects), flush=True)
 
 selected = {obj for obj in sources if obj.startswith('obj/net/base/registry_controlled_domains/')}
-selected.update(('obj/third_party/boringssl/boringssl_asm/md5-x86_64-linux.o', 'obj/third_party/zlib/zlib_crc32_simd/crc32_simd.o'))
+selected.update(('obj/third_party/boringssl/boringssl_asm/md5-x86_64-linux.o', 'obj/third_party/boringssl/boringssl_asm/sha1-x86_64-linux.o', 'obj/third_party/zlib/zlib_crc32_simd/crc32_simd.o'))
 objects = {}
 def compile_source(key, source, flags, language):
     source_digest = pathlib.Path(source).read_bytes() if key == 'harness' else b''
@@ -78,7 +80,7 @@ while True:
     for obj in sorted(selected - objects.keys()):
         source, flags, language = sources[obj]
         objects[obj] = compile_source(obj, source, flags, language)
-    source, flags, language = sources['obj/url/url/gurl.o']
+    source, flags, language = sources['obj/third_party/blink/renderer/platform/platform/kurl.o']
     harness = compile_source('harness', '/lane/oracle/harness/url/harness.cc', flags, language)
     command = [clang, '--target=x86_64-alpine-linux-musl', '-flto=thin', '-fuse-ld=lld',
                '-Wl,--gc-sections,--no-demangle,--error-limit=0,--thinlto-jobs=2', '-pthread', harness, str(scratch / 'icudtl.o'), '-Wl,--start-lib', *objects.values(), '-Wl,--end-lib',

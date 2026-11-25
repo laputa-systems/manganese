@@ -8,5 +8,8 @@ def field(value):
     return struct.pack('>I', len(data)) + data
 
 
-def request(value, base, other, private):
-    return field(value) + field(base) + field(other) + bytes([private])
+def request(value, base, other, private, setter=None):
+    result = field(value) + field(base) + field(other) + bytes([private])
+    if setter is not None:
+        result += field(setter[0]) + field(setter[1])
+    return result

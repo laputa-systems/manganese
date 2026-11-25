@@ -19,6 +19,7 @@ fn path_input(input: &str) -> String {
             '\\' if !tail => out.push('/'),
             '|' if !tail => out.push_str("%7C"),
             '^' if !tail => out.push_str("%5E"),
+            ' ' if !tail => out.push_str("%20"),
             _ => out.push(ch),
         }
     }
@@ -118,6 +119,57 @@ pub fn parse(input: &str, base: Option<&str>) -> Option<FileUrl> {
         }
         Some(file)
     } else if has_scheme { absolute(input) } else { None }
+}
+
+pub fn replace_path(file: &FileUrl, value: &str) -> Option<FileUrl> {
+    let host = file.host.as_deref().unwrap_or("manganese.invalid");
+    let value: String = value.chars().filter(|c| !matches!(c, '\t' | '\n' | '\r')).collect();
+    let path = path_input(&value.replace('?', "%3F").replace('#', "%23"));
+    let path = if path.starts_with('/') { path } else { format!("/{path}") };
+    let mut url = Url::parse(&format!("http://{host}{path}")).ok()?;
+    url.set_query(file.query.as_deref());
+    url.set_fragment(file.fragment.as_deref());
+    Some(from_http(url, file.host.is_some()))
+}
+
+fn rebuild(file: &mut FileUrl) {
+    file.spec = format!("file://{}{}", file.host.as_deref().unwrap_or(""), file.path);
+    if let Some(query) = &file.query { file.spec.push('?'); file.spec.push_str(query); }
+    if let Some(fragment) = &file.fragment { file.spec.push('#'); file.spec.push_str(fragment); }
+}
+
+pub fn replace_host(file: &mut FileUrl, value: &str) -> bool {
+    let host = if value.is_empty() { None } else {
+        let raw = format!("http://{value}/");
+        match Url::parse(&raw) {
+            Ok(url) if url.username().is_empty() && url.password().is_none() && url.port().is_none() => url.host_str().map(str::to_owned),
+            _ => match crate::host::parse(&raw) { Some((_, host)) => Some(host), None => return false },
+        }
+    };
+    file.host = host;
+    if file.host.as_deref() == Some("localhost") {
+        let path = file.path.as_bytes();
+        if path.len() >= 3 && path[0] == b'/' && path[1].is_ascii_alphabetic() && path[2] == b':' { file.host = None; }
+    }
+    rebuild(file);
+    true
+}
+
+pub fn replace_query_or_fragment(file: &mut FileUrl, name: &str, value: &str) {
+    let clean: String = value.chars().filter(|c| !matches!(c, '\t' | '\n' | '\r')).collect();
+    let mut helper = Url::parse("http://manganese.invalid/").unwrap();
+    if name == "search" {
+        if value.is_empty() || value == "?" { file.query = None; }
+        else {
+            helper.set_query(Some(clean.strip_prefix('?').unwrap_or(&clean)));
+            file.query = helper.query().map(str::to_owned);
+        }
+    } else if value.is_empty() { file.fragment = None; }
+    else {
+        helper.set_fragment(Some(clean.strip_prefix('#').unwrap_or(&clean)));
+        file.fragment = helper.fragment().map(str::to_owned);
+    }
+    rebuild(file);
 }
 
 #[cfg(test)]

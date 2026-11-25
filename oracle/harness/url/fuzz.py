@@ -20,7 +20,14 @@ def generate(oracle):
     if rng.randrange(2): value += rng.choice(['?q=1', '?', '#frag', '#', ':80'])
     base = rng.choice([None, 'https://example.com/a/b', 'file:///tmp/a', 'foo:opaque'])
     other = rng.choice([None, 'https://example.com/', 'http://a.blogspot.com/', 'https://localhost/'])
-    return request(value, base, other, rng.randrange(2))
+    setter = None
+    if rng.randrange(4) == 0:
+        name = rng.choice(['href', 'protocol', 'username', 'password', 'host', 'hostname', 'port', 'pathname', 'search', 'hash'])
+        argument = rng.choice(['', 'http', 'https:', 'file:', host, host + ':8080', path, '?q=1', '#fragment', '65536', '00080', 'x@y', 'bücher', "a'b", ' '])
+        setter = (('blink:' if rng.randrange(2) else '') + name, argument)
+    elif rng.randrange(4) == 0:
+        setter = ('schemeful-site', '')
+    return request(value, base, other, rng.randrange(2), setter)
 
 
 fuzzdriver.run('url', seed, cases, generate)

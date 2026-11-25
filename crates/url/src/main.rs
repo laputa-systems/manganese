@@ -6,6 +6,7 @@ use url_parser::{Host, Origin, Position, Url};
 mod file_url;
 mod filesystem_url;
 mod host;
+mod setter;
 
 const SUFFIX_DATA: &[u8] = include_bytes!("effective_tld_names.dat");
 
@@ -70,6 +71,42 @@ fn put_field(output: &mut Vec<u8>, value: Option<&str>) {
     }
 }
 
+fn site(response: &[u8]) -> io::Result<Option<(String, String)>> {
+    if response.first() != Some(&1) || response.get(1) != Some(&0) { return Ok(None); }
+    let mut fields = &response[2..];
+    let mut values = Vec::new();
+    for _ in 0..11 { values.push(take_field(&mut fields)?); }
+    let origin = values[9].unwrap_or("null");
+    let scheme = origin.split(':').next().unwrap_or("");
+    let host = if scheme == "file" {
+        if let Some(value) = values[4] { value.to_owned() }
+        else if let Some(inner) = values[0].and_then(|value| value.strip_prefix("blob:")) {
+            file_url::parse(inner, None).and_then(|value| value.host).unwrap_or_default()
+        } else { String::new() }
+    } else if let Ok(value) = Url::parse(origin) {
+        value.host_str().unwrap_or("").to_owned()
+    } else if let Some((_, host)) = host::parse(origin) { host }
+    else { return Ok(None); };
+    let domain = registrable_domain(&host, true).unwrap_or(&host).to_owned();
+    Ok(Some((scheme.to_owned(), domain)))
+}
+
+fn file_response(file: file_url::FileUrl, other: Option<&str>, include_private: bool) -> Vec<u8> {
+    let domain = file.host.as_deref().and_then(|host| registrable_domain(host, include_private));
+    let same = other.and_then(|value| Url::parse(value).ok()).and_then(|value| {
+        let other_host = value.host_str()?;
+        let host = file.host.as_deref()?;
+        Some(domain.unwrap_or(host) == registrable_domain(other_host, include_private).unwrap_or(other_host))
+    });
+    let mut output = vec![1, 0];
+    for field in [Some(file.spec.as_str()), Some("file"), Some(""), None, file.host.as_deref(), None,
+                  Some(file.path.as_str()), file.query.as_deref(), file.fragment.as_deref(), Some("file://"), domain] {
+        put_field(&mut output, field);
+    }
+    output.push(match same { Some(true) => 1, Some(false) => 0, None => 2 });
+    output
+}
+
 fn parse(input: &str, base: Option<&str>) -> Result<Url, url_parser::ParseError> {
     match base {
         Some(base) => {
@@ -112,10 +149,122 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
     let input = take_field(&mut request)?.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing URL"))?;
     let base = take_field(&mut request)?;
     let other = take_field(&mut request)?;
-    if request.len() != 1 || request[0] > 1 {
+    if request.is_empty() || request[0] > 1 {
         return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid registry policy"));
     }
     let include_private = request[0] == 1;
+    request = &request[1..];
+    if !request.is_empty() {
+        let name = take_field(&mut request)?.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing setter"))?;
+        let value = take_field(&mut request)?.ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "missing setter value"))?;
+        if !request.is_empty() { return Err(io::Error::new(io::ErrorKind::InvalidData, "extra setter fields")); }
+        let mut original_request = Vec::new();
+        put_field(&mut original_request, Some(input));
+        put_field(&mut original_request, base);
+        put_field(&mut original_request, other);
+        original_request.push(u8::from(include_private));
+        let original = respond(&original_request)?;
+        if original.first() != Some(&1) { return Ok(original); }
+        if name == "schemeful-site" {
+            let mut result = original;
+            let same = if let Some(other) = other {
+                let mut other_request = Vec::new();
+                put_field(&mut other_request, Some(other));
+                put_field(&mut other_request, None);
+                put_field(&mut other_request, None);
+                other_request.push(u8::from(include_private));
+                let first = site(&result)?;
+                let second = site(&respond(&other_request)?)?;
+                u8::from(first.is_some() && first == second)
+            } else { 2 };
+            *result.last_mut().unwrap() = same;
+            return Ok(result);
+        }
+        if name == "blink:href" {
+            let mut replacement = Vec::new();
+            put_field(&mut replacement, Some(value));
+            put_field(&mut replacement, None);
+            put_field(&mut replacement, other);
+            replacement.push(u8::from(include_private));
+            let updated = respond(&replacement)?;
+            return if updated.first() == Some(&1) { Ok(updated) } else { Ok(original) };
+        }
+        if name.starts_with("blink:") {
+            let mut fields = &original[2..];
+            let original_spec = take_field(&mut fields)?.unwrap_or("");
+            if original_spec.starts_with("file:") {
+                if let Some(mut file) = file_url::parse(original_spec, None) {
+                    match name {
+                        "blink:pathname" => {
+                            if let Some(file) = file_url::replace_path(&file, value) { return Ok(file_response(file, other, include_private)); }
+                            return Ok(original);
+                        }
+                        "blink:host" | "blink:hostname" => {
+                            let clean: String = value.chars().filter(|c| !matches!(c, '\t' | '\n' | '\r')).collect();
+                            let end = clean.find(['/', '\\', '?', '#']).unwrap_or(clean.len());
+                            let host = &clean[..end];
+                            let bracket = host.rfind(']').map_or(0, |index| index + 1);
+                            let colon = host[bracket..].find(':').map(|index| index + bracket);
+                            if host.contains('@') || (name == "blink:hostname" && colon.is_some()) { return Ok(original); }
+                            let host = if name == "blink:host" { colon.map_or(host, |index| &host[..index]) } else { host };
+                            if file_url::replace_host(&mut file, host) { return Ok(file_response(file, other, include_private)); }
+                            return Ok(original);
+                        }
+                        "blink:username" | "blink:password" | "blink:port" => return Ok(file_response(file, other, include_private)),
+                        "blink:protocol" => {
+                            let scheme = value.split(':').next().unwrap_or("");
+                            let valid = !scheme.is_empty() && scheme.as_bytes()[0].is_ascii_alphabetic() && scheme.bytes().all(|b| b.is_ascii_alphanumeric() || b"+-.".contains(&b));
+                            let scheme = scheme.to_ascii_lowercase();
+                            if !valid || !matches!(scheme.as_str(), "http" | "https" | "ftp" | "ws" | "wss" | "file") || (scheme != "file" && file.host.is_none()) {
+                                return Ok(file_response(file, other, include_private));
+                            }
+                        }
+                        "blink:search" | "blink:hash" => {
+                            file_url::replace_query_or_fragment(&mut file, &name[6..], value);
+                            return Ok(file_response(file, other, include_private));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        if (name == "blink:search" || name == "blink:hash") && value.is_empty() && original[1] == 1 {
+            let mut fields = &original[2..];
+            let mut values = Vec::new();
+            for _ in 0..11 { values.push(take_field(&mut fields)?); }
+            if values[6].is_some_and(|path| path.ends_with(' ')) {
+                let old_spec = values[0].unwrap_or("");
+                let spec = if name == "blink:search" {
+                    let end = old_spec.find(['?', '#']).unwrap_or(old_spec.len());
+                    let mut spec = old_spec[..end].to_owned();
+                    if let Some(fragment) = values[8] { spec.push('#'); spec.push_str(fragment); }
+                    values[7] = None;
+                    spec
+                } else {
+                    values[8] = None;
+                    old_spec[..old_spec.find('#').unwrap_or(old_spec.len())].to_owned()
+                };
+                let mut output = vec![1, original[1]];
+                put_field(&mut output, Some(&spec));
+                for value in &values[1..] { put_field(&mut output, *value); }
+                output.push(*original.last().unwrap());
+                return Ok(output);
+            }
+        }
+        let updated = match setter::apply(input, base, name, value) {
+            Some(value) => value,
+            None => return Ok(vec![0]),
+        };
+        if original.first() == Some(&1) && take_field(&mut &original[2..])? == Some(updated.as_str()) {
+            return Ok(original);
+        }
+        let mut replacement = Vec::new();
+        put_field(&mut replacement, Some(&updated));
+        put_field(&mut replacement, None);
+        put_field(&mut replacement, other);
+        replacement.push(u8::from(include_private));
+        return respond(&replacement);
+    }
     let trimmed = input.trim_matches(|c: char| c <= ' ');
     let file_scheme = trimmed.get(..5).is_some_and(|s| s.eq_ignore_ascii_case("file:"));
     let input_scheme = trimmed.find(':').is_some_and(|i| {
@@ -141,19 +290,7 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
             Some(file) => file,
             None => return Ok(vec![0]),
         };
-        let domain = file.host.as_deref().and_then(|host| registrable_domain(host, include_private));
-        let same = other.and_then(|value| Url::parse(value).ok()).and_then(|value| {
-            let other_host = value.host_str()?;
-            let host = file.host.as_deref()?;
-            Some(domain.unwrap_or(host) == registrable_domain(other_host, include_private).unwrap_or(other_host))
-        });
-        let mut output = vec![1, 0];
-        for field in [Some(file.spec.as_str()), Some("file"), Some(""), None, file.host.as_deref(), None,
-                      Some(file.path.as_str()), file.query.as_deref(), file.fragment.as_deref(), Some("file://"), domain] {
-            put_field(&mut output, field);
-        }
-        output.push(match same { Some(true) => 1, Some(false) => 0, None => 2 });
-        return Ok(output);
+        return Ok(file_response(file, other, include_private));
     }
     let (parsed, host_override) = match parse(input, base) {
         Ok(parsed) => (parsed, None),
@@ -360,5 +497,72 @@ mod tests {
     #[test]
     fn wpt_853_userinfo_apostrophe_is_escaped() {
         assert_eq!(spec("wss://a'b@host/", None), "wss://a%27b@host/");
+    }
+
+    #[test]
+    fn schemeful_site_compares_scheme_and_private_suffix() {
+        for (first, second, expected) in [
+            ("https://a.example.com/", "https://b.example.com/", 1),
+            ("https://example.com/", "http://example.com/", 0),
+            ("https://a.blogspot.com/", "https://b.blogspot.com/", 0),
+            ("data:text/plain,a", "data:text/plain,a", 0),
+        ] {
+            let mut request = Vec::new();
+            put_field(&mut request, Some(first));
+            put_field(&mut request, None);
+            put_field(&mut request, Some(second));
+            request.push(0);
+            put_field(&mut request, Some("schemeful-site"));
+            put_field(&mut request, Some(""));
+            assert_eq!(respond(&request).unwrap().last().copied(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn setters_preserve_resolved_file_path_and_reject_invalid_input() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("..//a/../b"));
+        put_field(&mut request, Some("file:///tmp/a"));
+        put_field(&mut request, None);
+        request.push(0);
+        put_field(&mut request, Some("blink:href"));
+        put_field(&mut request, Some("#fragment"));
+        let response = respond(&request).unwrap();
+        assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("file:///.//b"));
+
+        let mut request = Vec::new();
+        put_field(&mut request, Some("filesystem:/ space#"));
+        put_field(&mut request, None);
+        put_field(&mut request, None);
+        request.push(0);
+        put_field(&mut request, Some("protocol"));
+        put_field(&mut request, Some("file:"));
+        assert_eq!(respond(&request).unwrap(), [0]);
+    }
+
+    #[test]
+    fn wpt_setter_pathname_23_retains_multiple_file_slashes() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("file:///unicorn"));
+        put_field(&mut request, None);
+        put_field(&mut request, None);
+        request.push(0);
+        put_field(&mut request, Some("blink:pathname"));
+        put_field(&mut request, Some("//\\/"));
+        let response = respond(&request).unwrap();
+        assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("file://////"));
+    }
+
+    #[test]
+    fn wpt_setter_search_10_preserves_opaque_trailing_space() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("data:space ?query"));
+        put_field(&mut request, None);
+        put_field(&mut request, None);
+        request.push(0);
+        put_field(&mut request, Some("blink:search"));
+        put_field(&mut request, Some(""));
+        let response = respond(&request).unwrap();
+        assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("data:space "));
     }
 }
