@@ -52,7 +52,7 @@ def run(directory, browser_root, image, preferences):
                          and any(item.get('type') == 'iframe' and item.get('url') == 'http://frame.test/cross' for item in target),
                          {'same':observed['same_frame'], 'cross_clicked':observed['cross_clicked'], 'targets':target}),
         'page-js':outcome(observed['user_agent'] == checks.VERSION['User-Agent'], {'user_agent':observed['user_agent']}),
-        'sessions':outcome(sessions['cycles'] == 10 and sessions['sockets_before'] == sessions['sockets_after'], sessions),
+        'sessions':outcome(sessions['cycles'] == 10 and not sessions['sockets_before'] and not sessions['sockets_after'], sessions),
         'files':outcome(any(item['length'] == 150000 and item['sha256'] == observed['upload_expected_sha256'] for item in upload)
                         and observed['download'] == 'client download',
                         {'uploads':upload, 'expected_sha256':observed['upload_expected_sha256'],

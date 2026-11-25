@@ -22,7 +22,10 @@ agent-browser --json close > /evidence/close.json
 awk '$4 == "01" && ($2 ~ /:2405$/ || $3 ~ /:2405$/) { print $2, $3 }' /proc/net/tcp > /evidence/agent-sockets-before
 cycle=0
 while [ "$cycle" -lt 10 ]; do
-    agent-browser --json open http://forms.test/workload > "/evidence/agent-cycle-$cycle-open.json"
+    if ! agent-browser --json open http://forms.test/workload > "/evidence/agent-cycle-$cycle-open.json"; then
+        cp -R /root/.agent-browser /evidence/agent-debug
+        exit 1
+    fi
     agent-browser --json close > "/evidence/agent-cycle-$cycle-close.json"
     cycle=$((cycle + 1))
 done

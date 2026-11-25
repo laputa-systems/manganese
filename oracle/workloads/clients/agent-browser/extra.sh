@@ -6,6 +6,7 @@ agent-browser --json open http://forms.test/workload > /evidence/extra-open.json
 agent-browser --json eval "({same:!!document.querySelector('#same'),cross:!!document.querySelector('#cross'),src:document.querySelector('#cross').src,ready:document.readyState})" > /evidence/frame-elements.json
 agent-browser --json snapshot > /evidence/extra-snapshot.json
 agent-browser snapshot > /evidence/extra-snapshot.txt
+curl -fsS http://127.0.0.1:9221/json/list > /evidence/extra-targets.json
 agent-browser --json frame '#same' > /evidence/same-frame-switch.json
 agent-browser --json frame main > /evidence/main-frame-switch.json
 reference=$(awk '/button "Cross-origin click"/ {sub(/^.*\[ref=/, ""); sub(/\].*$/, ""); print; exit}' /evidence/extra-snapshot.txt)
