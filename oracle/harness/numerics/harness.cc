@@ -1,0 +1,71 @@
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include "base/third_party/double_conversion/double-conversion/double-conversion.h"
+
+using double_conversion::DoubleToStringConverter;
+using double_conversion::StringBuilder;
+using double_conversion::StringToDoubleConverter;
+
+static uint32_t read_u32(const unsigned char* p) {
+  return (uint32_t(p[0]) << 24) | (uint32_t(p[1]) << 16) | (uint32_t(p[2]) << 8) | p[3];
+}
+
+static void write_u32(unsigned char* p, uint32_t v) {
+  p[0] = v >> 24; p[1] = v >> 16; p[2] = v >> 8; p[3] = v;
+}
+
+int main() {
+  char magic[4];
+  if (fread(magic, 1, 4, stdin) != 4 || memcmp(magic, "MGB1", 4)) return 1;
+  if (fwrite("MGB1", 1, 4, stdout) != 4) return 1;
+  fflush(stdout);
+  unsigned char header[4];
+  while (fread(header, 1, 4, stdin) == 4) {
+    uint32_t length = read_u32(header);
+    if (length > 65536 || length < 1) return 1;
+    unsigned char* input = static_cast<unsigned char*>(malloc(length));
+    if (!input || fread(input, 1, length, stdin) != length) return 1;
+    unsigned char output[2048] = {};
+    size_t out_len = 0;
+    if (input[0] <= 4 && length == 11) {
+      uint64_t bits = 0;
+      for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];
+      double value;
+      memcpy(&value, &bits, sizeof(value));
+      int digits = int(input[9]) * 256 + input[10] - 1;
+      char text[1024];
+      StringBuilder builder(text, sizeof(text));
+      DoubleToStringConverter base(DoubleToStringConverter::EMIT_POSITIVE_EXPONENT_SIGN, nullptr, nullptr, 'e', -6, 12, 0, 0);
+      const auto& ecma = DoubleToStringConverter::EcmaScriptConverter();
+      bool success = false;
+      if (input[0] == 0) success = base.ToShortest(value, &builder);
+      if (input[0] == 1 && digits >= 0) success = base.ToFixed(value, digits, &builder);
+      if (input[0] == 2) success = ecma.ToShortest(value, &builder);
+      if (input[0] == 3) success = ecma.ToPrecision(value, digits, &builder);
+      if (input[0] == 4) success = ecma.ToExponential(value, digits, &builder);
+      output[0] = success;
+      out_len = 1 + builder.position();
+      memcpy(output + 1, text, out_len - 1);
+      builder.Finalize();
+    } else if (input[0] == 5) {
+      StringToDoubleConverter converter(StringToDoubleConverter::ALLOW_LEADING_SPACES | StringToDoubleConverter::ALLOW_TRAILING_JUNK, 0.0, 0.0, nullptr, nullptr);
+      int consumed = 0;
+      double value = converter.StringToDouble(reinterpret_cast<char*>(input + 1), length - 1, &consumed);
+      uint64_t bits;
+      memcpy(&bits, &value, sizeof(bits));
+      write_u32(output, consumed);
+      for (int i = 0; i < 8; ++i) output[4 + i] = bits >> (56 - 8 * i);
+      out_len = 12;
+    } else {
+      free(input);
+      return 1;
+    }
+    free(input);
+    write_u32(header, out_len);
+    if (fwrite(header, 1, 4, stdout) != 4 || fwrite(output, 1, out_len, stdout) != out_len) return 1;
+    fflush(stdout);
+  }
+  return feof(stdin) ? 0 : 1;
+}
