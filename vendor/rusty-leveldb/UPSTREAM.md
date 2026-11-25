@@ -9,3 +9,5 @@ The durability patch gives writable files an explicit sync, persists synchronous
 Read errors propagate through `get`, table, version, merging and public iterators, with sticky iterator status and per-read checksum and cache options. Compaction checks iterator status before installing its output. Repair still needs qualification against Chromium's implementation.
 
 Lock failures retain the `std::io::Error` returned by the operating-system lock operation. The obsolete `errno` dependency and its `errno-dragonfly`/`cc` transitive build are removed.
+
+Disk locks use POSIX record locks on Unix, with a process-wide file-identity table, so they exclude Chromium's file locks as well as other instances in the same process. Other platforms use the standard library's file lock.
