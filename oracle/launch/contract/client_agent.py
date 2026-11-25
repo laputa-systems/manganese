@@ -16,7 +16,7 @@ def read(directory, name):
 
 def run(directory, browser_root, image, preferences):
     directory.mkdir(parents=True)
-    session = launch.Session(directory, browser_root, f'manganese-client-agent-{directory.parent.name}')
+    session = launch.Session(directory, browser_root, f'manganese-client-agent-{directory.parent.parent.name}')
     workload = launch.ROOT / 'oracle/workloads/clients/agent-browser'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:

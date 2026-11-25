@@ -11,7 +11,7 @@ def run(directory, browser_root, image, preferences, mode):
     if mode not in ('cli', 'library'):
         raise ValueError(f'unknown browser-use mode: {mode}')
     directory.mkdir(parents=True)
-    session = launch.Session(directory, browser_root, f'manganese-client-bu-{mode}-{directory.parent.name}')
+    session = launch.Session(directory, browser_root, f'manganese-client-bu-{mode}-{directory.parent.parent.name}')
     workload = launch.ROOT / 'oracle/workloads/clients/browser-use'
     mounts = {directory:'/evidence', session.profile:'/profile', session.downloads:'/downloads', workload:'/workload:ro'}
     try:
