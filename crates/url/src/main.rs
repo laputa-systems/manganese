@@ -314,7 +314,20 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
     let blob_inner = parsed.as_str().strip_prefix("blob:");
     let blob_file = blob_inner.is_some_and(|inner| inner.starts_with("file:"));
     let blob_nested = blob_inner.is_some_and(|inner| inner.starts_with("blob:"));
-    let serialized_origin = if blob_file { "file://".to_owned() } else if blob_nested { "null".to_owned() } else {
+    let blob_authority_origin = if parsed.scheme() == "blob" && parsed.has_authority() {
+        let inner = &parsed[Position::BeforeUsername..Position::AfterQuery];
+        parse(inner, None).ok().and_then(|value| {
+            if value.scheme() == "file" { Some("file://".to_owned()) }
+            else if value.scheme() == "blob" { None }
+            else {
+                let origin = value.origin();
+                if matches!(origin, Origin::Opaque(_)) { None } else { Some(origin.ascii_serialization()) }
+            }
+        })
+    } else { None };
+    let serialized_origin = if let Some(value) = &blob_authority_origin { value.clone() }
+    else if parsed.scheme() == "blob" && parsed.has_authority() { "null".to_owned() }
+    else if blob_file { "file://".to_owned() } else if blob_nested { "null".to_owned() } else {
         let value = origin.ascii_serialization().replace('*', "%2A");
         if let Some(host) = &host_override { value.replace("manganese.invalid", host) } else { value }
     };
@@ -361,7 +374,9 @@ fn respond(mut request: &[u8]) -> io::Result<Vec<u8>> {
             }
         }
     }
-    let mut output = vec![1, u8::from(!blob_file && (blob_nested || matches!(origin, Origin::Opaque(_))))];
+    let opaque = if parsed.scheme() == "blob" && parsed.has_authority() { blob_authority_origin.is_none() }
+                 else { !blob_file && (blob_nested || matches!(origin, Origin::Opaque(_))) };
+    let mut output = vec![1, u8::from(opaque)];
     for field in [Some(spec.as_str()), Some(parsed.scheme()), Some(username.as_str()),
                   password.as_deref(), host, port.as_deref(), Some(path.as_str()), query.as_deref(),
                   parsed.fragment(), Some(serialized_origin.as_str()), domain] {
@@ -574,5 +589,22 @@ mod tests {
         put_field(&mut request, Some(""));
         let response = respond(&request).unwrap();
         assert_eq!(take_field(&mut &response[2..]).unwrap(), Some("data:space "));
+    }
+
+    #[test]
+    fn blob_authority_content_can_form_a_tuple_origin() {
+        let mut request = Vec::new();
+        put_field(&mut request, Some("blob://bücher.examplehello:80"));
+        put_field(&mut request, None);
+        put_field(&mut request, Some("https://example.com/"));
+        request.push(1);
+        put_field(&mut request, Some("blink:hostname"));
+        put_field(&mut request, Some("http"));
+        let response = respond(&request).unwrap();
+        assert_eq!(&response[..2], &[1, 0]);
+        let mut fields = &response[2..];
+        let values: Vec<_> = (0..11).map(|_| take_field(&mut fields).unwrap()).collect();
+        assert_eq!(values[0], Some("blob://http:80"));
+        assert_eq!(values[9], Some("http://0.0.0.80"));
     }
 }
