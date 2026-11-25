@@ -81,7 +81,20 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+    use super::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn json_numbers_preserve_integer_type_and_reject_invalid_grammar() {
+        assert_eq!(parse_json_number(b"2147483647"), JsonNumber::Integer(i32::MAX));
+        assert_eq!(parse_json_number(b"2147483648"), JsonNumber::Double(2147483648.0));
+        match parse_json_number(b"-0") {
+            JsonNumber::Double(value) => assert_eq!(value.to_bits(), (-0.0f64).to_bits()),
+            other => panic!("expected negative zero, got {other:?}"),
+        }
+        assert_eq!(parse_json_number(b"1.0"), JsonNumber::Double(1.0));
+        assert_eq!(parse_json_number(b"01"), JsonNumber::Invalid);
+        assert_eq!(parse_json_number(b"1e999"), JsonNumber::Invalid);
+    }
 
     #[test]
     fn blink_formats_strip_only_nonexponential_trailing_zeroes() {
@@ -403,4 +416,52 @@ pub fn blink_fixed(value: f64, digits: usize) -> String {
     let mut text = fixed(value, digits).unwrap_or_default();
     if value == 0.0 && text.starts_with('-') { text.remove(0); }
     text
+}
+
+#[derive(Debug, PartialEq)]
+pub enum JsonNumber { Invalid, Integer(i32), Double(f64) }
+
+pub fn parse_json_number(input: &[u8]) -> JsonNumber {
+    let input = input.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(input);
+    let whitespace = |byte: u8| matches!(byte, b' ' | b'\t' | b'\r' | b'\n');
+    let start = input.iter().position(|&b| !whitespace(b)).unwrap_or(input.len());
+    let end = input.iter().rposition(|&b| !whitespace(b)).map_or(start, |n| n + 1);
+    let text = &input[start..end];
+    let mut cursor = usize::from(text.first() == Some(&b'-'));
+    if cursor == text.len() { return JsonNumber::Invalid; }
+    match text[cursor] {
+        b'0' => { cursor += 1; if text.get(cursor).is_some_and(u8::is_ascii_digit) { return JsonNumber::Invalid; } }
+        b'1'..=b'9' => { while text.get(cursor).is_some_and(u8::is_ascii_digit) { cursor += 1; } }
+        _ => return JsonNumber::Invalid,
+    }
+    let mut real = text == b"-0";
+    if text.get(cursor) == Some(&b'.') {
+        real = true;
+        cursor += 1;
+        let first = cursor;
+        while text.get(cursor).is_some_and(u8::is_ascii_digit) { cursor += 1; }
+        if cursor == first { return JsonNumber::Invalid; }
+    }
+    if matches!(text.get(cursor), Some(b'e' | b'E')) {
+        real = true;
+        cursor += 1;
+        if matches!(text.get(cursor), Some(b'+' | b'-')) { cursor += 1; }
+        let first = cursor;
+        while text.get(cursor).is_some_and(u8::is_ascii_digit) { cursor += 1; }
+        if cursor == first { return JsonNumber::Invalid; }
+    }
+    if cursor != text.len() { return JsonNumber::Invalid; }
+    let decimal = std::str::from_utf8(text).expect("JSON number grammar is ASCII");
+    if !real {
+        if let Ok(number) = decimal.parse::<i64>() {
+            return i32::try_from(number).map_or_else(|_| JsonNumber::Double(number as f64), JsonNumber::Integer);
+        }
+        if let Ok(number) = decimal.parse::<u64>() {
+            return i32::try_from(number).map_or_else(|_| JsonNumber::Double(number as f64), JsonNumber::Integer);
+        }
+    }
+    match decimal.parse::<f64>() {
+        Ok(number) if number.is_finite() => JsonNumber::Double(number),
+        _ => JsonNumber::Invalid,
+    }
 }

@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, PrecisionStyle, ShortestStyle, Utf16Conversion};
+use numerics::{blink_fixed, blink_precision, fixed, parse_double, parse_integer, parse_json_number, precision, shortest, shortest_exponential, utf16_to_utf8, validate_utf8, IntegerKind, IntegerRadix, JsonNumber, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,17 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 12 {
+            let response = match parse_json_number(&request[1..]) {
+                JsonNumber::Invalid => vec![0],
+                JsonNumber::Integer(value) => { let mut out = vec![1]; out.extend(value.to_be_bytes()); out }
+                JsonNumber::Double(value) => { let mut out = vec![2]; out.extend(value.to_bits().to_be_bytes()); out }
+            };
+            output.write_all(&(response.len() as u32).to_be_bytes())?;
+            output.write_all(&response)?;
+            output.flush()?;
+            continue;
+        }
         if matches!(request[0], 10 | 11) && length == 11 {
             let bits = u64::from_be_bytes(request[1..9].try_into().unwrap());
             let number = f64::from_bits(bits);

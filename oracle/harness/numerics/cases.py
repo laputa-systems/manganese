@@ -36,7 +36,18 @@ def generate_blink(rng: random.Random) -> bytes:
     return struct.pack('>BQH', op, bits, digits)
 
 
+def generate_json(rng: random.Random) -> bytes:
+    number = str(rng.randrange(-(1 << 80), 1 << 80)).encode()
+    if rng.randrange(3) == 0: number += b'.' + str(rng.randrange(10**18)).encode()
+    if rng.randrange(3) == 0: number += b'e' + str(rng.randrange(-400, 401)).encode()
+    if rng.randrange(3) == 0:
+        alphabet = b'0123456789+-.eE x\t\n'
+        number = bytes(rng.choice(alphabet) for _ in range(rng.randrange(60)))
+    return b'\x0c' + rng.choice((b'', b' ', b'\t')) + number + rng.choice((b'', b'', b' ', b'!'))
+
+
 def generate(rng: random.Random) -> bytes:
-    if rng.randrange(6) == 0:
-        return generate_blink(rng)
+    selected = rng.randrange(7)
+    if selected == 0: return generate_blink(rng)
+    if selected == 1: return generate_json(rng)
     return generate_base(rng)

@@ -9,6 +9,9 @@
 #include "base/strings/utf_string_conversion_utils.h"
 #include "third_party/blink/renderer/platform/wtf/dtoa.h"
 
+struct JsonNumber { unsigned char tag; unsigned char size; unsigned char data[8]; };
+extern "C" JsonNumber json_number(const unsigned char* input, uint32_t len);
+
 using double_conversion::DoubleToStringConverter;
 using double_conversion::StringBuilder;
 using double_conversion::StringToDoubleConverter;
@@ -63,6 +66,13 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 12) {
+      unsigned char buffer[65536] = {};
+      memcpy(buffer, input + 1, length - 1);
+      JsonNumber result = json_number(buffer, length - 1);
+      output[0] = result.tag;
+      memcpy(output + 1, result.data, result.size);
+      out_len = 1 + result.size;
     } else if ((input[0] == 10 || input[0] == 11) && length == 11) {
       uint64_t bits = 0;
       for (int i = 1; i < 9; ++i) bits = (bits << 8) | input[i];

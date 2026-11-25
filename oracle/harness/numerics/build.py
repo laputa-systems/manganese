@@ -65,4 +65,4 @@ for target in ('libc++', 'libc++abi'):
         obj = scratch / (target + '-' + str(index) + '.o')
         subprocess.run([compiler, *target_args, '-c', path, '-o', str(obj)], cwd=out, env=env, check=True)
         objects.append(str(obj))
-subprocess.run(['/opt/chromium-llvm/bin/clang', '--target=x86_64-alpine-linux-musl', '-flto=thin', '-fuse-ld=lld', '-Wl,--gc-sections', '-pthread', str(scratch / 'harness.o'), *objects, '/usr/lib/libstdc++.so.6', '/usr/lib/libgcc_s.so.1', '-o', str(scratch / 'oracle')], cwd=out, env=env, check=True)
+subprocess.run(['/opt/chromium-llvm/bin/clang', '--target=x86_64-alpine-linux-musl', '-flto=thin', '-fuse-ld=lld', '-Wl,--gc-sections', '-pthread', str(scratch / 'harness.o'), *objects, str(scratch / 'json-build/target/x86_64-unknown-linux-musl/debug/libjson_oracle.a'), '/usr/lib/libstdc++.so.6', '/usr/lib/libgcc_s.so.1', '-o', str(scratch / 'oracle')], cwd=out, env=env, check=True)
