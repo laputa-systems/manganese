@@ -4,11 +4,11 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Status
 
-- **State:** ready. No slice has started.
+- **State:** active. Accepted: `p0-ground`.
 - **Campaign:** [Manganese](#campaign-manganese).
 - **Last accepted revision:** the scaffold on `main` (local, not pushed); `make check lint` is green in pristine Alpine capsules on x86_64 and aarch64 (see Baseline).
 - **Red or parked:** none.
-- **Next:** `p0-ground` on the campaign host.
+- **Next:** `p0-artifacts`.
 - **First command:** `sh scripts/setup-dev && make check lint`, then "resume the roadmap".
 - **Frozen archives:** both architectures' package revision 2 archives and sidecars are published by digest (`oracle/frozen/artifacts.lock`).
 
@@ -286,17 +286,18 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
   - The frozen arm64 archive runs to readiness with a sandboxed renderer (`NoNewPrivs 1`, `Seccomp 2`, own PID namespace) in a pristine Alpine container under the appliance's launch switches: 8.4 s for the whole container run.
   - The frozen verifier accepts the frozen arm64 archive on Alpine with `python3` and `llvm`: 12.9 s including package installation.
   - A static-PIE musl binary segfaults under `ld-musl-aarch64.so.1`, which is the evidence behind decision 12.
-- **Loop timings, pristine `alpine:3.24` capsules from a fresh clone, privileged with their own dockerd, 2026-11-24:**
+- **Loop timings, pristine `alpine:3.24` capsules from a fresh clone, privileged with their own dockerd.** x86_64 is native on the campaign host (32-core Threadripper, Alpine 3.25, 2026-11-25); aarch64 is native on Apple Silicon (2026-11-24):
 
-  | Step | x86_64 (emulated on Apple Silicon) | aarch64 (native) |
+  | Step | x86_64 | aarch64 |
   |---|---|---|
-  | `sh scripts/setup-dev`, cold | 26 s | 21 s |
-  | `make check`, cold | 5 s | 2 s |
-  | `make check`, warm | 2 s | 1 s |
-  | `make lint` | 1 s | 0 s |
-  | `sh scripts/setup-dev`, rerun | 1 s | 0 s |
+  | `sh scripts/setup-dev`, cold | 15 s | 21 s |
+  | `make check`, cold | 2 s | 2 s |
+  | `make check`, warm | 1 s | 1 s |
+  | `make lint` | 0 s | 0 s |
+  | `sh scripts/setup-dev`, rerun | 0 s | 0 s |
 
-  `git status --porcelain` is empty after the gates. `p0-ground` replaces the x86_64 column with native figures from the campaign host.
+  `git status --porcelain` is empty after the gates. Reproduce with a privileged `alpine:3.24` container that clones the repository as a uid 1000 user in the `wheel` and `docker` groups and times each step through `su -l`.
+- **Campaign host, 2026-11-25.** The host is a shared workstation, not a dedicated machine, so `scripts/setup-dev` is not run on it directly: it would replace the host's newer kache (a descendant of the pinned release) and rerun `kache init`. The host instead has the additive parts (`mold`, the static unwinder alias, the pinned toolchain), and `make check lint` passes there in 2 s with the host's kache.
 
 ### Acceptance
 
