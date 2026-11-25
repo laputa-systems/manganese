@@ -15,8 +15,11 @@ OUT = FROZEN / 'abi/x86_64.txt'
 UNSTABLE = FROZEN / 'abi/x86_64-unstable.txt'
 WORKLOADS = (('oracle-launch-headless', ['make', 'oracle-launch', 'ARCH=x86_64', 'MODE=headless']),
              ('oracle-launch-headed', ['make', 'oracle-launch', 'ARCH=x86_64', 'MODE=headed']),
-             ('contract', ['make', 'contract', 'ARCHIVE=hydrogen-r2-amd64', 'CLAUSES=']),
-             ('capability-probes', ['make', 'capability-probes']))
+             ('contract', ['make', 'contract', 'ARCHIVE=hydrogen-r2-amd64',
+                           'CLAUSES=5.1 5.2 5.4 6.1 6.2 6.3 6.4 7.1 7.2 7.3 7.5 7.6 7.7 8.1 8.4']),
+             ('contract-7.4', ['make', 'contract', 'ARCHIVE=hydrogen-r2-amd64', 'CLAUSES=7.4']),
+             ('capability-probes', ['make', 'capability-probes']),
+             ('persona-inventory', ['make', 'persona-inventory']))
 SYSCALL = re.compile(r'^([a-zA-Z_][a-zA-Z_0-9]*)\((.*)\)\s+=\s+(.*)$')
 CLONE = re.compile(r'(?:clone|clone3|fork|vfork)\(.*\)\s+=\s+(\d+)(?: /\* (\d+) in strace.s PID NS \*/)?')
 TYPE = re.compile(r'--type=([a-zA-Z0-9_-]+)')
@@ -213,11 +216,10 @@ def run_contract(command, environment):
     clauses = report['clauses']
     failures = {name for name, value in clauses.items() if value.get('ok') is False}
     error = report.get('error', '')
-    if (result.returncode == 0 or failures != {'7.3', '7.4'} or
+    if (result.returncode == 0 or failures != {'7.4'} or
             '/launch/contract/crash.py' not in error or
             'Target.targetCrashed' not in error or
-            'ConnectionError: CDP connection closed' not in error or
-            clauses['7.3'].get('robustness', {}).get('checks_ok') is not True):
+            'ConnectionError: CDP connection closed' not in error):
         raise RuntimeError('traced contract failed outside the expected crash case')
     run_dir = Path(report['run_dir'])
     crash_log = (run_dir / 'crash/browser.log').read_text(errors='replace')
@@ -252,7 +254,7 @@ def main():
         raise RuntimeError('native x86_64 required')
     run_dir = ROOT / '.work/tmp/abi' / str(time.time_ns())
     run_dir.mkdir(parents=True)
-    capability = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in (FROZEN / 'capability').iterdir() if p.is_file()}
+    capability = {p: hashlib.sha256(p.read_bytes()).digest() for d in ('capability', 'persona') for p in (FROZEN / d).iterdir() if p.is_file()}
     runs = int(os.environ.get('ABI_RUNS') or 2)
     union = collections.defaultdict(set)
     seen = collections.Counter()
@@ -262,7 +264,7 @@ def main():
             directory = run_dir / f'{run}-{label}'
             directory.mkdir()
             environment = {**os.environ, 'MANGANESE_ABI_TRACE': str(directory)}
-            if label == 'contract':
+            if label == 'contract-7.4':
                 run_contract(command, environment)
             else:
                 subprocess.run(command, cwd=ROOT, env=environment, check=True)
@@ -273,9 +275,9 @@ def main():
                 observed.add(key)
             shutil.rmtree(directory)
         seen.update(observed)
-    after = {p.name: hashlib.sha256(p.read_bytes()).digest() for p in (FROZEN / 'capability').iterdir() if p.is_file()}
+    after = {p: hashlib.sha256(p.read_bytes()).digest() for d in ('capability', 'persona') for p in (FROZEN / d).iterdir() if p.is_file()}
     if capability != after:
-        raise RuntimeError('frozen capability files changed')
+        raise RuntimeError('frozen capability or persona files changed')
     archive = next(line.split() for line in (FROZEN / 'artifacts.lock').read_text().splitlines()
                    if line.endswith('manganese/oracle-inputs:hydrogen-r2-amd64') and '.tar.xz ' in line)
     header = ['# archive: ' + archive[2] + ' sha256:' + archive[0],
