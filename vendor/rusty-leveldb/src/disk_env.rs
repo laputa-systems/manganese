@@ -38,6 +38,14 @@ fn map_err_with_name(method: &'static str, f: &Path, e: io::Error) -> Status {
     s
 }
 
+fn map_lock_error(p: &Path, error: io::Error) -> Status {
+    if error.kind() == ErrorKind::WouldBlock {
+        Status::new(StatusCode::LockError, "lock on database is already held by different process")
+    } else {
+        map_err_with_name("lock", p, error)
+    }
+}
+
 // Note: We're using Ok(f()?) in several locations below in order to benefit from the automatic
 // error conversion using std::convert::From.
 impl Env for PosixDiskEnv {
@@ -138,21 +146,7 @@ impl Env for PosixDiskEnv {
                 .open(p)
                 .map_err(|e| map_err_with_name("lock", p, e))?;
 
-            match f.try_lock_exclusive() {
-                Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                    return Err(Status::new(
-                        StatusCode::LockError,
-                        "lock on database is already held by different process",
-                    ))
-                }
-                Err(_) => {
-                    return Err(Status::new(
-                        StatusCode::Errno(errno::errno()),
-                        &format!("unknown lock error on file {:?} (file {})", f, p.display()),
-                    ))
-                }
-                _ => (),
-            };
+            f.try_lock_exclusive().map_err(|error| map_lock_error(p, error))?;
 
             e.insert(f);
             let lock = FileLock {
@@ -200,6 +194,17 @@ mod tests {
     use std::convert::AsRef;
     use std::io::Write;
     use std::iter::FromIterator;
+
+    #[test]
+    fn lock_error_preserves_the_io_error() {
+        let path = Path::new("db/LOCK");
+        let denied = map_lock_error(path, io::Error::new(ErrorKind::PermissionDenied, "access denied"));
+        assert_eq!(denied.code, StatusCode::PermissionDenied);
+        assert!(denied.err.contains("access denied"));
+        assert!(denied.err.contains("db/LOCK"));
+        let held = map_lock_error(path, io::Error::new(ErrorKind::WouldBlock, "busy"));
+        assert_eq!(held.code, StatusCode::LockError);
+    }
 
     #[test]
     fn test_files() {

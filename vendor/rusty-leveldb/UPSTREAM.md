@@ -8,4 +8,4 @@ The durability patch gives writable files an explicit sync, persists synchronous
 
 Read errors propagate through `get`, table, version, merging and public iterators, with sticky iterator status and per-read checksum and cache options. Compaction checks iterator status before installing its output. Repair still needs qualification against Chromium's implementation.
 
-The default dependency graph also includes `errno-dragonfly` and its `cc` build through `errno`. Remove that native transitive dependency before adding this crate to Manganese's `Cargo.lock`; the current snapshot has not been added to the workspace dependencies.
+Lock failures retain the `std::io::Error` returned by the operating-system lock operation. The obsolete `errno` dependency and its `errno-dragonfly`/`cc` transitive build are removed.

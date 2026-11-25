@@ -24,9 +24,6 @@
 #![allow(dead_code)]
 
 #[cfg(feature = "fs")]
-extern crate errno;
-
-#[cfg(feature = "fs")]
 extern crate fs2;
 
 extern crate integer_encoding;

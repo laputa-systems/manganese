@@ -23,8 +23,6 @@ pub enum StatusCode {
     PermissionDenied,
     AsyncError,
     Unknown,
-    #[cfg(feature = "fs")]
-    Errno(errno::Errno),
 }
 
 /// Status encapsulates a `StatusCode` and an error message. It can be displayed, and also
