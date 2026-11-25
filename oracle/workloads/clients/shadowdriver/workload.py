@@ -11,6 +11,12 @@ sys.path.insert(0, '/launch')
 from cdp import Cdp
 
 
+def cdp_sockets():
+    rows = Path('/proc/net/tcp').read_text().splitlines()[1:]
+    return sorted((parts[1], parts[2]) for row in rows if (parts := row.split())
+                  and parts[3] == '01' and (parts[1].endswith(':2405') or parts[2].endswith(':2405')))
+
+
 async def main():
     browser, tab = await connect_browser('http://127.0.0.1:9221', stealth=False)
     try:
@@ -94,17 +100,30 @@ async def main():
         monitor.send('Browser.getVersion')
         events = [event for event in monitor.events if event.get('method', '').startswith('Browser.download')]
         monitor.close()
-        print(json.dumps({'version':version, 'targets':targets, 'user_agent':user_agent,
+        result = {'version':version, 'targets':targets, 'user_agent':user_agent,
                           'ax_nodes':len(ax['nodes']), 'png_bytes':len(png), 'png_signature':png[:8].hex(),
                           'form_submission':submitted, 'same_frame':same_frame, 'frame_targets':frame_targets,
                           'cross_clicked':cross_clicked, 'before_popup':before_popup, 'after_popup':after_popup,
                           'upload_expected_sha256':hashlib.sha256(payload).hexdigest(), 'uploads':uploaded,
                           'dialogs':dialogs, 'confirm':confirm, 'download':downloaded,
                           'download_clicks':clicks, 'download_url_api_initial':url_api_initial,
-                          'download_click_detail':click_detail, 'download_hit':hit, 'download_events':events}))
+                          'download_click_detail':click_detail, 'download_hit':hit, 'download_events':events}
     finally:
         await tab.close()
         await browser.close(terminate=False)
+    await asyncio.sleep(0.2)
+    before = cdp_sockets()
+    for _ in range(10):
+        browser, tab = await connect_browser('http://127.0.0.1:9221', stealth=False)
+        try:
+            await browser.command('Browser.getVersion')
+        finally:
+            await tab.close()
+            await browser.close(terminate=False)
+    await asyncio.sleep(0.2)
+    after = cdp_sockets()
+    result['sessions'] = {'cycles':10, 'sockets_before':before, 'sockets_after':after}
+    print(json.dumps(result))
 
 
 asyncio.run(main())
