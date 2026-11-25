@@ -77,3 +77,7 @@ zlib-harness:
 .PHONY: zlib-anchor
 zlib-anchor:
 	PYTHONPATH=oracle/harness/zlib python3 -B oracle/harness/zlib/anchor.py
+	python3 -B oracle/probes/capability/run.py
+.PHONY: abi-census
+abi-census:
+	python3 -B oracle/probes/abi/census.py

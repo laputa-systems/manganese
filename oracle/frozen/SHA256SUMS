@@ -49,3 +49,5 @@ a0c9deb3948b373ed5328b39405cc24318775423d908b3d188899dac5b175a47  ./persona/head
 8e7db0ddb4d413b61bdfd8f4fbb8065e40840d59e6a7d4eb86583e40e5d1a618  ./persona/headless-math.json
 2742e81354b5c522172071bcffd69d0dbb4ef5838bbc5306afa6739055fb75f2  ./persona/headless-webgl.json
 3e45f9d45bea0f5ac9199181736636c7fa09bcb0fa00999c0e7e2992d15b23f2  ./persona/headless-wire.json
+a0c0f6f3fc2f3813eeb06c4aac31c9e5c607a077bc0f27be26c5e897e72a9e9c  ./abi/x86_64.txt
+c65a0505f5b94ac7266de57d1f9de4f61e48d426f811268f6bd50c2119f6ecc6  ./abi/x86_64-unstable.txt
