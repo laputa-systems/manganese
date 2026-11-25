@@ -41,9 +41,11 @@ contract:
 contract-selftest:
 	python3 -B oracle/launch/contract/selftest.py
 
-.PHONY: box
+.PHONY: census
 census:
 	python3 -B oracle/probes/census/census.py
+
+.PHONY: box
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
 
@@ -54,7 +56,7 @@ assembly:
 .PHONY: capability-probes
 capability-probes:
 	python3 -B oracle/probes/capability/run.py
-.PHONY: setup check lint test artifact-selftest oracle-launch oracle-gate-a census box assembly
+
 .PHONY: persona-inventory
 persona-inventory:
 	python3 -B oracle/probes/persona/run.py

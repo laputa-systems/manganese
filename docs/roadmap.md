@@ -6,8 +6,8 @@ This is the single plan for this repository: all current and future work, and th
 
 - **State:** active, M0 and M1 in progress.
 - **Campaign:** [Manganese](#campaign-manganese).
-- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`.
-- **In progress:** `m0-workloads` (clauses 5.1-5.2, 6, 7.1-7.4, 7.7, 8.1 and 8.4 pass on the oracle; 5.4, 7.5 and 7.6 are on `lane/m0-clients`), `m0-persona`, `m0-abi`, `m0-census` (lanes under `.work/wt/`), and the `m1-source-oracle` build (`oracle/source-oracle build test-fast build-target:chrome_sandbox stage-runtime test-staged package export`, log in `.work/tmp/build.log`).
+- **Accepted:** `p0-ground`, `p0-artifacts`, `p0-launch` (headless and headed under Tinyland), `m1-kache-oracle`, `m1-workspace`, `m0-probes`, `m0-census`, `m0-persona`.
+- **In progress:** `m0-workloads` (clauses 5.1-5.2, 6, 7.1-7.4, 7.7, 8.1 and 8.4 pass on the oracle; 5.4, 7.5 and 7.6 are on `lane/m0-clients`), `m0-abi` (lanes under `.work/wt/`), and the `m1-source-oracle` build (`oracle/source-oracle build test-fast build-target:chrome_sandbox stage-runtime test-staged package export`, log in `.work/tmp/build.log`).
 - **Red or parked:** none.
 - **Next:** `m0-cdp-trace` once the client workloads land; `m1-oracle-equivalence` once the rebuild and every M0 inventory are in; then `m1-fuzz-lane` and `m1-zlib`.
 - **Oracle findings that later slices depend on:** `/json/protocol` kills the oracle on the first request on native Linux (7.3 reports it as the expected defect); x86_64 WebGL exists only headed (ANGLE on SwiftShader Vulkan); XSLT and speculation rules are exposed, so those cuts are not compatible.
