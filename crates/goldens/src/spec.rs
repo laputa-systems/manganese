@@ -21,6 +21,9 @@ pub enum Arm64Evidence {
 }
 
 #[derive(Debug)]
+pub enum Fuzz { Bytes { max_len: usize }, Corpus { seeds: Vec<String>, max_len: usize } }
+
+#[derive(Debug)]
 pub struct Spec {
     pub(crate) seam: String,
     pub(crate) streaming: Declaration,
@@ -40,6 +43,7 @@ pub struct Spec {
     pub(crate) holdout_percent: u8,
     pub(crate) oracle: String,
     pub(crate) candidate: String,
+    pub(crate) fuzz: Fuzz,
 }
 
 fn nonempty(value: &str, key: &str) -> Result<String, String> {
@@ -158,7 +162,19 @@ impl Spec {
         if !(30..=99).contains(&holdout_percent) { return Err("holdout_percent must be 30..99".into()); }
         let oracle = take(&mut values, "oracle")?;
         let candidate = take(&mut values, "candidate")?;
+        let fuzz_kind = take(&mut values, "fuzz")?;
+        let max_len = integer(&mut values, "fuzz_max_len")?.parse::<usize>().map_err(|_| "invalid fuzz_max_len")?;
+        if max_len == 0 || max_len > 1_048_576 { return Err("fuzz_max_len must be 1..1048576".into()); }
+        let fuzz = match fuzz_kind.as_str() {
+            "bytes" => Fuzz::Bytes { max_len },
+            "corpus" => {
+                let seeds = take(&mut values, "fuzz_seeds")?.split_whitespace().map(str::to_owned).collect::<Vec<_>>();
+                if seeds.is_empty() || seeds.iter().any(|s| !super::name(s)) { return Err("invalid fuzz_seeds".into()); }
+                Fuzz::Corpus { seeds, max_len }
+            }
+            _ => return Err("invalid fuzz generator".into()),
+        };
         if !values.is_empty() { return Err(format!("unknown keys: {:?}", values.keys())); }
-        Ok(Self { seam, streaming, reentrancy, callbacks, threading, wire, corpus, environment, comparator, varying, ordering, defects, improvements, anchor, arm64, holdout_percent, oracle, candidate })
+        Ok(Self { seam, streaming, reentrancy, callbacks, threading, wire, corpus, environment, comparator, varying, ordering, defects, improvements, anchor, arm64, holdout_percent, oracle, candidate, fuzz })
     }
 }

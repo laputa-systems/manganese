@@ -139,7 +139,7 @@ Protocol version 1 begins with the four bytes `MGB1` on both stdin and stdout.
 Each request and response is a four-byte big-endian length followed by that
 many bytes, at most 2^32-1 bytes. A peer returns one response for each request, in
 order, and writes diagnostics only to stderr. EOF closes the request stream.
-The runner starts a fresh process for each item and sends one request. It runs
+The golden runner starts a fresh process for each item and sends one request. It runs
 the oracle twice in separate processes for every item and checks all oracle
 results before starting any candidate. Oracle output must equal the recorded
 golden even for a tolerance comparator.
@@ -149,8 +149,21 @@ L0 loads seen blobs only, then applies Linux Landlock before invoking either
 adapter. The sandbox permits read and execution of the adapter binaries and
 runtime libraries but denies access to the blob store. L0 fails closed when
 Landlock is unavailable. L1 loads holdout blobs and runs the same oracle and
-candidate comparisons. The separate differential-fuzz lane is owned by
-`m1-fuzz-lane`.
+candidate comparisons. Run `make box-fuzz BOX=<id>` for L1 differential
+fuzzing against the prebuilt oracle named by the spec. Build the harness beforehand. The lane starts one
+oracle and one candidate and sends each a stream of requests. `SEED` selects a
+decimal u64 seed; otherwise the runner chooses and prints one. `CASES` defaults
+to 10000. On divergence the runner minimizes byte removals and prints the seed,
+zero-based case index, input and outputs, and saves the input as
+`.work/tmp/fuzz-<box>-<seed>.bin`. `INJECT=1` selects the selftest injected
+candidate as a negative control.
+
+Each spec declares `fuzz = "bytes"` or `fuzz = "corpus"` and an integer
+`fuzz_max_len` from 1 to 1048576. The bytes generator chooses random lengths
+and bytes. The corpus generator also requires `fuzz_seeds`, a space-separated
+string of seen item IDs in `goldens.lock`. It mutates those inputs with bit
+flips, insertions, deletions, splices and truncations. Holdout items cannot be
+used as seeds.
 
 `boxes/<id>/scoreboard.toml` records version 1 and the set of passing seen
 items. A previously passing item that fails is a regression. Run

@@ -49,6 +49,10 @@ census:
 box:
 	sh scripts/box "$(BOX)" "$(LANE)"
 
+.PHONY: box-fuzz
+box-fuzz:
+	SEED="$(SEED)" CASES="$(CASES)" INJECT="$(INJECT)" sh scripts/box "$(BOX)" fuzz
+
 .PHONY: assembly
 assembly:
 	sh scripts/assembly "$(A)"

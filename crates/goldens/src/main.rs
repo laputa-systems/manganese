@@ -71,6 +71,7 @@ fn selftest() -> Result<(), String> {
     let oracle = executable(".work/tmp/target-oracle/x86_64-unknown-linux-musl/debug/selftest-oracle")?;
     let candidate = executable(".work/tmp/target/x86_64-unknown-linux-musl/debug/candidate")?;
     let wrong_absolute = executable(wrong)?;
+    let fuzz_wrong = executable(".work/tmp/target/x86_64-unknown-linux-musl/debug/fuzz-wrong")?;
     let partial = executable(".work/tmp/target/x86_64-unknown-linux-musl/debug/partial")?;
     let fixture = temp.join("fixture");
     fs::create_dir_all(fixture.join("boxes/selftest")).map_err(|e| e.to_string())?;
@@ -153,6 +154,14 @@ fn selftest() -> Result<(), String> {
         if marker.exists() { return Err("candidate ran before oracle agreement".into()); }
         Ok(())
     })());
+    case("fuzz finds an injected divergence", (|| {
+        let out = Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+            .args(["fuzz", "selftest", "--candidate", &fuzz_wrong]).env("SEED", "1").env("CASES", "10000")
+            .output().map_err(|e| e.to_string())?;
+        require(&out, false, "minimized input hex=a5 escaped=\"\\xa5\"")?;
+        require(&out, false, "divergence seed=1 case=")?;
+        Ok(())
+    })());
     fs::remove_dir_all(&temp).map_err(|e| format!("remove selftest store: {e}"))?;
     if failed { Err("selftest failed".into()) } else { Ok(()) }
 }
@@ -162,6 +171,16 @@ fn main() -> ExitCode {
     let result = match args.next().as_deref().and_then(|s| s.to_str()) {
         Some("run") => run_args(args.collect()),
         Some("selftest") => selftest(),
+        Some("fuzz") => (|| {
+            let id = args.next().ok_or("missing box id")?.into_string().map_err(|_| "non-UTF8 box id")?;
+            let candidate = match args.next() {
+                None => None,
+                Some(arg) if arg == "--candidate" => Some(PathBuf::from(args.next().ok_or("missing candidate path")?)),
+                _ => return Err("invalid fuzz option".into()),
+            };
+            if args.next().is_some() { return Err("extra fuzz arguments".into()); }
+            goldens::fuzz(&id, &default_store()?, candidate)
+        })(),
         _ => Err("usage: goldens selftest | run BOX seen|holdout [options]".into()),
     };
     match result { Ok(()) => ExitCode::SUCCESS, Err(e) => { eprintln!("{e}"); ExitCode::FAILURE } }
