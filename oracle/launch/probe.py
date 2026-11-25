@@ -7,15 +7,14 @@ Runs in a sidecar container that shares the browser container's network and PID 
 from __future__ import annotations
 
 import argparse
-import base64
 import json
 import os
 import socket
-import struct
 import sys
 import time
 
 import appliance
+from cdp import WebSocket
 
 
 def readiness() -> dict[str, object]:
@@ -142,74 +141,6 @@ def browser_root() -> dict[str, object]:
                     "environment": environment_of(item["pid"]),
                     "executable": os.readlink(f"/proc/{item['pid']}/exe")}
     raise RuntimeError("no browser process")
-
-
-class WebSocket:
-    """A minimal RFC 6455 client: one text frame out, text frames in."""
-
-    def __init__(self, url: str) -> None:
-        if not url.startswith("ws://"):
-            raise ValueError(f"not a ws:// URL: {url}")
-        authority, _, path = url.removeprefix("ws://").partition("/")
-        host, _, port = authority.rpartition(":")
-        self.connection = socket.create_connection((host, int(port)), timeout=5)
-        key = base64.b64encode(os.urandom(16)).decode()
-        self.connection.sendall(
-            (
-                f"GET /{path} HTTP/1.1\r\nHost: {authority}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n\r\n"
-            ).encode()
-        )
-        head = b""
-        while b"\r\n\r\n" not in head:
-            chunk = self.connection.recv(1)
-            if not chunk:
-                raise OSError("connection closed during the WebSocket handshake")
-            head += chunk
-        if not head.startswith(b"HTTP/1.1 101"):
-            raise OSError(f"WebSocket upgrade refused: {head.split(b'\r\n', 1)[0]!r}")
-
-    def send_text(self, text: str) -> None:
-        payload = text.encode()
-        mask = os.urandom(4)
-        length = len(payload)
-        if length < 126:
-            prefix = struct.pack("!BB", 0x81, 0x80 | length)
-        elif length < 1 << 16:
-            prefix = struct.pack("!BBH", 0x81, 0x80 | 126, length)
-        else:
-            prefix = struct.pack("!BBQ", 0x81, 0x80 | 127, length)
-        masked = bytes(byte ^ mask[index % 4] for index, byte in enumerate(payload))
-        self.connection.sendall(prefix + mask + masked)
-
-    def receive_text(self) -> str | None:
-        """The next text message, or None when the peer closes."""
-        try:
-            first, second = self.exactly(2)
-        except OSError:
-            return None
-        length = second & 0x7F
-        if length == 126:
-            (length,) = struct.unpack("!H", self.exactly(2))
-        elif length == 127:
-            (length,) = struct.unpack("!Q", self.exactly(8))
-        payload = self.exactly(length)
-        opcode = first & 0x0F
-        if opcode == 0x8:
-            return None
-        return payload.decode() if opcode == 0x1 else ""
-
-    def exactly(self, count: int) -> bytes:
-        data = b""
-        while len(data) < count:
-            chunk = self.connection.recv(count - len(data))
-            if not chunk:
-                raise OSError("connection closed")
-            data += chunk
-        return data
-
-    def close(self) -> None:
-        self.connection.close()
 
 
 def shutdown(websocket_url: str) -> dict[str, object]:
