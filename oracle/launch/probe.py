@@ -130,13 +130,11 @@ def environment_of(pid: int) -> dict[str, str]:
 
 
 def browser_root() -> dict[str, object]:
-    """The browser process the supervisor started: the uid 1000 process whose parent is not a uid 1000 process."""
-    owned = browser_processes()
-    pids = {item["pid"] for item in owned}
-    for item in owned:
-        with open(f"/proc/{item['pid']}/stat", encoding="utf-8") as stream:
-            parent = int(stream.read().rsplit(")", 1)[1].split()[1])
-        if parent not in pids:
+    """The browser process the supervisor started, whether directly or through the compositor."""
+    for item in browser_processes():
+        if item["argv"] and item["argv"][0] == f"{appliance.INSTALL_ROOT}/chrome":
+            if any(arg.startswith("--type=") for arg in item["argv"]):
+                continue
             return {"pid": item["pid"], "argv": item["argv"], "uid": item["uid"], "gid": item["gid"],
                     "environment": environment_of(item["pid"]),
                     "executable": os.readlink(f"/proc/{item['pid']}/exe")}

@@ -1,0 +1,9 @@
+[package]
+name = "manganese-remote-host"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+
+[dependencies]
+tinyland-remote = { path = "../../../.work/tmp/tinyland-4796621b96537bb78232e3d01ca0e96297216ffd/remote-protocol" }

@@ -28,6 +28,10 @@ LOCK = ROOT / "oracle/frozen/artifacts.lock"
 VERIFIER = ROOT / "oracle/build/scripts/install-runtime.py"
 BASE_IMAGE = "alpine@sha256:d56c381f961d307a21b3ca004cf1e3910f106644aefb1f43e654c8a56c4fd395"
 PROBE_IMAGE = "manganese-launch-probe:1"
+TINYLAND_REV = "4796621b96537bb78232e3d01ca0e96297216ffd"
+TINYLAND_SOURCE = ROOT / ".work/tmp" / f"tinyland-{TINYLAND_REV}"
+COMPOSITOR = ROOT / ".work/tmp/compositor" / TINYLAND_REV
+XKB = Path("/usr/share/X11/xkb")
 ARCHES = {"x86_64": "amd64", "aarch64": "arm64"}
 
 
@@ -103,6 +107,34 @@ def ensure_probe_image() -> None:
              "-f", str(LAUNCH / "probe.Dockerfile"), str(LAUNCH)])
 
 
+def ensure_compositor() -> Path:
+    binary = COMPOSITOR / "tinyland"
+    host = COMPOSITOR / "remote-host"
+    host_inputs = [LAUNCH / "remote-host/Cargo.toml", LAUNCH / "remote-host/Cargo.lock",
+                   LAUNCH / "remote-host/src/main.rs"]
+    if binary.is_file() and host.is_file() and all(host.stat().st_mtime_ns >= p.stat().st_mtime_ns for p in host_inputs):
+        return host
+    COMPOSITOR.mkdir(parents=True, exist_ok=True)
+    if not (TINYLAND_SOURCE / "Cargo.toml").is_file():
+        TINYLAND_SOURCE.mkdir(parents=True, exist_ok=True)
+        archive = subprocess.run(["git", "-C", str(Path.home() / "repos/laputa-systems/tinyland"), "archive", TINYLAND_REV],
+                                 capture_output=True, check=True).stdout
+        subprocess.run(["tar", "-x", "-C", str(TINYLAND_SOURCE)], input=archive, check=True)
+    environment = {**os.environ, "RUSTC_WRAPPER": "kache",
+                   "RUSTFLAGS": "-C target-feature=+crt-static -C link-arg=-fuse-ld=mold",
+                   "CARGO_TARGET_DIR": str(ROOT / ".work/tmp/tinyland-target")}
+    cargo = str(Path.home() / ".cargo/bin/cargo")
+    checked([cargo, "+nightly-2026-11-09", "build", "--locked", "--target", "x86_64-unknown-linux-musl", "-p", "tinyland"],
+            cwd=TINYLAND_SOURCE, env=environment)
+    shutil.copyfile(ROOT / ".work/tmp/tinyland-target/x86_64-unknown-linux-musl/debug/tinyland", binary)
+    binary.chmod(0o755)
+    checked([cargo, "+nightly-2026-11-09", "build", "--locked", "--target", "x86_64-unknown-linux-musl", "--manifest-path",
+             str(LAUNCH / "remote-host/Cargo.toml")], env=environment)
+    shutil.copyfile(ROOT / ".work/tmp/tinyland-target/x86_64-unknown-linux-musl/debug/manganese-remote-host", host)
+    host.chmod(0o755)
+    return host
+
+
 class Session:
     """One browser container: the image root, /opt/browser, /profile, Downloads and a tmpfs /tmp."""
 
@@ -116,10 +148,13 @@ class Session:
             directory.mkdir(exist_ok=True)
         if os.getuid() != appliance.UID:
             raise LaunchError(f"run as uid {appliance.UID} so /profile is owned by the browser user")
+        COMPOSITOR.mkdir(parents=True, exist_ok=True)
         checked([
             "docker", "run", "-d", "--rm", "--init", "--name", name, "--network", "none",
             "--security-opt", "seccomp=unconfined", "--tmpfs", "/tmp:exec,mode=1777",
             "-v", f"{browser_root}:{appliance.INSTALL_ROOT}:ro",
+            "-v", f"{COMPOSITOR}:/opt/compositor:ro",
+            *(["-v", f"{XKB}:/opt/xkb:ro"] if XKB.is_dir() else []),
             "-v", f"{self.profile}:{appliance.PROFILE}",
             "-v", f"{self.downloads}:{appliance.DOWNLOADS}",
             BASE_IMAGE, "sleep", "infinity",
@@ -127,7 +162,9 @@ class Session:
         self.root(
             f"adduser -D -H -u {appliance.UID} -G video -h {appliance.HOME} {appliance.USER}"
             f" && chown {appliance.UID}:{appliance.GID} {appliance.HOME}"
-            f" && mkdir -p {Path(appliance.LAUNCHER_LINK).parent}"
+            f" && mkdir -p {Path(appliance.LAUNCHER_LINK).parent} /run/user/{appliance.UID}"
+            f" && chown {appliance.UID}:{appliance.GID} /run/user/{appliance.UID}"
+            f" && chmod 700 /run/user/{appliance.UID}"
             f" && ln -s {appliance.INSTALL_ROOT}/chrome {appliance.LAUNCHER_LINK}"
         )
 
@@ -147,8 +184,19 @@ class Session:
         """Start the browser as the supervisor does; stdout and stderr append to the run's browser.log (2.5)."""
         command = appliance.argv(self.resolve_launcher(), mode, start_url, extra)
         with (self.run_dir / "browser.log").open("ab") as log:
-            browser = subprocess.Popen(self.as_browser(command, appliance.ENVIRONMENT), stdin=subprocess.DEVNULL,
-                                       stdout=log, stderr=log)
+            if mode == "headed":
+                if not XKB.is_dir():
+                    raise LaunchError(f"XKB data missing: {XKB}")
+                host = ensure_compositor()
+                environment = {**appliance.ENVIRONMENT, "XDG_RUNTIME_DIR": "/run/user/1000",
+                               "XKB_CONFIG_ROOT": "/opt/xkb", "TINYLAND_XKB_ROOT": "/opt/xkb"}
+                compositor = ["/opt/compositor/tinyland", "--remote", "--width", "1024", "--height", "768",
+                              "--socket", "wayland-1", "--", *command]
+                browser = subprocess.Popen([str(host), str(self.run_dir), *self.as_browser(compositor, environment)],
+                                           stdin=subprocess.DEVNULL, stdout=log, stderr=log)
+            else:
+                browser = subprocess.Popen(self.as_browser(command, appliance.ENVIRONMENT), stdin=subprocess.DEVNULL,
+                                           stdout=log, stderr=log)
         return command, browser
 
     def sidecar(self, command: list[str], mounts: dict[Path, str] | None = None, image: str = PROBE_IMAGE,
@@ -193,7 +241,23 @@ def launch(session: Session, mode: str) -> tuple[dict[str, object], dict[str, ob
     started = time.monotonic()
     command, browser = session.start_browser(mode)
     try:
-        observed = session.probe("--close")
+        if mode == "headed":
+            observed = session.probe()
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                frame = session.run_dir / "frame.rgba"
+                if frame.is_file():
+                    pixels = frame.read_bytes()
+                    if len(pixels) >= 8 and any(pixels[i:i + 4] != pixels[:4] for i in range(4, len(pixels), 4)):
+                        (session.run_dir / "visible-frame.rgba").write_bytes(pixels)
+                        break
+                if browser.poll() is not None:
+                    break
+                time.sleep(0.1)
+            if observed["readiness"]["ok"]:
+                observed["shutdown"] = session.probe("--close").get("shutdown", {"ok": False})
+        else:
+            observed = session.probe("--close")
         try:
             returncode = browser.wait(timeout=appliance.CLOSE_DEADLINE_SECONDS + 7)
         except subprocess.TimeoutExpired:
@@ -205,6 +269,18 @@ def launch(session: Session, mode: str) -> tuple[dict[str, object], dict[str, ob
     observed["wall_seconds"] = round(time.monotonic() - started, 3)
     observed["returncode"] = returncode
     observed["command"] = command
+    observed["mode"] = mode
+    if mode == "headed":
+        frame = session.run_dir / "frame.rgba"
+        visible = session.run_dir / "visible-frame.rgba"
+        pixels = visible.read_bytes() if visible.is_file() else b""
+        size = (session.run_dir / "frame-size").read_text().strip() if pixels else ""
+        observed["frame"] = {"ok": len(pixels) >= 8 and any(pixels[i:i + 4] != pixels[:4]
+                             for i in range(4, len(pixels), 4)), "bytes": len(pixels), "size": size,
+                             "path": str(visible), "last_frame": str(frame)}
+        log = (session.run_dir / "browser.log").read_text(errors="replace")
+        observed["gpu_log"] = [line for line in log.splitlines() if "gpu" in line.lower() and "TINYLAND_SPAWN_COMMAND" not in line]
+        observed["compositor_ready"] = "TINYLAND_COMPOSITOR_READY" in log
     return install, observed
 
 
@@ -218,10 +294,13 @@ def clauses(observed: dict[str, object], install: dict[str, object]) -> dict[str
     environment = browser["environment"]
     result["2.2"] = {
         "ok": browser["uid"][:1] == [str(appliance.UID)] and browser["gid"][:1] == [str(appliance.GID)]
-        and environment == appliance.ENVIRONMENT,
+        and ((observed["mode"] == "headless" and environment == appliance.ENVIRONMENT)
+             or (observed["mode"] == "headed"
+                 and all(environment.get(k) == v for k, v in appliance.ENVIRONMENT.items())
+                 and environment.get("XDG_RUNTIME_DIR") == "/run/user/1000")),
         "uid": browser["uid"], "gid": browser["gid"], "environment": environment,
     }
-    result["3.1-3.2"] = {
+    result["3.1-3.3"] = {
         "ok": browser["argv"] == observed["command"] and browser["argv"][-1] == appliance.START_URL,
         "argv": browser["argv"],
     }
@@ -232,6 +311,8 @@ def clauses(observed: dict[str, object], install: dict[str, object]) -> dict[str
         "status_line": readiness["status_line"], "content_length": readiness["content_length"],
         "version": version,
     }
+    if observed["mode"] == "headed":
+        result["3.1-3.3"]["ok"] = result["3.1-3.3"]["ok"] and observed["compositor_ready"]
     result["4.2"] = observed["sandbox"]
     shutdown = observed.get("shutdown", {"ok": False, "error": "not attempted"})
     result["4.3"] = {**shutdown, "ok": shutdown["ok"] and observed["returncode"] == 0,
@@ -265,7 +346,7 @@ def open_session(run_dir: Path, archive: Archive) -> Session:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n", 1)[0])
     parser.add_argument("--arch", choices=sorted(ARCHES), default=platform.machine())
-    parser.add_argument("--mode", choices=("headless",), default="headless")
+    parser.add_argument("--mode", choices=("headless", "headed"), default="headless")
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--archive", type=Path, help="an archive with its .sha256 and .acceptance.json beside it")
     source.add_argument("--frozen", help="an artifacts.lock OCI tag (default hydrogen-r2-<arch>)")
@@ -291,12 +372,16 @@ def main() -> int:
             report["clauses"].update(clauses(observed, install))
             report["processes"] = observed.get("processes", [])
             report["wall_seconds"] = observed["wall_seconds"]
+            if args.mode == "headed":
+                report["frame"] = observed["frame"]
+                report["gpu_log"] = observed["gpu_log"]
+                report["compositor_ready"] = observed["compositor_ready"]
     except (LaunchError, OSError, subprocess.SubprocessError, json.JSONDecodeError) as error:
         report["error"] = str(error)
     finally:
         if session is not None:
             session.close()
-    report["ok"] = "error" not in report and all(item["ok"] for item in report.get("clauses", {}).values())
+    report["ok"] = "error" not in report and (args.mode != "headed" or report.get("frame", {}).get("ok", False)) and all(item["ok"] for item in report.get("clauses", {}).values())
     report_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     for clause, item in report.get("clauses", {}).items():
         print(f"{'ok  ' if item['ok'] else 'FAIL'} {clause}")
