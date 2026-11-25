@@ -111,3 +111,8 @@ brotli-harness:
 .PHONY: brotli-anchor
 brotli-anchor:
 	PYTHONPATH=oracle/harness/brotli python3 -B oracle/harness/brotli/anchor.py
+
+.PHONY: encoding-harness
+encoding-harness:
+	mkdir -p .work/tmp/encoding
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/encoding "$$tag" python3 -B /lane/oracle/harness/encoding/build.py
