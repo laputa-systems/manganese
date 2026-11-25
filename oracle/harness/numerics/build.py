@@ -20,6 +20,16 @@ for path in sorted(source.glob('*.cc')):
     obj = scratch / (path.name + '.o')
     subprocess.run([compiler, *args, '-c', str(path), '-o', str(obj)], cwd=out, env=env, check=True)
     objects.append(str(obj))
+simd_flags = {}
+for line in (out / 'obj/third_party/simdutf/simdutf.ninja').read_text().splitlines():
+    for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc'):
+        if line.startswith(key + ' = '):
+            simd_flags[key] = shlex.split(line.split(' = ', 1)[1])
+simd_args = sum((simd_flags[key] for key in ('defines', 'include_dirs', 'cflags', 'cflags_cc')), [])
+simd_args = [arg for arg in simd_args if not arg.startswith('-fcrash-diagnostics-dir=')]
+obj = scratch / 'simdutf.o'
+subprocess.run([compiler, *simd_args, '-c', '/work/src/third_party/simdutf/simdutf.cpp', '-o', str(obj)], cwd=out, env=env, check=True)
+objects.append(str(obj))
 for target in ('libc++', 'libc++abi'):
     ninja = out / ('obj/buildtools/third_party/' + target + '/' + target + '.ninja')
     target_flags = {}

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "base/third_party/double_conversion/double-conversion/double-conversion.h"
+#include "third_party/simdutf/simdutf.h"
 
 using double_conversion::DoubleToStringConverter;
 using double_conversion::StringBuilder;
@@ -27,7 +28,7 @@ int main() {
     if (length > 65536 || length < 1) return 1;
     unsigned char* input = static_cast<unsigned char*>(malloc(length));
     if (!input || fread(input, 1, length, stdin) != length) return 1;
-    unsigned char output[2048] = {};
+    unsigned char output[196608] = {};
     size_t out_len = 0;
     if (input[0] <= 4 && length == 11) {
       uint64_t bits = 0;
@@ -49,6 +50,20 @@ int main() {
       out_len = 1 + builder.position();
       memcpy(output + 1, text, out_len - 1);
       builder.Finalize();
+    } else if (input[0] == 6 && length % 2 == 1) {
+      size_t count = (length - 1) / 2;
+      char16_t* units = static_cast<char16_t*>(malloc((count + 1) * sizeof(char16_t)));
+      if (!units) return 1;
+      for (size_t i = 0; i < count; ++i) units[i] = (uint16_t(input[1 + i * 2]) << 8) | input[2 + i * 2];
+      simdutf::result result = simdutf::convert_utf16_to_utf8_with_errors(units, count, reinterpret_cast<char*>(output + 8));
+      write_u32(output, result.error);
+      write_u32(output + 4, result.count);
+      if (result.error == simdutf::SUCCESS) out_len = 8 + result.count;
+      else {
+        size_t prefix = simdutf::convert_utf16_to_utf8(units, result.count, reinterpret_cast<char*>(output + 8));
+        out_len = 8 + prefix;
+      }
+      free(units);
     } else if (input[0] == 5) {
       StringToDoubleConverter converter(StringToDoubleConverter::ALLOW_LEADING_SPACES | StringToDoubleConverter::ALLOW_TRAILING_JUNK, 0.0, 0.0, nullptr, nullptr);
       int consumed = 0;

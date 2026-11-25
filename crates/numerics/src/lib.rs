@@ -81,7 +81,14 @@ fn is_decimal_halfway(value: f64, decimal_exponent: i32) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{fixed, parse_double, precision, shortest, shortest_exponential, PrecisionStyle, ShortestStyle};
+    use super::{fixed, parse_double, precision, shortest, shortest_exponential, utf16_to_utf8, PrecisionStyle, ShortestStyle, Utf16Conversion};
+
+    #[test]
+    fn utf16_reports_the_first_unpaired_surrogate() {
+        assert_eq!(utf16_to_utf8(&[0x41, 0xd83d, 0xde00]), Utf16Conversion::Complete("A😀".into()));
+        assert_eq!(utf16_to_utf8(&[0x41, 0xd800, 0x42]), Utf16Conversion::Invalid { valid_units: 1, prefix: "A".into() });
+        assert_eq!(utf16_to_utf8(&[0xdc00]), Utf16Conversion::Invalid { valid_units: 0, prefix: String::new() });
+    }
 
     #[test]
     fn precision_preserves_significant_digits_and_exponent() {
@@ -276,4 +283,32 @@ pub fn shortest_exponential(value: f64) -> String {
     if exponent >= 0 { result.push('+'); }
     result.push_str(&exponent.to_string());
     result
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Utf16Conversion {
+    Complete(String),
+    Invalid { valid_units: usize, prefix: String },
+}
+
+pub fn utf16_to_utf8(input: &[u16]) -> Utf16Conversion {
+    let mut prefix = String::new();
+    let mut cursor = 0;
+    while cursor < input.len() {
+        let first = input[cursor];
+        let scalar = if (0xd800..=0xdbff).contains(&first) {
+            if cursor + 1 == input.len() || !(0xdc00..=0xdfff).contains(&input[cursor + 1]) {
+                return Utf16Conversion::Invalid { valid_units: cursor, prefix };
+            }
+            cursor += 2;
+            0x10000 + ((u32::from(first) - 0xd800) << 10) + u32::from(input[cursor - 1]) - 0xdc00
+        } else if (0xdc00..=0xdfff).contains(&first) {
+            return Utf16Conversion::Invalid { valid_units: cursor, prefix };
+        } else {
+            cursor += 1;
+            u32::from(first)
+        };
+        prefix.push(char::from_u32(scalar).expect("valid UTF-16 scalar"));
+    }
+    Utf16Conversion::Complete(prefix)
 }

@@ -1,5 +1,5 @@
 use std::io::{self, Read, Write};
-use numerics::{fixed, parse_double, precision, shortest, shortest_exponential, PrecisionStyle, ShortestStyle};
+use numerics::{fixed, parse_double, precision, shortest, shortest_exponential, utf16_to_utf8, PrecisionStyle, ShortestStyle, Utf16Conversion};
 
 fn main() -> io::Result<()> {
     let mut input = io::stdin().lock();
@@ -20,6 +20,19 @@ fn main() -> io::Result<()> {
         if length == 0 || length > 65536 { return Err(io::ErrorKind::InvalidData.into()); }
         let mut request = vec![0; length];
         input.read_exact(&mut request)?;
+        if request[0] == 6 && length % 2 == 1 {
+            let units: Vec<u16> = request[1..].chunks_exact(2).map(|pair| u16::from_be_bytes([pair[0], pair[1]])).collect();
+            let (error, count, text) = match utf16_to_utf8(&units) {
+                Utf16Conversion::Complete(text) => (0u32, text.len(), text),
+                Utf16Conversion::Invalid { valid_units, prefix } => (6u32, valid_units, prefix),
+            };
+            output.write_all(&((8 + text.len()) as u32).to_be_bytes())?;
+            output.write_all(&error.to_be_bytes())?;
+            output.write_all(&(count as u32).to_be_bytes())?;
+            output.write_all(text.as_bytes())?;
+            output.flush()?;
+            continue;
+        }
         if request[0] == 5 {
             let (value, consumed) = parse_double(&request[1..]);
             output.write_all(&12_u32.to_be_bytes())?;
