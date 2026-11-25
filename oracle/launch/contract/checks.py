@@ -1,5 +1,8 @@
 AD = 'pagead2.googlesyndication.com'
 VERSION = {'Browser': 'Chrome/156.0.8078.79', 'Protocol-Version': '1.3', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36', 'V8-Version': '15.6.75.27', 'WebKit-Version': '537.36 (@a21ce95c24ce3964416f09ae1862f53f319eb4d0)', 'File-Path-Style': 'posix'}
+CLIENTS = {'browser-use', 'agent-browser', 'extension-cli', 'shadowdriver-sdk', 'shadowdriver-crawler'}
+WORKLOADS = {'discovery', 'forms', 'accessibility', 'screenshot', 'dialogs', 'popups', 'frames', 'page-js', 'sessions', 'files', 'profiles'}
+EXTENSION_FEATURES = {'switch-load', 'cdp-load', 'get-extensions', 'trigger-action', 'service-worker', 'popup', 'badge', 'options', 'active-tab', 'scripting.executeScript', 'runtime.sendMessage', 'runtime.onMessage', 'runtime.connect', 'runtime.onConnect', 'runtime.getContexts', 'runtime.getURL', 'runtime.openOptionsPage', 'runtime.lastError', 'runtime.onMessageExternal', 'storage.local', 'tabs.query', 'tabs.get', 'tabs.create', 'tabs.update', 'tabs.onUpdated', 'tabs.onRemoved', 'windows.update', 'downloads.download', 'cookies.get', 'webRequest.onSendHeaders', 'declarativeNetRequest', 'offscreen.createDocument', 'notifications.create', 'clipboardWrite'}
 
 
 def adblock(observed):
@@ -69,6 +72,25 @@ def profile_modes(observed):
     return (len(observed) == 3 and [item['mode'] for item in observed] == ['headed', 'headless', 'headed']
             and all(item['storage'] == 'persisted' and cookie in item['cookies'] for item in observed)
             and observed[0].get('download') == 'headed download evidence')
+
+
+def client_workloads(observed):
+    if set(observed) != CLIENTS:
+        return False
+    for workloads in observed.values():
+        if set(workloads) != WORKLOADS:
+            return False
+        for item in workloads.values():
+            if item.get('status') == 'ok' and item.get('evidence'):
+                continue
+            if item.get('status') == 'n/a' and item.get('reason'):
+                continue
+            return False
+    return True
+
+
+def extension_features(observed):
+    return set(observed) == EXTENSION_FEATURES and all(item.get('ok') is True and item.get('evidence') for item in observed.values())
 
 
 def durability(cases):

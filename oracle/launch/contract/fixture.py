@@ -1,4 +1,5 @@
 import http.server
+import hashlib
 import json
 import select
 import socket
@@ -22,6 +23,21 @@ class HTTP(http.server.BaseHTTPRequestHandler):
         elif self.path == '/profile-download':
             body = b'headed download evidence'
             content_type = 'application/octet-stream'
+        elif self.path == '/workload':
+            body = b'''<!doctype html><title>Client workload</title><h1>Client workload</h1>
+<form action="/submit" method="post"><label>Text <input name="text" id="text"></label><button id="submit">Submit</button></form>
+<iframe id="same" src="/same"></iframe><iframe id="cross" src="http://frame.test/cross"></iframe>
+<input id="upload" type="file"><button id="send-upload" onclick="fetch('/upload',{method:'POST',body:document.querySelector('#upload').files[0]})">Upload</button>
+<button id="confirm" onclick="document.body.dataset.confirm=confirm('Confirm workload')">Confirm</button>
+<button id="popup" onclick="window.open('/popup')">Popup</button>
+<button id="blob" onclick="let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['client download']));a.download='client-download.txt';a.click()">Download</button>'''
+            content_type = 'text/html'
+        elif self.path == '/same':
+            body = b'<!doctype html><p id="same-text">same-origin frame</p>'
+            content_type = 'text/html'
+        elif self.path == '/cross':
+            body = b'<!doctype html><button id="cross-click" onclick="fetch(\'/frame-click\',{method:\'POST\',body:\'clicked\'})">Cross-origin click</button>'
+            content_type = 'text/html'
         else:
             body = b'<!doctype html><title>fixture</title><input id="field"><iframe src="http://frame.test/"></iframe>' if self.headers.get('Host', '').startswith('forms.test') else b'<!doctype html><title>frame</title>'
             content_type = 'text/html'
@@ -34,6 +50,16 @@ class HTTP(http.server.BaseHTTPRequestHandler):
             self.send_header('Content-Disposition', 'attachment; filename="contract-profile.txt"')
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        data = self.rfile.read(int(self.headers['Content-Length']))
+        with (LOG.parent / 'requests.jsonl').open('a') as log:
+            log.write(json.dumps({'path':self.path, 'length':len(data), 'sha256':hashlib.sha256(data).hexdigest(),
+                                  'body':data.decode('utf-8', errors='replace') if len(data) < 1024 else None}) + '\n')
+        self.send_response(200)
+        self.send_header('Content-Length', '2')
+        self.end_headers()
+        self.wfile.write(b'ok')
 
     def log_message(self, *_args):
         pass

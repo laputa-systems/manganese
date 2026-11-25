@@ -23,6 +23,38 @@ def evidence():
 
 
 class NegativeControls(unittest.TestCase):
+    def test_client_workloads(self):
+        good = {name:{workload:{'status':'ok', 'evidence':{'observed':True}} for workload in checks.WORKLOADS} for name in checks.CLIENTS}
+        self.assertTrue(checks.client_workloads(good))
+        good['extension-cli']['dialogs'] = {'status':'n/a', 'reason':'no dialog API'}
+        self.assertTrue(checks.client_workloads(good))
+        for change in ('client', 'workload', 'failure', 'missing-evidence', 'missing-reason'):
+            bad = copy.deepcopy(good)
+            if change == 'client':
+                del bad['browser-use']
+            elif change == 'workload':
+                del bad['agent-browser']['forms']
+            elif change == 'failure':
+                bad['agent-browser']['forms'] = {'status':'FAIL', 'evidence':{'observed':False}}
+            elif change == 'missing-evidence':
+                bad['agent-browser']['forms'] = {'status':'ok'}
+            else:
+                bad['extension-cli']['dialogs'] = {'status':'n/a'}
+            self.assertFalse(checks.client_workloads(bad), change)
+
+    def test_extension_features(self):
+        good = {name:{'ok':True, 'evidence':{'observed':True}} for name in checks.EXTENSION_FEATURES}
+        self.assertTrue(checks.extension_features(good))
+        for change in ('missing', 'failed', 'no-evidence'):
+            bad = copy.deepcopy(good)
+            if change == 'missing':
+                del bad['clipboardWrite']
+            elif change == 'failed':
+                bad['clipboardWrite']['ok'] = False
+            else:
+                del bad['clipboardWrite']['evidence']
+            self.assertFalse(checks.extension_features(bad), change)
+
     def test_profile_modes(self):
         cookie = {'name':'contract_profile', 'value':'persisted', 'httpOnly':True}
         good = [{'mode':mode, 'storage':'persisted', 'cookies':[cookie]} for mode in ('headed', 'headless', 'headed')]
