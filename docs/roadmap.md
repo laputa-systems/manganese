@@ -6,7 +6,7 @@ This is the single plan for this repository: all current and future work, and th
 
 - **State:** ready. No slice has started.
 - **Campaign:** [Manganese](#campaign-manganese).
-- **Last accepted revision:** the preflight commit on `main`; `make check lint` is green on a pristine Alpine x86_64 capsule (see Baseline).
+- **Last accepted revision:** the scaffold on `main` (local, not pushed); `make check lint` is green in pristine Alpine capsules on x86_64 and aarch64 (see Baseline).
 - **Red or parked:** none.
 - **Next:** `p0-ground` on the campaign host.
 - **First command:** `sh scripts/setup-dev && make check lint`, then "resume the roadmap".
@@ -26,40 +26,42 @@ This is the single plan for this repository: all current and future work, and th
 
 ## Sequence
 
-Every item belongs to the Manganese campaign. Acceptance commands are run on the integrated tree, together with `make check lint`. Items marked *box* own `crates/<id>/` and `boxes/<id>/` and accept with `make box BOX=<id>`. Items marked *asm* own `crates/asm-<id>/` and accept with `make assembly A=<id>`. Both targets come from `m1-workspace`.
+Every item belongs to the Manganese campaign. Acceptance commands are run on the integrated tree, together with `make check lint`. Items marked *box* own `crates/<id>/` and `boxes/<id>/` and accept with `make box BOX=<id>`. Items marked *asm* own `crates/asm-<id>/` and accept with `make assembly A=<id>`. Both targets come from `m1-workspace`. Every other `make` target an acceptance command names is created by the item that owns it.
 
 **Disjoint sets.** Box and assembly items within one milestone own disjoint directories and run in parallel. These files are shared and coordinator-owned; lanes propose changes to them and the parent merges serially: `Cargo.toml` (workspace members), `Cargo.lock`, `goldens.lock`, `oracle/capture/series`, `Makefile`, and this roadmap's **Status**. Items in P0, M0 and M1 touch shared harness code and run serially unless the table says otherwise.
 
+J05, J06 and J08 are closed by removal (decision: supervisor and compositor are environment), so they have no item.
+
 ### P0 — ground
 
-| ID | Owns | Prerequisites | Acceptance |
-|---|---|---|---|
-| `p0-ground` | Baseline section of this roadmap | none | `sh scripts/setup-dev && make check lint` on the campaign host; record the timings |
-| `p0-artifacts` | `scripts/artifact`, `scripts/artifact-selftest` | `p0-ground` | `make artifact-selftest`: fetch from a `file://` blob base verifies digest and size, a corrupted blob fails, and a name missing from the lock fails |
-| `p0-launch` | `oracle/launch/` | `p0-artifacts`; N2 published, or `m1-source-oracle` accepted | `make oracle-launch ARCH=x86_64 MODE=headless`: appliance contract 2 to 4 hold for the frozen x86_64 archive (readiness, sandbox witness, `Browser.close` exit within 8 s), and the run writes a JSON report |
+| ID | TODOs | Owns | Prerequisites | Acceptance |
+|---|---|---|---|---|
+| `p0-ground` | A15 | Baseline section of this roadmap | none | `sh scripts/setup-dev && make check lint` on the campaign host; record the timings |
+| `p0-artifacts` | T13, T14 | `scripts/artifact`, `scripts/artifact-selftest` | `p0-ground` | `make artifact-selftest`: fetch from a `file://` blob base verifies digest and size, a corrupted blob fails, and a name missing from the lock fails |
+| `p0-launch` | U01 | `oracle/launch/` | `p0-artifacts`; N2 published, or `m1-source-oracle` accepted | `make oracle-launch ARCH=x86_64 MODE=headless`: appliance contract 2 to 4 hold for the frozen x86_64 archive (readiness, sandbox witness, `Browser.close` exit within 8 s), and the run writes a JSON report |
 
 ### M0 — freeze the remaining evidence
 
 M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/frozen/SHA256SUMS`; nothing else in the frozen tree changes. They run in parallel once `p0-launch` is accepted (disjoint `oracle/frozen/<inventory>/` directories and `oracle/probes/<inventory>/` harnesses).
 
-| ID | Owns | Prerequisites | Acceptance |
-|---|---|---|---|
-| `m0-workloads` | `oracle/workloads/clients/`, `oracle/launch/contract` | `p0-launch` | `make contract ARCHIVE=hydrogen-r2-amd64` passes appliance contract 5 to 8 against the oracle itself (excluding 8.2, which is headed, and 8.3, which runs at M8) |
-| `m0-cdp-trace` | `oracle/probes/cdp/`, `oracle/frozen/cdp/` | `m0-workloads` | `make cdp-trace`: the union of methods, events and parameter shapes from every frozen client workload is written to `oracle/frozen/cdp/` and identical across two runs |
-| `m0-abi` | `oracle/probes/abi/`, `oracle/frozen/abi/` | `m0-workloads` | `make abi-census`: the syscall, flag, ioctl, socket-family, `/proc`, `/sys` and `madvise` census of the oracle under every workload is written to `oracle/frozen/abi/x86_64.txt` and identical across two runs |
-| `m0-persona` | `oracle/probes/persona/`, `oracle/frozen/persona/` | `m0-workloads` | `make persona-inventory`: every F16 surface recorded with its comparator class (exact or tolerance with bound); two runs give identical exact surfaces |
-| `m0-probes` | `oracle/probes/capability/`, `oracle/frozen/capability/` | `p0-launch` | `make capability-probes`: WebGL availability and strings per mode, codec answers (`canPlayType`, MSE, WebCodecs, MediaRecorder), XSLT, `chrome.notifications`, Privacy Sandbox interfaces and the global interface and property inventory are recorded, and the proposed-cuts table rows are marked compatible or not from them |
-| `m0-census` | `oracle/probes/census/`, `oracle/frozen/census/` | `m1-source-oracle` | `make census`: GN target, generated-source, link and staged-file graph for `chromium-wayland-release` on x86_64 (A03 to A05), with every node classified per A05 |
+| ID | TODOs | Owns | Prerequisites | Acceptance |
+|---|---|---|---|---|
+| `m0-workloads` | A02, A08, S12 | `oracle/workloads/clients/`, `oracle/launch/contract` | `p0-launch` | `make contract ARCHIVE=hydrogen-r2-amd64` passes appliance contract 5 to 8 against the oracle itself (excluding 8.2, which is headed, and 8.3, which runs at M8) |
+| `m0-cdp-trace` | S02 | `oracle/probes/cdp/`, `oracle/frozen/cdp/` | `m0-workloads` | `make cdp-trace`: the union of methods, events and parameter shapes from every frozen client workload is written to `oracle/frozen/cdp/` and identical across two runs |
+| `m0-abi` | B04 | `oracle/probes/abi/`, `oracle/frozen/abi/` | `m0-workloads` | `make abi-census`: the syscall, flag, ioctl, socket-family, `/proc`, `/sys` and `madvise` census of the oracle under every workload is written to `oracle/frozen/abi/x86_64.txt` and identical across two runs |
+| `m0-persona` | F16 | `oracle/probes/persona/`, `oracle/frozen/persona/` | `m0-workloads` | `make persona-inventory`: every F16 surface recorded with its comparator class (exact or tolerance with bound); two runs give identical exact surfaces |
+| `m0-probes` | K01, L01, M01, R11, A12 | `oracle/probes/capability/`, `oracle/frozen/capability/` | `p0-launch` | `make capability-probes`: WebGL availability and strings per mode, codec answers (`canPlayType`, MSE, WebCodecs, MediaRecorder), XSLT, `chrome.notifications`, Privacy Sandbox interfaces and the global interface and property inventory are recorded, and the proposed-cuts table rows are marked compatible or not from them |
+| `m0-census` | A01, A03, A04, A05, A06, A07, A09, A10 | `oracle/probes/census/`, `oracle/frozen/census/` | `m1-source-oracle` | `make census`: GN target, generated-source, link and staged-file graph for `chromium-wayland-release` on x86_64 (A03 to A05), with every node classified per A05 |
 
 ### M1 — oracle, golden store and lanes
 
-| ID | Owns | Prerequisites | Acceptance |
-|---|---|---|---|
-| `m1-kache-oracle` | `oracle/capture/kache.patch` | `p0-ground` | `make oracle-gate-a`: the frozen Gate A cache-reuse check passes with kache as `cc_wrapper` and as the rustc wrapper |
-| `m1-source-oracle` | `oracle/Makefile` targets | `m1-kache-oracle` | `make source-oracle`: `oracle/build` produces an x86_64 package revision 2 archive that passes the frozen `test-fast` and `qualify-package.py`; a second run with no input change is an incremental no-op |
-| `m1-workspace` | `crates/goldens/`, `boxes/selftest/`, `make box`, `make assembly` | `p0-artifacts` | `make box BOX=selftest`: a synthetic box passes with exact goldens; its negative control (a deliberately wrong crate) fails; a scoreboard regression fails; and the holdout set is unreadable from the L0 lane |
-| `m1-fuzz-lane` | `crates/goldens/` fuzz runner | `m1-workspace`, `m1-source-oracle` | `make box-fuzz BOX=selftest`: 10 000 differential cases against a prebuilt harness with no divergence, and an injected divergence is reported with a minimized input |
-| `m1-zlib` | box `zlib` | `m1-fuzz-lane` | `make box BOX=zlib` (Q01): zlib-rs output matches the oracle's zlib inflate and deflate on the corpus, the holdout set and 10 000 fuzz cases |
+| ID | TODOs | Owns | Prerequisites | Acceptance |
+|---|---|---|---|---|
+| `m1-kache-oracle` | T16 | `oracle/capture/kache.patch` | `p0-ground` | `make oracle-gate-a`: the frozen Gate A cache-reuse check passes with kache as `cc_wrapper` and as the rustc wrapper |
+| `m1-source-oracle` | T15 | `oracle/Makefile` targets | `m1-kache-oracle` | `make source-oracle`: `oracle/build` produces an x86_64 package revision 2 archive that passes the frozen `test-fast` and `qualify-package.py`; a second run with no input change is an incremental no-op |
+| `m1-workspace` | U15, A11, A13, A14, B01, T01, T02, T03, T06 | `crates/goldens/`, `boxes/selftest/`, `make box`, `make assembly` | `p0-artifacts` | `make box BOX=selftest`: a synthetic box passes with exact goldens; its negative control (a deliberately wrong crate) fails; a scoreboard regression fails; and the holdout set is unreadable from the L0 lane |
+| `m1-fuzz-lane` | U05 | `crates/goldens/` fuzz runner | `m1-workspace`, `m1-source-oracle` | `make box-fuzz BOX=selftest`: 10 000 differential cases against a prebuilt harness with no divergence, and an injected divergence is reported with a minimized input |
+| `m1-zlib` | Q01 | box `zlib` | `m1-fuzz-lane` | `make box BOX=zlib` (Q01): zlib-rs output matches the oracle's zlib inflate and deflate on the corpus, the holdout set and 10 000 fuzz cases |
 
 ### M2 — leaf boxes (*box*, parallel)
 
@@ -101,6 +103,9 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 | `yuv` | K12 | libyuv port |
 | `codec-licensing` | K19, K20 | records only |
 | `common-codecs` | B09 | std, existing crates |
+| `svg` | M09 | resvg/usvg components where compatible |
+| `image-qualification` | M12 | needs every image box |
+| `native-support` | Q09 | removal of each native support library by consumer |
 
 ### M3 — services on Smolith (*box* unless marked)
 
@@ -180,13 +185,13 @@ M0 items may add files under `oracle/frozen/<inventory>/` and extend `oracle/fro
 
 ### M8 — integration and release
 
-| ID | Owns | Prerequisites | Acceptance |
-|---|---|---|---|
-| `m8-browser` | `crates/manganese/` | M7 | `make assembly A=browser`: the full browser passes the M6 and M7 assembly goldens |
-| `m8-archive` | `release/` | `m8-browser` | `make archive`: Cargo-only offline build (`cargo build --release --locked --offline --target x86_64-unknown-linux-musl`) produces an archive that the frozen verifier accepts, with the ELF rules of contract 1.4 and 1.8 |
-| `m8-contract` | none | `m8-archive` | `make contract ARCHIVE=<manganese archive>` gives the same results as on the oracle archive, including 8.3 (60-minute soak) |
-| `m8-persona` | none | `m8-archive` | `make persona ARCHIVE=<manganese archive>`: the U16 report shows no unapproved difference from the oracle |
-| `m8-closure` | none | `m8-archive` | `make closure`: T02 to T10, T13, T14 and the remaining U items; two clean builds give identical digests |
+| ID | TODOs | Owns | Prerequisites | Acceptance |
+|---|---|---|---|---|
+| `m8-browser` | T11, U06 | `crates/manganese/` | M7 | `make assembly A=browser`: the full browser passes the M6 and M7 assembly goldens |
+| `m8-archive` | T04, T05, T07, T08, T12 | `release/` | `m8-browser` | `make archive`: Cargo-only offline build (`cargo build --release --locked --offline --target x86_64-unknown-linux-musl`) produces an archive that the frozen verifier accepts, with the ELF rules of contract 1.4 and 1.8 |
+| `m8-contract` | U02, U03, U07, U08, U09, U10, U11 | none | `m8-archive` | `make contract ARCHIVE=<manganese archive>` gives the same results as on the oracle archive, including 8.3 (60-minute soak) |
+| `m8-persona` | U16 | none | `m8-archive` | `make persona ARCHIVE=<manganese archive>`: the U16 report shows no unapproved difference from the oracle |
+| `m8-closure` | C02, C06, C07, C08, R10, T09, T10, U12, U13, U14 | none | `m8-archive` | `make closure`: T02 to T10, T13, T14 and the remaining U items; two clean builds give identical digests |
 
 ### M9 — conditional transport
 
@@ -265,7 +270,17 @@ Build the browser that [the requirements](requirements.md) define, prove it agai
   - The frozen arm64 archive runs to readiness with a sandboxed renderer (`NoNewPrivs 1`, `Seccomp 2`, own PID namespace) in a pristine Alpine container under the appliance's launch switches: 8.4 s for the whole container run.
   - The frozen verifier accepts the frozen arm64 archive on Alpine with `python3` and `llvm`: 12.9 s including package installation.
   - A static-PIE musl binary segfaults under `ld-musl-aarch64.so.1`, which is the evidence behind decision 12.
-- **Loop timings:** filled in by `p0-ground` on the campaign host: cold `setup-dev`, cold and warm `make check`. The preflight capsule figures (emulated x86_64) are in the preflight commit message.
+- **Loop timings, pristine `alpine:3.24` capsules from a fresh clone, privileged with their own dockerd, 2026-11-24:**
+
+  | Step | x86_64 (emulated on Apple Silicon) | aarch64 (native) |
+  |---|---|---|
+  | `sh scripts/setup-dev`, cold | 26 s | 21 s |
+  | `make check`, cold | 5 s | 2 s |
+  | `make check`, warm | 2 s | 1 s |
+  | `make lint` | 1 s | 0 s |
+  | `sh scripts/setup-dev`, rerun | 1 s | 0 s |
+
+  `git status --porcelain` is empty after the gates. `p0-ground` replaces the x86_64 column with native figures from the campaign host.
 
 ### Acceptance
 
