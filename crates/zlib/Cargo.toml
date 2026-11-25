@@ -1,0 +1,8 @@
+[package]
+name = "zlib"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+zlib-rs = { path = "../../vendor/zlib-rs", features = ["chromium-compat"] }

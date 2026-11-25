@@ -60,3 +60,8 @@ capability-probes:
 .PHONY: persona-inventory
 persona-inventory:
 	python3 -B oracle/probes/persona/run.py
+
+.PHONY: zlib-harness
+zlib-harness:
+	mkdir -p .work/tmp/zlib
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zlib manganese-oracle-builder:156.0.8078.79-amd64-9535972e6a8a python3 -B /lane/oracle/harness/zlib/build.py
