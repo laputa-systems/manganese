@@ -39,10 +39,11 @@ if ! docker_ready; then
         as_root rc-update add docker default >/dev/null 2>&1 || true
         as_root rc-service docker start
     else
-        # dockerd cannot stack overlay storage on an overlay root, as inside a container.
+        # dockerd cannot stack overlay storage on an overlay root (filesystem magic
+        # 794c7630), as inside a container.
         as_root mkdir -p /var/lib/docker
         driver=
-        if [ "$(stat -f -c %T /var/lib/docker 2>/dev/null)" = overlayfs ]; then
+        if [ "$(stat -f -c %t /var/lib/docker 2>/dev/null)" = 794c7630 ]; then
             driver=--storage-driver=vfs
         fi
         as_root sh -c "dockerd $driver >/var/log/dockerd.log 2>&1 &"
