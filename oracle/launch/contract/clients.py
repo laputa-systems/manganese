@@ -16,9 +16,7 @@ def run(run_dir: Path, archive: launch.Archive, preferences: Callable[[Path, boo
         selected: set[str], endpoint: str = "http://127.0.0.1:9221") -> dict[str, dict[str, object]]:
     directory = run_dir / 'clients'
     directory.mkdir()
-    browser_root, verified = launch.verify(archive, directory)
-    if not verified['ok']:
-        raise RuntimeError(f'client archive verification failed: {verified}')
+    browser_root = launch.verified_root(archive)
     launch.ensure_probe_image()
     images_dir = directory / 'images'
     if '7.5' in selected:
