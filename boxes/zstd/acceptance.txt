@@ -1,17 +1,18 @@
 version 1
 box zstd
-revision 72df9dbf3ee195c6ff8f3c0200c1d452cc8e0cdf
+revision e7863ac2136aac27c09c82d04c435291ce63261f
 arch x86_64
-spec sha256:d8705ec47e55c6c3ca710c234af7f457f7e5667208717b9a740122b75ec7543c
+spec sha256:d7fd5d7f191b0797fcb5ed76fc602eaaa6e49dc869ad49ccbaf2006a2e9448a0
 corpus sha256:38c040e8c03af1d9aed572f0f5c199800c723c3816269ac0de43054c4e601c45 seen 60 holdout 37
 oracle .work/tmp/zstd/oracle sha256:ffd925a8e36d00e4f9a551b6928b2b705a22bcec1ff4591a702abdcb9d33e7ce
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
 candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/zstd sha256:d4d15d74103662244d73cef21afe442d2738e3c3363851ae75af98a6b5d71eb5
-dependencies cargo-lock sha256:f5934e1b95ca35298f871f3540f8e1c1bf70d6980d09b2c3b53be171731efd2d tree sha256:c3e891e76207e6d40758806beee372d1c13c3a2875ca5b167d10d8428a3ca95f
+dependencies cargo-lock sha256:7198a0ca10f36f0bcff3ce46f85edf51c30b6a4b6caac9e0a0e7a035d5e11f62 tree sha256:0b05cefd54c8238e136ed69e54e255e3372bf9cc919bd83be631d608b82f5430
 snapshot vendor/ruzstd tree 2415156f31cc7fbdff3daf95fa9ee0ca79511c27
 run seen exit 0 items 60 60
 run holdout exit 0 items 37 37
-run fuzz exit 0 seed 1795631344746557131 requested 20000 completed 20000
+run fuzz exit 0 seed 1795637174175944163 requested 20000 completed 20000
+run anchor make zstd-anchor exit 0
 level source-harness met
-level frozen-browser pending: a browser-level comparison of Content-Encoding zstd responses has not been recorded
+level frozen-browser met: make zstd-anchor
 level integration pending: arm64 evidence (public_api: zstd decoded HTTP response bodies in the frozen arm64 browser) and make closure have not run
