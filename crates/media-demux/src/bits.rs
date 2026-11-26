@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct BitReader<'a> {
     buf: &'a [u8],
     index: usize,
@@ -58,6 +59,10 @@ impl<'a> BitReader<'a> {
 
     pub fn count(&self) -> usize {
         self.index
+    }
+
+    pub fn left(&self) -> i64 {
+        self.size_in_bits_plus8 as i64 - 8 - self.index as i64
     }
 
     pub fn buffer(&self) -> &'a [u8] {

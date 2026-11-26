@@ -5,6 +5,8 @@ import struct
 import subprocess
 
 import flacgen
+import mp3gen
+import ogggen
 
 root = pathlib.Path(__file__).resolve().parents[3]
 fixture_dir = root / '.work/tmp/media-demux/fixtures'
@@ -62,6 +64,8 @@ FIXTURES = [
     'chrome/browser/resources/intro/sounds/welcome_back.flac',
     'chrome/browser/resources/intro/sounds/feature_showcase_ambient.flac',
     'chrome/browser/resources/intro/sounds/ambient.flac',
+    'third_party/depot_tools/external_bin/gsutil/gsutil_5.35/gsutil/gslib/tests/test_data/test.mp3',
+    'third_party/webrtc/examples/objc/AppRTCMobile/ios/resources/mozart.mp3',
 ]
 
 
@@ -543,8 +547,257 @@ def flac_generated(lane):
     return items
 
 
+def mp3_generated(lane):
+    seen = lane == 'seen'
+    rng = random.Random(5281 if seen else 7703)
+    g = mp3gen
+    items = []
+
+    def add(name, data):
+        items.append((f'mp3-{name}', data))
+
+    def join(*parts):
+        return b''.join(part if isinstance(part, bytes) else b''.join(part) for part in parts)
+
+    grid = [('1', 9, 0, 0, 40), ('1', 14, 1, 1, 30), ('1', 1, 2, 3, 60), ('1', 5, 0, 2, 25), ('2', 8, 0, 3, 50), ('2', 1, 1, 0, 80),
+            ('2', 14, 2, 1, 45), ('2.5', 1, 2, 3, 120), ('2.5', 4, 0, 0, 60), ('2.5', 8, 1, 1, 70), ('1', 11, 0, 1, 51), ('2', 4, 0, 3, 49)] if seen else \
+           [('1', 10, 1, 0, 35), ('1', 3, 0, 3, 52), ('2', 6, 1, 1, 48), ('2.5', 2, 0, 3, 90), ('2', 12, 0, 0, 33), ('1', 13, 2, 2, 41)]
+    for version, bitrate, rate, mode, count in grid:
+        add(f'cbr-{version.replace(".", "")}-{bitrate}-{rate}-{mode}-{count}', join(g.stream(rng, count, version, 3, bitrate, rate, mode)))
+    for count in ([1, 2, 3, 4, 5, 6, 7, 8, 50] if seen else [1, 3, 6, 9, 51]):
+        add(f'frames-{count}', join(g.stream(rng, count)))
+    base = g.stream(rng, 30)
+    lsf = g.stream(rng, 40, '2', 3, 8, 0, 3)
+    vbr = [g.frame(rng, bitrate_index=rng.choice([5, 7, 9, 11, 14]), padding=rng.randrange(2)) for _ in range(45)]
+    vbr_bytes = sum(len(f) for f in vbr)
+    xing = lambda **options: g.info_frame(rng, **options)
+    lame_frames = len(vbr)
+
+    def bad_side(**fields):
+        return g.frame(rng, side=g.side_info('1', 0, [fields, {}]))
+
+    def apic(mime, data, kind=3, description=b'cover', version=3):
+        if version == 2:
+            return g.id3_frame(b'PIC', bytes([0]) + mime[:3].ljust(3, b'\0') + bytes([kind]) + description + b'\0' + data, version=2)
+        return g.id3_frame(b'APIC', bytes([0]) + mime + b'\0' + bytes([kind]) + description + b'\0' + data, version=version)
+
+    png = b'\x89PNG\r\n\x1a\n' + bytes(56)
+    jpeg = b'\xff\xd8\xff\xe0' + bytes(60)
+    smpb_frames = g.stream(rng, 40)
+    smpb_total = 40 * 1152
+    comm = lambda value, **options: g.tag([g.id3_frame(b'COMM', g.comment(b'iTunSMPB', value, **options))])
+    cases = {
+        'crc': join(g.stream(rng, 20, protected=True)),
+        'crc-lsf': join(g.stream(rng, 20, '2', 3, 8, 0, 3, protected=True)),
+        'layer1': join(g.stream(rng, 30, '1', 1, 6, 0, 0)),
+        'layer2': join(g.stream(rng, 30, '1', 2, 8, 1, 0)),
+        'layer2-lsf': join(g.stream(rng, 30, '2', 2, 8, 0, 3)),
+        'mixed-layer3-then-2': join(base[:10], g.stream(rng, 10, '1', 2, 8, 0)),
+        'mixed-layer2-then-3': join(g.stream(rng, 10, '1', 2, 8, 0), base[:10]),
+        'mixed-layer3-one-layer2': join(base[:6], g.stream(rng, 1, '1', 2, 8, 0), base[6:12]),
+        'rate-change': join(base[:15], g.stream(rng, 15, rate_index=1)),
+        'mode-change': join(base[:15], g.stream(rng, 15, mode=3)),
+        'version-change': join(base[:12], lsf[:12]),
+        'lsf': join(lsf),
+        'vbr-plain': join(vbr),
+        'free-format': join(g.frame(rng, bitrate_index=0, size=417) for _ in range(10)),
+        'free-format-first': join([g.frame(rng, bitrate_index=0, size=417)], base[:10]),
+        'side-big-values': join([bad_side(big_values=300)], base[:10]),
+        'side-block-type-zero': join([bad_side(block_type=0)], base[:10]),
+        'side-errors-all': join(bad_side(big_values=289) for _ in range(12)),
+        'side-valid-fields': join(g.frame(rng, side=g.side_info('1', 0, [{'big_values': 288, 'block_type': 2}, {'big_values': 100, 'block_type': 3}])) for _ in range(12)),
+        'side-error-after-zeros': join(bytes(50), [bad_side(block_type=0)], base[:5]),
+        'lead-zeros-100': join(bytes(100), base),
+        'lead-zeros-5000': join(bytes(5000), base),
+        'lead-junk': join(bytes(rng.randrange(1, 0x7f) for _ in range(700)), base),
+        'lead-false-sync': join(b'\x01\x02' + struct.pack('>I', mp3gen.header()) + bytes(range(1, 120)), base),
+        'lead-junk-70k': join(bytes(rng.randrange(1, 0x7f) for _ in range(70000)), base),
+        'gap-zeros': join(*[[f, bytes(37)] for f in base[:12]]),
+        'gap-junk': join(*[[f, bytes(range(1, 50))] for f in base[:12]]),
+        'garbage-mid': join(base[:8], [b'\xff\xff\xff\xff' + bytes(300)], base[8:16]),
+        'header-broken-mid': join(base[:8], [b'\xff\xfb\xf0\x00' + base[8][4:]], base[9:16]),
+        'trailing-id3v1': join(base, g.id3v1()),
+        'trailing-ape': join(base, g.ape_tag()),
+        'trailing-junk': join(base, bytes(range(1, 200))),
+        'trailing-partial': join(base, base[0][:150]),
+        'only-junk': bytes(range(1, 120)) + struct.pack('>I', mp3gen.header()) + bytes(range(1, 60)),
+        'single-header': struct.pack('>I', mp3gen.header() if seen else mp3gen.header('2', 3, 8, 1, mode=3)),
+        'xing-vbr': join([xing(frames=lame_frames, size=vbr_bytes, toc=True, quality=55)], vbr),
+        'xing-frames-only': join([xing(frames=lame_frames)], vbr),
+        'xing-size-only': join([xing(size=vbr_bytes)], vbr),
+        'xing-no-lame': join([xing(frames=lame_frames, size=vbr_bytes, encoder=None)], vbr),
+        'xing-no-fields': join([xing(encoder=None)], vbr),
+        'info-cbr': join([xing(tag=b'Info', frames=30, size=sum(len(f) for f in base))], base),
+        'xing-lavf': join([xing(frames=lame_frames, encoder=b'Lavf58.29')], vbr),
+        'xing-lavc': join([xing(frames=lame_frames, encoder=b'Lavc60.3.')], vbr),
+        'xing-other-encoder': join([xing(frames=lame_frames, encoder=b'GOGO1.00 ')], vbr),
+        'xing-delays-zero': join([xing(frames=lame_frames, delays=(0, 0))], vbr),
+        'xing-delays-max': join([xing(frames=lame_frames, delays=(4095, 4095))], vbr),
+        'xing-delays-no-frames': join([xing(size=vbr_bytes, delays=(1000, 300))], vbr),
+        'xing-frames-wrong': join([xing(frames=1000, size=vbr_bytes)], vbr),
+        'xing-frames-zero': join([xing(frames=0, size=vbr_bytes)], vbr),
+        'xing-size-concat': join([xing(frames=lame_frames, size=vbr_bytes // 4)], vbr),
+        'xing-size-growing': join([xing(frames=lame_frames, size=vbr_bytes * 4)], vbr),
+        'xing-bad-crc': join([xing(frames=lame_frames, crc=False)], vbr),
+        'xing-lsf': join([xing(version='2', bitrate_index=8, mode=3, frames=40)], lsf),
+        'xing-mono': join([xing(mode=3, frames=20)], g.stream(rng, 20, mode=3)),
+        'xing-layer2': join([g.frame(rng, layer=2, bitrate_index=8, body=bytes(32) + b'Xing' + struct.pack('>II', 1, 30))], g.stream(rng, 30, '1', 2, 8, 0)),
+        'xing-free-format': join([g.frame(rng, bitrate_index=0, size=417, body=bytes(32) + b'Xing' + struct.pack('>II', 1, 30))], base),
+        'xing-flags-all': join([xing(frames=lame_frames, size=vbr_bytes, toc=True, quality=10, flags=0xffffffff)], vbr),
+        'vbri': join([g.vbri_frame(rng, frames=lame_frames, size=vbr_bytes)], vbr),
+        'vbri-version-2': join([g.vbri_frame(rng, frames=lame_frames, size=vbr_bytes, version_field=2)], vbr),
+        'vbri-frames-zero': join([g.vbri_frame(rng, frames=0, size=vbr_bytes)], vbr),
+        'xing-and-vbri': join([xing(frames=10, size=vbr_bytes, encoder=None)[:36] + b'VBRI' + struct.pack('>HHHII', 1, 0, 0, vbr_bytes, lame_frames) +
+                               bytes(417 - 54)], vbr),
+        'smpb-comm-eng': join(comm(g.smpb(1105, 2000, smpb_total - 3105)), smpb_frames),
+        'smpb-comm-und': join(comm(g.smpb(1105, 2000, smpb_total - 3105), language=b'und'), smpb_frames),
+        'smpb-comm-xxx': join(comm(g.smpb(2112, 576, 40000), language=b'XXX'), smpb_frames),
+        'smpb-comm-fra': join(comm(g.smpb(500, 0, 30000), language=b'fra'), smpb_frames),
+        'smpb-comm-short-lang': join(comm(g.smpb(500, 0, 30000), language=b'en\0'), smpb_frames),
+        'smpb-comm-utf16': join(comm(g.smpb(1024, 1000, 30000), encoding=1), smpb_frames),
+        'smpb-comm-utf16be': join(comm(g.smpb(1024, 1000, 30000), encoding=2), smpb_frames),
+        'smpb-txxx': join(g.tag([g.id3_frame(b'TXXX', g.text(b'iTunSMPB') + g.smpb(1105, 1000, 40000))]), smpb_frames),
+        'smpb-priming-large': join(comm(g.smpb(20000, 100, 20000)), smpb_frames),
+        'smpb-samples-zero': join(comm(g.smpb(1105, 100, 0)), smpb_frames),
+        'smpb-xing-match': join(comm(g.smpb(1105, 2000, lame_frames * 1152 - 3105)), [xing(frames=lame_frames, encoder=None)], vbr),
+        'smpb-xing-mismatch': join(comm(g.smpb(1105, 2000, 1000)), [xing(frames=lame_frames, encoder=None)], vbr),
+        'smpb-and-lame': join(comm(g.smpb(3000, 100, 10000)), [xing(frames=lame_frames)], vbr),
+        'smpb-not-hex': join(comm(b' 00000000 0000zz10 00000000 00000000'), smpb_frames),
+        'smpb-17-digits': join(comm(b' 00000000 00000000210 000000F0 000000000000AC44'), smpb_frames),
+        'smpb-0x': join(comm(b'0x0 0x210 0xF0 0xAC44'), smpb_frames),
+        'smpb-0x-empty': join(comm(b'0 0x 0 0'), smpb_frames),
+        'smpb-negative': join(comm(b'0 -210 F0 AC44'), smpb_frames),
+        'smpb-plus': join(comm(b'+0 +210 F0 AC44'), smpb_frames),
+        'smpb-three-fields': join(comm(b' 00000000 00000210 000000F0'), smpb_frames),
+        'smpb-tabs': join(comm(b'\t0\n210\r\nF0\x0bAC44'), smpb_frames),
+        'smpb-descriptor-lang': join(g.tag([g.id3_frame(b'COMM', g.comment(b'iTunSMPB-eng', g.smpb(500, 0, 30000), language=b'und'))]), smpb_frames),
+        'smpb-descriptor-case': join(g.tag([g.id3_frame(b'COMM', g.comment(b'ITUNSMPB', g.smpb(500, 0, 30000)))]), smpb_frames),
+        'smpb-v22': join(g.tag([g.id3_frame(b'COM', g.comment(b'iTunSMPB', g.smpb(700, 300, 30000)), version=2)], version=2), smpb_frames),
+        'smpb-v24': join(g.tag([g.id3_frame(b'COMM', g.comment(b'iTunSMPB', g.smpb(700, 300, 30000)), version=4)], version=4), smpb_frames),
+        'smpb-two': join(g.tag([g.id3_frame(b'COMM', g.comment(b'iTunSMPB', g.smpb(700, 300, 30000), language=b'deu')),
+                                g.id3_frame(b'COMM', g.comment(b'iTunSMPB', g.smpb(1105, 3000, 20000)))]), smpb_frames),
+        'smpb-lsf': join(comm(g.smpb(1105, 0, 20000)), lsf),
+        'id3-v22-text': join(g.tag([g.id3_frame(b'TT2', g.text(b'Title'), version=2), g.id3_frame(b'TP1', g.text(b'Artist'), version=2)], version=2), base),
+        'id3-v23-encodings': join(g.tag([g.id3_frame(b'TIT2', g.text(b'Latin \xe9', 0)), g.id3_frame(b'TPE1', g.text(b'Bom', 1)),
+                                         g.id3_frame(b'TALB', g.text(b'Be', 2)), g.id3_frame(b'TCON', g.text(b'(12)', 3)),
+                                         g.id3_frame(b'TYER', g.text(b'2026')), g.id3_frame(b'TDAT', g.text(b'2611')), g.id3_frame(b'TIME', g.text(b'1530'))]), base),
+        'id3-v24-text': join(g.tag([g.id3_frame(b'TIT2', g.text(b'Four', 3), version=4), g.id3_frame(b'TDRC', g.text(b'2026', 3), version=4)], version=4), base),
+        'id3-v24-nonsyncsafe': join(g.tag([g.id3_frame(b'TIT2', g.text(b'x' * 200), version=3), g.id3_frame(b'TPE1', g.text(b'y'), version=3)], version=4), base),
+        'id3-unsync-tag': join(g.tag([g.unsynchronise(g.id3_frame(b'TIT2', g.text(b'\xff\xe0unsync'))), g.unsynchronise(apic(b'image/jpeg', jpeg))], flags=0x80), base),
+        'id3-unsync-frame': join(g.tag([g.id3_frame(b'TIT2', g.unsynchronise(g.text(b'\xff\x00frame')), version=4, flags=2)], version=4), base),
+        'id3-extended-v3': join(g.tag([g.id3_frame(b'TIT2', g.text(b'ext'))], flags=0x40, extended=struct.pack('>IHI', 6, 0, 0)), base),
+        'id3-extended-v4': join(g.tag([g.id3_frame(b'TIT2', g.text(b'ext'), version=4)], version=4, flags=0x40, extended=g.syncsafe(6) + b'\x01\x00'), base),
+        'id3-extended-bad': join(g.tag([g.id3_frame(b'TIT2', g.text(b'ext'))], flags=0x40, extended=struct.pack('>I', 0x7f7f7f7f)), base),
+        'id3-footer': join(g.tag([g.id3_frame(b'TIT2', g.text(b'foot'), version=4)], version=4, flags=0x10), base),
+        'id3-padding': join(g.tag([g.id3_frame(b'TIT2', g.text(b'pad'))], padding=500), base),
+        'id3-compressed': join(g.tag([g.id3_frame(b'TIT2', g.text(b'zip'), flags=0x0008), g.id3_frame(b'TPE1', g.text(b'after'))], version=4), base),
+        'id3-encrypted': join(g.tag([g.id3_frame(b'APIC', bytes(40), flags=0x0004), g.id3_frame(b'TPE1', g.text(b'after'))], version=4), base),
+        'id3-datalen': join(g.tag([g.id3_frame(b'TIT2', struct.pack('>I', 6) + g.text(b'len'), version=4, flags=0x0001)], version=4), base),
+        'id3-datalen-short': join(g.tag([g.id3_frame(b'TIT2', b'\0\0', version=4, flags=0x0001)], version=4), base),
+        'id3-apic-jpeg': join(g.tag([apic(b'image/jpeg', jpeg)]), base),
+        'id3-apic-png': join(g.tag([apic(b'image/png', png)]), base),
+        'id3-apic-png-sig-jpeg-mime': join(g.tag([apic(b'image/jpeg', png)]), base),
+        'id3-apic-mime-case': join(g.tag([apic(b'IMAGE/JPG', jpeg)]), base),
+        'id3-apic-unknown': join(g.tag([apic(b'image/x-icon', jpeg)]), base),
+        'id3-apic-two': join(g.tag([apic(b'image/jpeg', jpeg), apic(b'image/png', png, kind=4, description=b'back')]), base),
+        'id3-apic-v24': join(g.tag([apic(b'image/webp', b'RIFF' + bytes(40), version=4)], version=4), base),
+        'id3-pic-v22': join(g.tag([apic(b'PNG', png, version=2), apic(b'JPG', jpeg, version=2)], version=2), base),
+        'id3-apic-empty-data': join(g.tag([g.id3_frame(b'APIC', b'\0image/png\0\x03desc\0')]), base),
+        'id3-apic-short': join(g.tag([g.id3_frame(b'APIC', b'\0ima')]), base),
+        'id3-apic-utf16': join(g.tag([g.id3_frame(b'APIC', b'\x01image/png\0\x03' + g.utf16(b'desc', 1) + b'\0\0' + png)]), base),
+        'id3-chap': join(g.tag([g.id3_frame(b'CHAP', b'ch1\0' + struct.pack('>IIII', 0, 5000, 0xffffffff, 0xffffffff) + g.id3_frame(b'TIT2', g.text(b'Chapter')))]), base),
+        'id3-priv': join(g.tag([g.id3_frame(b'PRIV', b'owner\0' + bytes(range(16)))]), base),
+        'id3-geob': join(g.tag([g.id3_frame(b'GEOB', b'\0application/x\0file\0desc\0' + bytes(20))]), base),
+        'id3-two-tags': join(g.tag([g.id3_frame(b'TIT2', g.text(b'one'))]), g.tag([apic(b'image/png', png)], version=4), base),
+        'id3-bad-version': join(b'ID3\x05\0\0' + g.syncsafe(20) + bytes(20), base),
+        'id3-v22-compression-flag': join(g.tag([g.id3_frame(b'TT2', g.text(b'c'), version=2)], version=2, flags=0x40), base),
+        'id3-frame-too-long': join(g.tag([g.id3_frame(b'TIT2', g.text(b'long'), size=5000)]), base),
+        'id3-large': join(g.tag([apic(b'image/jpeg', jpeg + bytes(rng.randrange(256) for _ in range(6000)))]), base),
+        'id3-only': g.tag([g.id3_frame(b'TIT2', g.text(b'nothing' if seen else b'none'))]),
+        'id3-txxx-empty': join(g.tag([g.id3_frame(b'TXXX', b'\0\0'), g.id3_frame(b'TIT2', b'\0')]), base),
+        'id3-utf16-bad-bom': join(g.tag([g.id3_frame(b'TIT2', b'\x01\x12\x34abc'), g.id3_frame(b'COMM', b'\x01eng\x00')]), base),
+        'id3-utf16-surrogates': join(g.tag([g.id3_frame(b'TIT2', b'\x02\xd8\x3d\xde\x00\xdc\x00\x00\x41\x00\x00')]), base),
+    }
+    keep = sorted(cases) if seen else sorted(cases)[1::3]
+    for name in keep:
+        data = cases[name]
+        if not seen and name.startswith(('gap', 'trailing', 'id3-v2', 'xing-size')):
+            data = mutate(data, rng, 1)
+        add(name, data)
+    long_count = 400 if seen else 330
+    add('long-mpeg25-8k', join(g.stream(rng, long_count, '2.5', 3, 1, 2, 3)))
+    add('long-mpeg1-32k', join(g.stream(rng, 700 if seen else 600, '1', 3, 1, 0, 3)))
+    long_vbr = [g.frame(rng, '2', 3, rng.choice([1, 2, 3]), 0, 0, mode=3) for _ in range(500)]
+    add('long-xing', join([xing(version='2', bitrate_index=1, mode=3, frames=500, size=sum(len(f) for f in long_vbr), toc=True)], long_vbr))
+    add('long-understated', join([xing(version='2', bitrate_index=1, mode=3, frames=200, encoder=None)], long_vbr))
+    full = join(g.tag([g.id3_frame(b'TIT2', g.text(b'cut')), apic(b'image/png', png)]), [xing(frames=lame_frames, size=vbr_bytes)], vbr)
+    cuts = [3, 10, 30, 60, 100, 128, 140, 200, 300, 400, 600, 900, 2000, len(full) // 2, len(full) - 1] if seen else \
+        [5, 50, 135, 250, 700, len(full) // 3, len(full) - 200]
+    for cut in cuts:
+        add(f'truncated-{cut}', full[:cut])
+    bases = [join(base), join(vbr), join([xing(frames=lame_frames, size=vbr_bytes)], vbr), join(lsf), cases['smpb-comm-eng'],
+             cases['id3-apic-two'], cases['id3-unsync-tag'], join(g.stream(rng, 20, '2.5', 3, 4, 0, 0)), cases['crc']]
+    for count in range(60 if seen else 40):
+        add(f'mutated-{count}', mutate(rng.choice(bases), rng))
+    return items
+
+
+def ogg_generated(lane):
+    seen = lane == 'seen'
+    rng = random.Random(6187 if seen else 9137)
+    items = []
+
+    def add(name, data):
+        items.append((f'ogg-{name}', data))
+
+    grid = [(1, 8, 2, 0, 1), (2, 0, 2, 312, 3), (5, 16, 1, 1024, 1), (9, 24, 2, 0, 20),
+            (21, 8, 1, 312, 20), (40, 0, 2, 128, 7), (100, 8, 2, 312, 20)] if seen else \
+           [(3, 8, 1, 0, 2), (6, 16, 2, 312, 1), (12, 24, 1, 1024, 20), (31, 0, 2, 0, 5), (75, 8, 2, 312, 20)]
+    for count, toc, channels, pre_skip, per_page in grid:
+        add(f'opus-{count}-{toc}-{channels}-{pre_skip}-{per_page}',
+            ogggen.opus(count, toc=toc, channels=channels, pre_skip=pre_skip, per_page=per_page))
+    for count in ([1, 2, 3, 4, 5] if seen else [2, 3, 5]):
+        add(f'opus-multi-{count}', ogggen.opus(count, toc=8, payload=bytes(count + 1 + (not seen)), per_page=1))
+    add('opus-vbr-toc', ogggen.opus(60, toc=11 if seen else 13, payload=b'\x01\x01' if seen else b'\0', per_page=3))
+    add('opus-comments', ogggen.opus(80, comments=[b'TITLE=Test', b'ARTIST=Author'], vendor=b'Manganese' if seen else b'Holdout'))
+    add('opus-empty-comment', ogggen.opus(60, comments=[b''], vendor=b'' if seen else b' '))
+    add('opus-head-18', ogggen.opus(60, head_size=18 if seen else 17))
+    add('opus-tags-short', ogggen.opus(60, tags_size=4 if seen else 9))
+    base = ogggen.opus(80, per_page=20, pre_skip=312 if seen else 313)
+    add('opus-crc-first', ogggen.corrupt_crc(base))
+    add('opus-version-one', ogggen.bad_version(base))
+    add('opus-no-tags', ogggen.opus(80, drop_tags=True, pre_skip=312 if seen else 313))
+    add('opus-no-eos', ogggen.opus(80, drop_eos=True, pre_skip=312 if seen else 313))
+    add('opus-granule-shift', ogggen.opus(80, granule_shift=960 if seen else -960, pre_skip=312 if seen else 313))
+    add('opus-granule-zero', ogggen.opus(80, end_granule=0, pre_skip=312 if seen else 313))
+    add('opus-chained', ogggen.chained(base, base, count=40 if seen else 30))
+    start, end = ogggen.page_at(base, 2)
+    add('opus-page2-only', base[start:end])
+    add('opus-truncated-page', base[:end - 7])
+    add('opus-truncated-header', base[:17 if seen else 23])
+    add('opus-trailing-junk', base + bytes(range(1, 80)))
+    add('opus-junk-prefix', bytes(range(1, 40)) + base)
+    add('opus-long', ogggen.opus(1500 if seen else 1200, per_page=20))
+
+    vorbis = [data for _, data in fixtures() if data.startswith(b'OggS') and b'\x01vorbis' in data[:80]]
+    for index, data in enumerate(vorbis):
+        label = f'vorbis-{index}'
+        data = ogggen.set_granule(data, 0, 1 if seen else 2)
+        add(label, data)
+        add(f'{label}-crc', ogggen.corrupt_crc(data))
+        add(f'{label}-version', ogggen.bad_version(data))
+        add(f'{label}-trailing', data + bytes(range(1, 64)))
+        _, end = ogggen.page_at(data, 2)
+        add(f'{label}-no-last-page', data[:end])
+        add(f'{label}-truncated', data[:end - 11])
+    for count in range(30 if seen else 18):
+        source = rng.choice([base, *vorbis])
+        add(f'mutated-{count}', mutate(source, rng))
+    return items
+
+
 def lane_items(lane):
-    items = generated(lane) + flac_generated(lane)
+    items = generated(lane) + flac_generated(lane) + mp3_generated(lane) + ogg_generated(lane)
     for index, (path, data) in enumerate(fixtures()):
         if (index % 3 == 2) == (lane == 'holdout'):
             items.append(('fixture-' + pathlib.Path(path).name.lower().replace('.', '-'), data))
