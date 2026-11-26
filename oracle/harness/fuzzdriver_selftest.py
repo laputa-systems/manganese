@@ -63,11 +63,11 @@ fuzzdriver.run('control', int(os.environ['SEED']), int(os.environ['CASES']), gen
 
 
 def alive(pid):
-    try:
-        stat = pathlib.Path(f'/proc/{pid}/stat').read_text()
-    except OSError:
+    result = subprocess.run(['ps', '-o', 'stat=', '-p', str(pid)], capture_output=True, text=True)
+    if result.returncode != 0:
         return False
-    return stat.split(') ', 1)[-1].split()[0] != 'Z'
+    state = result.stdout.strip().split()
+    return bool(state) and not state[0].startswith('Z')
 
 
 def cleanup(pids):
@@ -117,6 +117,15 @@ def report(name, problems):
     return True
 
 
+def stop_group(process):
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    if process.poll() is None:
+        process.wait(timeout=5)
+
+
 def bounded_write():
     pidfiles = [WORK / 'write-oracle.pid', WORK / 'write-candidate.pid']
     for path in pidfiles:
@@ -126,29 +135,33 @@ def bounded_write():
     oracle = wrapper('write-oracle', 'deaf', pidfiles[0])
     candidate = wrapper('write-candidate', 'echo', pidfiles[1])
     process = start(oracle, candidate, '101', {'PEER_TIMEOUT_SECS': '1', 'DRIVER_MODE': 'deaf'})
-    started = time.monotonic()
-    try:
-        _, stderr = process.communicate(timeout=8)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        pids = pids_from(pidfiles)
-        cleanup(pids)
-        process.communicate()
-        return report('a deaf peer fails within the write deadline', ['the driver blocked past its wrapper timeout'])
-    elapsed = time.monotonic() - started
-    pids = pids_from(pidfiles)
+    pids = []
     problems = []
-    if process.returncode == 0:
-        problems.append('the driver accepted the stalled case')
-    if elapsed >= 6:
-        problems.append(f'took {elapsed:.2f}s')
-    if 'did not accept the request within 1s' not in stderr.decode(errors='replace'):
-        problems.append(f'missing bounded-write failure: {stderr.decode(errors="replace")[:200]}')
-    if not saved.exists() or saved.stat().st_size != 1 << 20:
-        problems.append('the in-flight input was not saved')
-    if any(alive(pid) for pid in pids):
-        problems.append('a peer survived the failure')
-    cleanup(pids)
+    stderr = b''
+    try:
+        started = time.monotonic()
+        try:
+            _, stderr = process.communicate(timeout=8)
+        except subprocess.TimeoutExpired:
+            problems.append('the driver blocked past its wrapper timeout')
+        elapsed = time.monotonic() - started
+        pids.extend(pids_from(pidfiles))
+        if process.returncode == 0:
+            problems.append('the driver accepted the stalled case')
+        if process.returncode is None:
+            problems.append('the driver did not exit')
+        if elapsed >= 6:
+            problems.append(f'took {elapsed:.2f}s')
+        if 'did not accept the request within 1s' not in stderr.decode(errors='replace'):
+            problems.append(f'missing bounded-write failure: {stderr.decode(errors="replace")[:200]}')
+        if not saved.exists() or saved.stat().st_size != 1 << 20:
+            problems.append('the in-flight input was not saved')
+        if any(alive(pid) for pid in pids):
+            problems.append('a peer survived the failure')
+    finally:
+        pids.extend(pids_from(pidfiles))
+        cleanup(pids)
+        stop_group(process)
     return report('a deaf peer fails within the write deadline', problems)
 
 
@@ -159,23 +172,27 @@ def trailing_record():
     oracle = wrapper('trailing-oracle', 'extra', pidfiles[0])
     candidate = wrapper('trailing-candidate', 'echo', pidfiles[1])
     process = start(oracle, candidate, '102', {'PEER_TIMEOUT_SECS': '2', 'DRIVER_MODE': 'echo'})
-    try:
-        _, stderr = process.communicate(timeout=8)
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        pids = pids_from(pidfiles)
-        cleanup(pids)
-        process.communicate()
-        return report('an extra trailing record fails the run', ['the driver blocked past its wrapper timeout'])
-    pids = pids_from(pidfiles)
+    pids = []
     problems = []
-    if process.returncode == 0:
-        problems.append('the driver accepted an unrequested record')
-    if 'unrequested record' not in stderr.decode(errors='replace'):
-        problems.append(f'missing trailing-record failure: {stderr.decode(errors="replace")[:200]}')
-    if any(alive(pid) for pid in pids):
-        problems.append('a peer survived the failure')
-    cleanup(pids)
+    stderr = b''
+    try:
+        try:
+            _, stderr = process.communicate(timeout=8)
+        except subprocess.TimeoutExpired:
+            problems.append('the driver blocked past its wrapper timeout')
+        pids.extend(pids_from(pidfiles))
+        if process.returncode == 0:
+            problems.append('the driver accepted an unrequested record')
+        if process.returncode is None:
+            problems.append('the driver did not exit')
+        if 'unrequested record' not in stderr.decode(errors='replace'):
+            problems.append(f'missing trailing-record failure: {stderr.decode(errors="replace")[:200]}')
+        if any(alive(pid) for pid in pids):
+            problems.append('a peer survived the failure')
+    finally:
+        pids.extend(pids_from(pidfiles))
+        cleanup(pids)
+        stop_group(process)
     return report('an extra trailing record fails the run', problems)
 
 
@@ -188,24 +205,25 @@ def interrupted():
     oracle = wrapper('interrupt-oracle', 'deaf', pidfiles[0])
     candidate = wrapper('interrupt-candidate', 'echo', pidfiles[1])
     process = start(oracle, candidate, '103', {'PEER_TIMEOUT_SECS': '30', 'DRIVER_MODE': 'deaf'})
-    deadline = time.monotonic() + 6
-    while not saved.exists() and time.monotonic() < deadline and process.poll() is None:
-        time.sleep(0.05)
-    appeared = saved.exists()
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    process.wait(timeout=5)
-    pids = pids_from(pidfiles)
+    pids = []
     problems = []
-    if not appeared:
-        problems.append('the in-flight input was not saved before the interruption')
-    if saved.exists() and saved.stat().st_size != 1 << 20:
-        problems.append('the saved input is incomplete')
-    if any(alive(pid) for pid in pids):
-        problems.append('a peer survived the driver group kill')
-    cleanup(pids)
+    try:
+        deadline = time.monotonic() + 6
+        while not saved.exists() and time.monotonic() < deadline and process.poll() is None:
+            time.sleep(0.05)
+        appeared = saved.exists()
+        stop_group(process)
+        pids.extend(pids_from(pidfiles))
+        if not appeared:
+            problems.append('the in-flight input was not saved before the interruption')
+        if saved.exists() and saved.stat().st_size != 1 << 20:
+            problems.append('the saved input is incomplete')
+        if any(alive(pid) for pid in pids):
+            problems.append('a peer survived the driver group kill')
+    finally:
+        pids.extend(pids_from(pidfiles))
+        cleanup(pids)
+        stop_group(process)
     return report('an interrupted run keeps its input and stops its peers', problems)
 
 

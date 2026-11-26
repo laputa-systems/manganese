@@ -131,6 +131,13 @@ def identity(role, path):
         return f'{role} {path} unreadable: {error}'
 
 
+def preserve(record, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + '.tmp')
+    temporary.write_bytes(record)
+    os.replace(temporary, path)
+
+
 def run(box, seed, cases, generate):
     """Ask both peers each request generate(oracle) returns, and stop at the first difference or failure."""
     timeout = positive('PEER_TIMEOUT_SECS', DEFAULT_TIMEOUT_SECS)
@@ -148,10 +155,10 @@ def run(box, seed, cases, generate):
             peer.handshake()
         oracle, candidate = peers
         for index in range(cases):
-            record = generate(oracle)
+            record = b''
             saved = pathlib.Path(f'.work/tmp/fuzz-{box}-{seed}-case{index}.bin')
-            saved.parent.mkdir(parents=True, exist_ok=True)
-            saved.write_bytes(record)
+            record = generate(oracle)
+            preserve(record, saved)
             expected, actual = oracle.ask(record), candidate.ask(record)
             if expected != actual:
                 failure = f'divergence\noracle hex={expected.hex()}\ncandidate hex={actual.hex()}'
@@ -166,12 +173,23 @@ def run(box, seed, cases, generate):
     except Exception as error:
         failure = f'{type(error).__name__}: {error}'
     finally:
-        pathlib.Path(os.environ['FUZZ_RESULT']).write_text(f'seed={seed}\nrequested={cases}\ncompleted={completed}\n')
         for peer in peers:
-            peer.stop()
+            try:
+                peer.stop()
+            except Exception as error:
+                if failure is None:
+                    failure = f'peer cleanup: {type(error).__name__}: {error}'
+                else:
+                    print(f'peer cleanup: {type(error).__name__}: {error}', file=sys.stderr, flush=True)
+        try:
+            pathlib.Path(os.environ['FUZZ_RESULT']).write_text(f'seed={seed}\nrequested={cases}\ncompleted={completed}\n')
+        except Exception as error:
+            if failure is None:
+                failure = f'result write: {type(error).__name__}: {error}'
+            else:
+                print(f'result write: {type(error).__name__}: {error}', file=sys.stderr, flush=True)
     if failure is not None:
-        saved.parent.mkdir(parents=True, exist_ok=True)
-        saved.write_bytes(record)
+        preserve(record, saved)
         print(f'{failure}\nseed={seed} case={completed} request hex={record.hex()}\n{identities}\nsaved {saved}', file=sys.stderr, flush=True)
         raise SystemExit(1)
     print(f'fuzz passed {completed} cases seed={seed} elapsed={time.monotonic() - started:.2f}s', flush=True)

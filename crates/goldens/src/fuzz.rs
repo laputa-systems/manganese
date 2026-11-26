@@ -238,9 +238,13 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
 
     fn alive(pid: u32) -> bool {
-        match fs::read_to_string(format!("/proc/{pid}/stat")) {
-            Ok(stat) => stat.split_once(')').map(|(_, rest)| rest.split_whitespace().next() != Some("Z")).unwrap_or(false),
-            Err(_) => false,
+        match std::process::Command::new("ps").args(["-o", "stat=", "-p", &pid.to_string()]).output() {
+            Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .split_whitespace()
+                .next()
+                .is_some_and(|state| !state.starts_with('Z')),
+            _ => false,
         }
     }
 
@@ -271,14 +275,14 @@ improvements = "none: synthetic driver"
 anchor = "none: synthetic driver"
 arm64_evidence = "harness: synthetic driver"
 holdout_percent = 30
-oracle = "/bin/true"
-candidate = "/bin/true"
+oracle = "/usr/bin/true"
+candidate = "/usr/bin/true"
 fuzz = "driver"
 fuzz_driver = "{}"
 acceptance_cases = 1
 "#, program.display())).unwrap();
         let started = Instant::now();
-        let error = drive("cleanup", &program.to_string_lossy(), &spec, Path::new("/bin/true"), Budget { seed: 11, cases: 1 }, "identities", &dir, Duration::from_secs(1)).unwrap_err();
+        let error = drive("cleanup", &program.to_string_lossy(), &spec, Path::new("/usr/bin/true"), Budget { seed: 11, cases: 1 }, "identities", &dir, Duration::from_secs(1)).unwrap_err();
         assert!(error.contains("exceeded FUZZ_TIMEOUT_SECS"), "{error}");
         assert!(started.elapsed() < Duration::from_secs(10), "the driver was not bounded");
         let pid = fs::read_to_string(&pidfile).unwrap().trim().parse::<u32>().unwrap();
