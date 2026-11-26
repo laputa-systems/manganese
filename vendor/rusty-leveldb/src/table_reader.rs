@@ -1,0 +1,1031 @@
+use crate::block::{Block, BlockIter};
+use crate::blockhandle::BlockHandle;
+use crate::cache::{self, Cache};
+use crate::cmp::{DefaultCmp, InternalKeyCmp};
+use crate::env::RandomAccess;
+use crate::error::{self, err, Result, Status};
+use crate::filter;
+use crate::filter_block::FilterBlockReader;
+use crate::key_types::InternalKey;
+use crate::options::{Options, ReadOptions};
+use crate::table_block;
+use crate::table_builder::{self, Footer};
+use crate::types::{current_key_val, LdbIterator, Shared};
+
+use std::cmp::Ordering;
+use std::rc::Rc;
+
+use bytes::Bytes;
+use integer_encoding::FixedIntWriter;
+
+/// Reads the table footer.
+fn read_footer(f: &dyn RandomAccess, size: usize) -> Result<Footer> {
+    if size < table_builder::FULL_FOOTER_LENGTH {
+        return err(error::StatusCode::Corruption, "table footer is truncated");
+    }
+    let mut buf = vec![0; table_builder::FULL_FOOTER_LENGTH];
+    if f.read_at(size - table_builder::FULL_FOOTER_LENGTH, &mut buf)? != buf.len() {
+        return err(error::StatusCode::Corruption, "table footer is truncated");
+    }
+    if buf[table_builder::FOOTER_LENGTH..] != table_builder::MAGIC_FOOTER_ENCODED {
+        return err(error::StatusCode::Corruption, "table footer magic is invalid");
+    }
+    match Footer::decode(&buf) {
+        Some(ok) => Ok(ok),
+        None => err(
+            error::StatusCode::Corruption,
+            &format!("Couldn't decode damaged footer {:?}", buf),
+        ),
+    }
+}
+
+fn validate_location(location: &BlockHandle, file_size: usize) -> Result<()> {
+    let end = location.offset().checked_add(location.size()).and_then(|n| n.checked_add(5));
+    if end.is_none_or(|end| end > file_size) {
+        return err(error::StatusCode::Corruption, "table block is outside the file");
+    }
+    Ok(())
+}
+
+#[derive(Clone)]
+pub struct Table {
+    file: Rc<Box<dyn RandomAccess>>,
+    file_size: usize,
+    cache_id: cache::CacheID,
+
+    opt: Options,
+    block_cache: Shared<Cache<Block>>,
+
+    footer: Footer,
+    indexblock: Block,
+    filters: Option<FilterBlockReader>,
+}
+
+impl Table {
+    /// Creates a new table reader operating on unformatted keys (i.e., UserKey).
+    fn new_raw(
+        opt: Options,
+        block_cache: Shared<Cache<Block>>,
+        file: Rc<Box<dyn RandomAccess>>,
+        size: usize,
+    ) -> Result<Table> {
+        let footer = read_footer(file.as_ref().as_ref(), size)?;
+        validate_location(&footer.index, size)?;
+        let indexblock = table_block::read_table_block_with_checksum(
+            opt.clone(),
+            file.as_ref().as_ref(),
+            &footer.index,
+            opt.paranoid_checks,
+        )?;
+        let filter_block_reader = Table::read_filter_block(&footer, file.as_ref().as_ref(), &opt, size);
+        let cache_id = block_cache.borrow_mut().new_cache_id();
+
+        Ok(Table {
+            file,
+            file_size: size,
+            cache_id,
+            opt,
+            block_cache,
+            footer,
+            filters: filter_block_reader,
+            indexblock,
+        })
+    }
+
+    /// Reads the filter for the configured policy. As in LevelDB, a table without a policy reads
+    /// no metadata, and a damaged metaindex or filter block only disables filtering, because
+    /// lookups do not need it.
+    fn read_filter_block(
+        footer: &Footer,
+        file: &dyn RandomAccess,
+        options: &Options,
+        file_size: usize,
+    ) -> Option<FilterBlockReader> {
+        let policy = options.filter_policy.as_ref()?;
+        validate_location(&footer.meta_index, file_size).ok()?;
+        let mut meta_options = options.clone();
+        meta_options.cmp = Rc::new(Box::new(DefaultCmp));
+        let metaindex = table_block::read_table_block_with_checksum(
+            meta_options,
+            file,
+            &footer.meta_index,
+            options.paranoid_checks,
+        )
+        .ok()?;
+        let filter_name = format!("filter.{}", policy.name());
+        let mut metaindexiter = metaindex.iter();
+        metaindexiter.seek(filter_name.as_bytes());
+        let (key, value) = current_key_val(&metaindexiter)?;
+        if key != filter_name.as_bytes() {
+            return None;
+        }
+        let (location, _) = BlockHandle::decode(&value)?;
+        validate_location(&location, file_size).ok()?;
+        let contents = table_block::read_block_contents(
+            options,
+            file,
+            &location,
+            options.paranoid_checks,
+        )
+        .ok()?;
+        Some(FilterBlockReader::new_owned(policy.clone(), contents))
+    }
+
+    pub fn open(opt: Options, path: &std::path::Path) -> Result<Table> {
+        let size = opt.env.size_of(path)?;
+        let file = Rc::new(opt.env.open_random_access_file(path)?);
+        let cache = crate::types::share(Cache::new(opt.block_cache_capacity_bytes / opt.block_size));
+        Table::new(opt, cache, file, size)
+    }
+
+    /// Creates a new table reader operating on internal keys (i.e., InternalKey). This means that
+    /// a different comparator (internal_key_cmp) and a different filter policy
+    /// (InternalFilterPolicy) are used.
+    pub fn new(
+        mut opt: Options,
+        block_cache: Shared<Cache<Block>>,
+        file: Rc<Box<dyn RandomAccess>>,
+        size: usize,
+    ) -> Result<Table> {
+        opt.cmp = Rc::new(Box::new(InternalKeyCmp(opt.cmp.clone())));
+        opt.filter_policy = opt.filter_policy.map(|policy| -> filter::BoxedFilterPolicy {
+            Rc::new(Box::new(filter::InternalFilterPolicy::new(policy)))
+        });
+        Table::new_raw(opt, block_cache, file, size)
+    }
+
+    /// block_cache_handle creates a CacheKey for a block with a given offset to be used in the
+    /// block cache.
+    fn block_cache_handle(&self, block_off: usize) -> cache::CacheKey {
+        let mut dst = [0; 2 * 8];
+        (&mut dst[..8])
+            .write_fixedint(self.cache_id)
+            .expect("error writing to vec");
+        (&mut dst[8..])
+            .write_fixedint(block_off as u64)
+            .expect("error writing to vec");
+        dst
+    }
+
+    /// Read a block from the current table at `location`, and cache it in the options' block
+    /// cache.
+    fn read_block(&self, location: &BlockHandle, options: ReadOptions) -> Result<Block> {
+        validate_location(location, self.file_size)?;
+        let cachekey = self.block_cache_handle(location.offset());
+        if let Some(block) = self.block_cache.borrow_mut().get(&cachekey) {
+            return Ok(block.clone());
+        }
+
+        // Two times as_ref(): First time to get a ref from Rc<>, then one from Box<>.
+        let b = table_block::read_table_block_with_checksum(
+            self.opt.clone(), self.file.as_ref().as_ref(), location, options.verify_checksums,
+        )?;
+
+        // insert a cheap copy (Rc).
+        if options.fill_cache {
+            self.block_cache.borrow_mut().insert(&cachekey, b.clone());
+        }
+
+        Ok(b)
+    }
+
+    /// Returns the offset of the block that contains `key`.
+    pub fn approx_offset_of(&self, key: &[u8]) -> usize {
+        let mut iter = self.indexblock.iter();
+
+        iter.seek(key);
+
+        if let Some((_, val)) = current_key_val(&iter) {
+            let location = BlockHandle::decode(&val).unwrap().0;
+            return location.offset();
+        }
+
+        self.footer.meta_index.offset()
+    }
+
+    /// Iterators read from the file; thus only one iterator can be borrowed (mutably) per scope
+    pub fn iter(&self) -> TableIterator {
+        self.iter_with_options(ReadOptions::verified())
+    }
+
+    pub(crate) fn iter_with_options(&self, options: ReadOptions) -> TableIterator {
+        TableIterator {
+            current_block: None,
+            current_block_off: 0,
+            index_block: self.indexblock.iter(),
+            table: self.clone(),
+            error: None,
+            options,
+        }
+    }
+
+    /// Retrieve next-biggest entry for key from table. This function uses the attached filters, so
+    /// is better suited if you frequently look for non-existing values (as it will detect the
+    /// non-existence of an entry in a block without having to load the block).
+    ///
+    /// The caller must check if the returned key, which is the raw key (not e.g. the user portion
+    /// of an InternalKey) is acceptable (e.g. correct value type or sequence number), as it may
+    /// not be an exact match for key.
+    ///
+    /// This is done this way because some key types, like internal keys, will not result in an
+    /// exact match; it depends on other comparators than the one that the table reader knows
+    /// whether a match is acceptable.
+    pub fn get(&self, key: InternalKey<'_>) -> Result<Option<(Bytes, Bytes)>> {
+        self.get_with_options(key, ReadOptions::verified())
+    }
+
+    pub(crate) fn get_with_options(&self, key: InternalKey<'_>, options: ReadOptions) -> Result<Option<(Bytes, Bytes)>> {
+        let mut index_iter = self.indexblock.iter();
+        index_iter.seek(key);
+        index_iter.status()?;
+
+        let handle;
+        if let Some((last_in_block, h)) = current_key_val(&index_iter) {
+            if self.opt.cmp.cmp(key, &last_in_block) != Ordering::Greater {
+                handle = BlockHandle::decode(&h)
+                    .ok_or_else(|| Status::new(error::StatusCode::Corruption, "invalid block handle"))?.0;
+            } else {
+                return Ok(None);
+            }
+        } else {
+            return Ok(None);
+        }
+
+        // found correct block.
+
+        // Check bloom (or whatever) filter
+        if let Some(ref filters) = self.filters {
+            if !filters.key_may_match(handle.offset(), key) {
+                return Ok(None);
+            }
+        }
+
+        // Read block (potentially from cache)
+        let tb = self.read_block(&handle, options)?;
+        let mut iter = tb.iter();
+
+        // Go to entry and check if it's the wanted entry.
+        iter.seek(key);
+        iter.status()?;
+        if let Some((k, v)) = current_key_val(&iter) {
+            if self.opt.cmp.cmp(&k, key) >= Ordering::Equal {
+                return Ok(Some((k.into(), v.into())));
+            }
+        }
+        Ok(None)
+    }
+}
+
+/// This iterator is a "TwoLevelIterator"; it uses an index block in order to get an offset hint
+/// into the data blocks.
+pub struct TableIterator {
+    // A TableIterator is independent of its table (on the syntax level -- it doesn't know its
+    // Table's lifetime). This is mainly required by the dynamic iterators used everywhere, where a
+    // lifetime makes things like returning an iterator from a function neigh-impossible.
+    //
+    // Instead, reference-counted pointers and locks inside the Table ensure that all
+    // TableIterators still share a table.
+    table: Table,
+    current_block: Option<BlockIter>,
+    current_block_off: usize,
+    index_block: BlockIter,
+    error: Option<Status>,
+    options: ReadOptions,
+}
+
+impl TableIterator {
+    fn skip_empty_blocks_backward(&mut self) -> bool {
+        while self.index_block.prev() {
+            if let Some((_, handle)) = current_key_val(&self.index_block) {
+                match self.load_block(&handle) {
+                    Ok(()) => {
+                        self.current_block.as_mut().unwrap().seek_to_last();
+                        if self.current_block.as_ref().unwrap().valid() { return true; }
+                        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                            self.remember(error);
+                        }
+                    }
+                    Err(error) => {
+                        self.remember(error);
+                    }
+                }
+            }
+            self.current_block = None;
+        }
+        if let Err(error) = self.index_block.status() { self.remember(error); }
+        self.reset();
+        false
+    }
+
+    fn remember(&mut self, error: Status) {
+        if self.error.is_none() {
+            self.error = Some(error);
+        }
+    }
+
+    // Skips to the entry referenced by the next entry in the index block.
+    // This is called once a block has run out of entries.
+    // Err means corruption or I/O error; Ok(true) means a new block was loaded; Ok(false) means
+    // tht there's no more entries.
+    fn skip_to_next_entry(&mut self) -> Result<bool> {
+        if let Some((_key, val)) = self.index_block.next() {
+            self.load_block(&val).map(|_| true)
+        } else {
+            self.index_block.status()?;
+            Ok(false)
+        }
+    }
+
+    // Load the block at `handle` into `self.current_block`
+    fn load_block(&mut self, handle: &[u8]) -> Result<()> {
+        let (new_block_handle, _) = match BlockHandle::decode(handle) {
+            None => {
+                return err(
+                    error::StatusCode::Corruption,
+                    "Couldn't decode corrupt block handle",
+                )
+            }
+            Some(ok) => ok,
+        };
+        let block = self.table.read_block(&new_block_handle, self.options)?;
+
+        self.current_block = Some(block.iter());
+        self.current_block_off = new_block_handle.offset();
+
+        Ok(())
+    }
+}
+
+impl LdbIterator for TableIterator {
+    fn seek_to_last(&mut self) {
+        self.index_block.seek_to_last();
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
+        }
+        self.current_block = None;
+        if let Some((_, handle)) = current_key_val(&self.index_block) {
+            match self.load_block(&handle) {
+                Ok(()) => {
+                    self.current_block.as_mut().unwrap().seek_to_last();
+                    if self.current_block.as_ref().unwrap().valid() {
+                        return;
+                    }
+                }
+                Err(error) => self.remember(error),
+            }
+            if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                self.remember(error);
+            }
+            self.current_block = None;
+            self.skip_empty_blocks_backward();
+            return;
+        }
+        if let Err(error) = self.index_block.status() { self.remember(error); }
+        self.reset();
+    }
+    fn advance(&mut self) -> bool {
+        loop {
+            if let Some(ref mut block) = self.current_block {
+                if block.advance() {
+                    return true;
+                }
+            }
+            if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                self.remember(error);
+            }
+            self.current_block = None;
+            match self.skip_to_next_entry() {
+                Ok(true) => {}
+                Ok(false) => {
+                    self.reset();
+                    return false;
+                }
+                Err(error) => self.remember(error),
+            }
+        }
+    }
+
+    // A call to valid() after seeking is necessary to ensure that the seek worked (e.g., no error
+    // while reading from disk)
+    fn seek(&mut self, to: &[u8]) {
+        // first seek in index block, rewind by one entry (so we get the next smaller index entry),
+        // then set current_block and seek there
+        self.index_block.seek(to);
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
+        }
+        self.current_block = None;
+
+        // It's possible that this is a seek past-last; reset in that case.
+        if let Some((past_block, handle)) = current_key_val(&self.index_block) {
+            if self.table.opt.cmp.cmp(to, &past_block) <= Ordering::Equal {
+                // ok, found right block: continue
+                match self.load_block(&handle) {
+                    Ok(()) => {
+                        let block = self.current_block.as_mut().unwrap();
+                        block.seek(to);
+                        if !block.valid() {
+                            if let Err(error) = block.status() {
+                                self.remember(error);
+                            }
+                            self.current_block = None;
+                            self.advance();
+                        }
+                        return;
+                    }
+                    Err(error) => {
+                        self.remember(error);
+                        self.current_block = None;
+                        self.advance();
+                        return;
+                    }
+                }
+            }
+        }
+        // Reached in case of failure.
+        self.reset();
+    }
+
+    fn prev(&mut self) -> bool {
+        // happy path: current block contains previous entry
+        if let Some(ref mut cb) = self.current_block {
+            if cb.prev() {
+                return true;
+            }
+        }
+
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
+        }
+        self.current_block = None;
+        self.skip_empty_blocks_backward()
+    }
+
+    fn reset(&mut self) {
+        self.index_block.reset();
+        self.current_block = None;
+    }
+
+    // This iterator is special in that it's valid even before the first call to advance(). It
+    // behaves correctly, though.
+    fn valid(&self) -> bool {
+        self.current_block.is_some() && (self.current_block.as_ref().unwrap().valid())
+    }
+
+    fn current(&self) -> Option<(Bytes, Bytes)> {
+        if let Some(ref cb) = self.current_block {
+            cb.current()
+        } else {
+            None
+        }
+    }
+    fn status(&self) -> Result<()> {
+        self.index_block.status()?;
+        if let Some(block) = &self.current_block { block.status()?; }
+        self.error.clone().map_or(Ok(()), Err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+
+    use crate::compressor::CompressorId;
+    use crate::filter::BloomPolicy;
+    use crate::key_types::LookupKey;
+    use crate::table_builder::TableBuilder;
+    use crate::test_util::{test_iterator_properties, LdbIteratorIter};
+    use crate::types::{current_key_val, share, LdbIterator};
+    use crate::{block, compressor, options};
+
+    use super::*;
+
+    fn build_data() -> Vec<(&'static str, &'static str)> {
+        vec![
+            // block 1
+            ("abc", "def"),
+            ("abd", "dee"),
+            ("bcd", "asa"),
+            // block 2
+            ("bsr", "a00"),
+            ("xyz", "xxx"),
+            ("xzz", "yyy"),
+            // block 3
+            ("zzz", "111"),
+        ]
+    }
+
+    // Build a table containing raw keys (no format). It returns (vector, length) for convenience
+    // reason, a call f(v, v.len()) doesn't work for borrowing reasons.
+    fn build_table(data: Vec<(&'static str, &'static str)>) -> (Vec<u8>, usize) {
+        let mut d = Vec::with_capacity(512);
+        let mut opt = options::for_test();
+        opt.block_restart_interval = 2;
+        opt.block_size = 32;
+        opt.compressor = compressor::SnappyCompressor::ID;
+
+        {
+            // Uses the standard comparator in opt.
+            let mut b = TableBuilder::new_raw(opt, &mut d);
+
+            for &(k, v) in data.iter() {
+                b.add(k.as_bytes(), v.as_bytes()).unwrap();
+            }
+
+            b.finish().unwrap();
+        }
+
+        let size = d.len();
+        (d, size)
+    }
+
+    // Build a table containing keys in InternalKey format.
+    fn build_internal_table() -> (Vec<u8>, usize) {
+        let mut d = Vec::with_capacity(512);
+        let mut opt = options::for_test();
+        opt.block_restart_interval = 1;
+        opt.block_size = 32;
+        opt.filter_policy = Some(Rc::new(Box::new(BloomPolicy::new(4))));
+
+        let mut i = 1_u64;
+        let data: Vec<(Vec<u8>, &'static str)> = build_data()
+            .into_iter()
+            .map(|(k, v)| {
+                i += 1;
+                (LookupKey::new(k.as_bytes(), i).internal_key().to_vec(), v)
+            })
+            .collect();
+
+        {
+            // Uses InternalKeyCmp
+            let mut b = TableBuilder::new(opt, &mut d);
+
+            for (k, v) in data.iter() {
+                b.add(k.as_slice(), v.as_bytes()).unwrap();
+            }
+
+            b.finish().unwrap();
+        }
+
+        let size = d.len();
+
+        (d, size)
+    }
+
+    fn wrap_buffer(src: Vec<u8>) -> Rc<Box<dyn RandomAccess>> {
+        Rc::new(Box::new(src))
+    }
+
+    #[test]
+    fn test_table_approximate_offset() {
+        let (src, size) = build_table(build_data());
+        let mut opt = options::for_test();
+        let bc = share(Cache::new(128));
+        opt.block_size = 32;
+        let table = Table::new_raw(opt, bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+
+        let expected_offsets = [0, 0, 0, 42, 42, 42, 86];
+        for (i, (k, _)) in LdbIteratorIter::wrap(&mut iter).enumerate() {
+            assert_eq!(expected_offsets[i], table.approx_offset_of(&k));
+        }
+
+        // Key-past-last returns offset of metaindex block.
+        assert_eq!(132, table.approx_offset_of("{aa".as_bytes()));
+    }
+
+    #[test]
+    fn test_table_block_cache_use() {
+        let (src, size) = build_table(build_data());
+        let bc = share(Cache::new(128));
+        let mut opt = options::for_test();
+        opt.block_size = 32;
+
+        {
+            let table = Table::new_raw(opt.clone(), bc.clone(), wrap_buffer(src), size).unwrap();
+            let mut iter = table.iter();
+
+            // index/metaindex blocks are not cached. That'd be a waste of memory.
+            assert_eq!(bc.borrow().count(), 0);
+            iter.next();
+            assert_eq!(bc.borrow().count(), 1);
+            // This may fail if block parameters or data change. In that case, adapt it.
+            iter.next();
+            iter.next();
+            iter.next();
+            iter.next();
+            assert_eq!(bc.borrow().count(), 2);
+        }
+
+        println!(
+            "weak = {}, strong = {}",
+            std::rc::Rc::<RefCell<cache::Cache<block::Block>>>::weak_count(&bc),
+            std::rc::Rc::<RefCell<cache::Cache<block::Block>>>::strong_count(&bc)
+        );
+    }
+
+    #[test]
+    fn test_table_iterator_fwd_bwd() {
+        let (src, size) = build_table(build_data());
+        let data = build_data();
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+        let mut i = 0;
+
+        while let Some((k, v)) = iter.next() {
+            assert_eq!(
+                (data[i].0.as_bytes(), data[i].1.as_bytes()),
+                (k.as_ref(), v.as_ref())
+            );
+            i += 1;
+        }
+
+        assert_eq!(i, data.len());
+        assert!(!iter.valid());
+
+        // Go forward again, to last entry.
+        while let Some((key, _)) = iter.next() {
+            if key.as_slice() == b"zzz" {
+                break;
+            }
+        }
+
+        assert!(iter.valid());
+        // backwards count
+        let mut j = 0;
+
+        while iter.prev() {
+            if let Some((k, v)) = current_key_val(&iter) {
+                j += 1;
+                assert_eq!(
+                    (
+                        data[data.len() - 1 - j].0.as_bytes(),
+                        data[data.len() - 1 - j].1.as_bytes()
+                    ),
+                    (k.as_ref(), v.as_ref())
+                );
+            } else {
+                break;
+            }
+        }
+
+        // expecting 7 - 1, because the last entry that the iterator stopped on is the last entry
+        // in the table; that is, it needs to go back over 6 entries.
+        assert_eq!(j, 6);
+    }
+
+    #[test]
+    fn test_table_iterator_filter() {
+        let (src, size) = build_table(build_data());
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        assert!(table.filters.is_some());
+        let filter_reader = table.filters.clone().unwrap();
+        let mut iter = table.iter();
+        while let Some((k, _)) = iter.next() {
+            assert!(filter_reader.key_may_match(iter.current_block_off, &k));
+            assert!(!filter_reader.key_may_match(iter.current_block_off, b"somerandomkey"));
+        }
+    }
+
+    #[test]
+    fn test_table_iterator_state_behavior() {
+        let (src, size) = build_table(build_data());
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+
+        // behavior test
+
+        // See comment on valid()
+        assert!(!iter.valid());
+        assert!(current_key_val(&iter).is_none());
+        assert!(!iter.prev());
+
+        assert!(iter.advance());
+        let first = current_key_val(&iter);
+        assert!(iter.valid());
+        assert!(current_key_val(&iter).is_some());
+
+        assert!(iter.advance());
+        assert!(iter.prev());
+        assert!(iter.valid());
+
+        iter.reset();
+        assert!(!iter.valid());
+        assert!(current_key_val(&iter).is_none());
+        assert_eq!(first, iter.next());
+    }
+
+    #[test]
+    fn test_table_iterator_behavior_standard() {
+        let mut data = build_data();
+        data.truncate(4);
+        let (src, size) = build_table(data);
+        let bc = share(Cache::new(128));
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        test_iterator_properties(table.iter());
+    }
+
+    #[test]
+    fn test_table_iterator_values() {
+        let (src, size) = build_table(build_data());
+        let data = build_data();
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+        let mut i = 0;
+
+        iter.next();
+        iter.next();
+
+        // Go back to previous entry, check, go forward two entries, repeat
+        // Verifies that prev/next works well.
+        loop {
+            iter.prev();
+
+            if let Some((k, v)) = current_key_val(&iter) {
+                assert_eq!(
+                    (data[i].0.as_bytes(), data[i].1.as_bytes()),
+                    (k.as_ref(), v.as_ref())
+                );
+            } else {
+                break;
+            }
+
+            i += 1;
+            if iter.next().is_none() || iter.next().is_none() {
+                break;
+            }
+        }
+
+        // Skipping the last value because the second next() above will break the loop
+        assert_eq!(i, 6);
+    }
+
+    #[test]
+    fn test_table_iterator_seek() {
+        let (src, size) = build_table(build_data());
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+
+        iter.seek(b"bcd");
+        assert!(iter.valid());
+        assert_eq!(
+            current_key_val(&iter),
+            Some((b"bcd".to_vec(), b"asa".to_vec()))
+        );
+        iter.seek(b"abc");
+        assert!(iter.valid());
+        assert_eq!(
+            current_key_val(&iter),
+            Some((b"abc".to_vec(), b"def".to_vec()))
+        );
+
+        // Seek-past-last invalidates.
+        iter.seek("{{{".as_bytes());
+        assert!(!iter.valid());
+        iter.seek(b"bbb");
+        assert!(iter.valid());
+    }
+
+    #[test]
+    fn test_table_iterator_seek_between_blocks() {
+        let (src, size) = build_table(build_data());
+        let data = build_data();
+        let bc = share(Cache::new(128));
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let mut iter = table.iter();
+
+        // Seek just past every key. For the last key of a block, the target falls between that
+        // key and the block's index separator, so the wanted entry is the first of the next block.
+        for i in 0..data.len() {
+            let mut target = data[i].0.as_bytes().to_vec();
+            target.push(0);
+            iter.seek(&target);
+
+            match data.get(i + 1) {
+                Some(&(k, v)) => {
+                    assert!(iter.valid(), "seek({:?}) left the iterator invalid", target);
+                    assert_eq!(
+                        current_key_val(&iter),
+                        Some((k.as_bytes().to_vec(), v.as_bytes().to_vec()))
+                    );
+                    // Iteration continues from the found entry.
+                    assert_eq!(
+                        iter.next(),
+                        data.get(i + 2)
+                            .map(|&(k, v)| (k.as_bytes().to_vec(), v.as_bytes().to_vec()))
+                    );
+                }
+                None => assert!(!iter.valid()),
+            }
+        }
+    }
+
+    #[test]
+    fn test_table_get() {
+        let (src, size) = build_table(build_data());
+        let bc = share(Cache::new(128));
+
+        let table =
+            Table::new_raw(options::for_test(), bc.clone(), wrap_buffer(src), size).unwrap();
+        let table2 = table.clone();
+
+        let mut _iter = table.iter();
+        // Test that all of the table's entries are reachable via get()
+        for (k, v) in LdbIteratorIter::wrap(&mut _iter) {
+            let r = table2.get(&k);
+            assert_eq!(Ok(Some((k.into(), v.into()))), r);
+        }
+
+        assert_eq!(bc.borrow().count(), 3);
+
+        // test that filters work and don't return anything at all.
+        assert!(table.get(b"aaa").unwrap().is_none());
+        assert!(table.get(b"aaaa").unwrap().is_none());
+        assert!(table.get(b"aa").unwrap().is_none());
+        assert!(table.get(b"abcd").unwrap().is_none());
+        assert!(table.get(b"abb").unwrap().is_none());
+        assert!(table.get(b"zzy").unwrap().is_none());
+        assert!(table.get(b"zz1").unwrap().is_none());
+        assert!(table.get("zz{".as_bytes()).unwrap().is_none());
+    }
+
+    #[test]
+    fn get_accepts_a_key_equal_to_the_last_index_separator() {
+        let opt = options::for_test();
+        let mut contents = Vec::new();
+        {
+            let mut builder = TableBuilder::new_raw(opt.clone(), &mut contents);
+            builder.add(&[0xff], b"value").unwrap();
+            builder.finish().unwrap();
+        }
+        let size = contents.len();
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        let result = table.get(&[0xff]).unwrap().unwrap();
+        assert_eq!(result.0.as_ref(), &[0xff]);
+        assert_eq!(result.1.as_ref(), b"value");
+    }
+
+    // This test verifies that the table and filters work with internal keys. This means:
+    // The table contains keys in InternalKey format and it uses a filter wrapped by
+    // InternalFilterPolicy.
+    // All the other tests use raw keys that don't have any internal structure; this is fine in
+    // general, but here we want to see that the other infrastructure works too.
+    #[test]
+    fn test_table_internal_keys() {
+        use crate::key_types::LookupKey;
+
+        let (src, size) = build_internal_table();
+
+        let bc = share(Cache::new(128));
+        let table = Table::new(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+        let filter_reader = table.filters.clone().unwrap();
+
+        // Check that we're actually using internal keys
+        let mut _iter = table.iter();
+        for (ref k, ref v) in LdbIteratorIter::wrap(&mut _iter) {
+            assert_eq!(k.len(), 3 + 8);
+            let (result_k, result_v) = table.get(k).unwrap().unwrap();
+            assert_eq!(
+                (k.to_vec(), v.to_vec()),
+                (result_k.to_vec(), result_v.to_vec())
+            );
+        }
+
+        assert!(table
+            .get(LookupKey::new(b"abc", 1000).internal_key())
+            .unwrap()
+            .is_some());
+
+        let mut iter = table.iter();
+
+        while let Some((k, _)) = iter.next() {
+            let lk = LookupKey::new(&k, 123);
+            let userkey = lk.user_key();
+
+            assert!(filter_reader.key_may_match(iter.current_block_off, userkey));
+            assert!(!filter_reader.key_may_match(iter.current_block_off, b"somerandomkey"));
+        }
+    }
+
+    fn build_table_with(opt: Options) -> Vec<u8> {
+        let mut contents = Vec::new();
+        {
+            let mut builder = TableBuilder::new_raw(opt, &mut contents);
+            for &(k, v) in build_data().iter() {
+                builder.add(k.as_bytes(), v.as_bytes()).unwrap();
+            }
+            builder.finish().unwrap();
+        }
+        contents
+    }
+
+    #[test]
+    fn a_table_without_a_filter_policy_has_no_filter_and_reads_back() {
+        let mut opt = options::for_test();
+        opt.filter_policy = None;
+        opt.block_size = 32;
+        let contents = build_table_with(opt.clone());
+        let size = contents.len();
+
+        let mut bloom = options::for_test();
+        bloom.block_size = 32;
+        let filtered = Table::new_raw(bloom, share(Cache::new(16)), wrap_buffer(contents.clone()), size).unwrap();
+        assert!(filtered.filters.is_none());
+
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        assert!(table.filters.is_none());
+        for &(k, v) in build_data().iter() {
+            let (key, value) = table.get(k.as_bytes()).unwrap().unwrap();
+            assert_eq!((key.as_ref(), value.as_ref()), (k.as_bytes(), v.as_bytes()));
+        }
+    }
+
+    #[test]
+    fn a_table_with_a_damaged_filter_block_still_answers_lookups() {
+        let mut opt = options::for_test();
+        opt.block_size = 32;
+        opt.compressor = compressor::NoneCompressor::ID;
+        let mut contents = build_table_with(opt.clone());
+        let size = contents.len();
+        let footer = read_footer(&contents, size).unwrap();
+        let metaindex = table_block::read_table_block(opt.clone(), &contents, &footer.meta_index).unwrap();
+        let mut iter = metaindex.iter();
+        iter.seek_to_first();
+        let (_, handle) = current_key_val(&iter).unwrap();
+        let (location, _) = BlockHandle::decode(&handle).unwrap();
+        contents[location.offset() + location.size() - 3] ^= 0x80;
+
+        let table = Table::new_raw(opt.clone(), share(Cache::new(16)), wrap_buffer(contents.clone()), size).unwrap();
+        assert!(table.filters.is_some());
+        for &(k, v) in build_data().iter() {
+            assert_eq!(table.get(k.as_bytes()).unwrap().unwrap().1.as_ref(), v.as_bytes());
+        }
+
+        opt.paranoid_checks = true;
+        let table = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).unwrap();
+        assert!(table.filters.is_none());
+        for &(k, v) in build_data().iter() {
+            assert_eq!(table.get(k.as_bytes()).unwrap().unwrap().1.as_ref(), v.as_bytes());
+        }
+    }
+
+    #[test]
+    fn the_index_checksum_is_verified_only_under_paranoid_checks() {
+        let mut opt = options::for_test();
+        opt.block_size = 32;
+        opt.compressor = compressor::NoneCompressor::ID;
+        let mut contents = build_table_with(opt.clone());
+        let size = contents.len();
+        let footer = read_footer(&contents, size).unwrap();
+        contents[footer.index.offset() + footer.index.size() + 1] ^= 1;
+
+        assert!(Table::new_raw(opt.clone(), share(Cache::new(16)), wrap_buffer(contents.clone()), size).is_ok());
+        opt.paranoid_checks = true;
+        let error = Table::new_raw(opt, share(Cache::new(16)), wrap_buffer(contents), size).err().unwrap();
+        assert_eq!(error.code, error::StatusCode::Corruption);
+    }
+
+    #[test]
+    fn test_table_reader_checksum() {
+        let bc = share(Cache::new(128));
+        let (mut src, size) = build_table(build_data());
+
+        src[10] += 1;
+
+        let table = Table::new_raw(options::for_test(), bc, wrap_buffer(src), size).unwrap();
+
+        assert!(table.filters.is_some());
+        assert_eq!(table.filters.as_ref().unwrap().num(), 1);
+
+        {
+            let mut _iter = table.iter();
+            let iter = LdbIteratorIter::wrap(&mut _iter);
+            // first block is skipped
+            assert_eq!(iter.count(), 4);
+        }
+
+        {
+            let mut _iter = table.iter();
+            let iter = LdbIteratorIter::wrap(&mut _iter);
+
+            for (k, _) in iter {
+                if k == build_data()[5].0.as_bytes() {
+                    return;
+                }
+            }
+
+            panic!("Should have hit 5th record in table!");
+        }
+    }
+}

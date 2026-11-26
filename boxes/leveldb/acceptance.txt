@@ -1,0 +1,18 @@
+version 1
+box leveldb
+revision b5a322144f1189b9155322f614d86e5868a5b8a7
+arch x86_64
+spec sha256:f6d84b00aa6a470133df8d5feff3278d2940370072b43c39ba36fb3583c55ff9
+corpus sha256:0e865d829accf62d8b56a046221bd78f17132586411d4cfc9957c7cbdc1beeff seen 545 holdout 457
+oracle .work/tmp/leveldb/oracle sha256:6c0b8f230d7201ea868851e96ad5e8b99fa59aad87694af68dc096f32e26b900
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/leveldb sha256:4ebda5b9a71ef6f13ada261e54d2913ae802a6900dcadc084fcc1a695f34a9bb
+dependencies cargo-lock sha256:0fa8375e4d747fcfdbdd5d26eda04acea2c1e887850dd0c63a5edab33f5b9cf0 tree sha256:39139ea50d55a3c76310eddbd2168087d019fc00db4dee2295bd0fbf7ff54760
+snapshot vendor/rusty-leveldb tree a6b44f5275c6d891f50bf7a446498e1e7c79ff3c
+run seen exit 0 items 545 545
+run holdout exit 0 items 457 457
+run fuzz exit 0 seed 1795669453753561293 requested 10000 completed 10000
+run anchor make leveldb-anchor exit 0
+level source-harness met
+level frozen-browser met: make leveldb-anchor
+level integration pending: arm64 evidence (public_api: Local Storage and IndexedDB LevelDB databases in the frozen arm64 browser) and make closure have not run
