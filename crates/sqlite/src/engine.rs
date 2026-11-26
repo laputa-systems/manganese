@@ -39,7 +39,7 @@ pub fn error_code(error: &LimboError) -> i32 {
 }
 
 impl Engine {
-    pub fn open(path: &str, read_only: bool, views_enabled: bool) -> Result<Self, i32> {
+    pub fn open(path: &str, read_only: bool, triggers_enabled: bool, views_enabled: bool) -> Result<Self, i32> {
         let io: Arc<dyn IO> = Arc::new(PlatformIO::new().map_err(|error| error_code(&error))?);
         let flags = if read_only { OpenFlags::ReadOnly } else { OpenFlags::Create };
         let options = OpenOptions::new(Arc::new(SqliteDialect))
@@ -50,6 +50,7 @@ impl Engine {
             .connect(ConnectOpts::new(SessionRole::Superuser))
             .map_err(|error| error_code(&error))?;
         connection.set_dqs_dml(false);
+        connection.set_triggers_enabled(triggers_enabled);
         Ok(Self { io, _database: database, connection, views_enabled })
     }
 

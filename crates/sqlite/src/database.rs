@@ -13,6 +13,7 @@ pub struct DatabaseOptions {
     pub exclusive_locking: bool,
     pub read_only: bool,
     pub mmap_enabled: bool,
+    pub enable_triggers: bool,
     pub enable_views: bool,
     pub no_sync: bool,
     pub page_size: u32,
@@ -26,6 +27,7 @@ impl DatabaseOptions {
             exclusive_locking: flags & 0x02 == 0,
             read_only: flags & 0x04 != 0,
             mmap_enabled: flags & 0x08 == 0,
+            enable_triggers: flags & 0x10 != 0,
             enable_views: flags & 0x20 != 0,
             no_sync: flags & 0x40 != 0,
             page_size,
@@ -153,7 +155,7 @@ impl Database {
 
     fn open_internal(&mut self, path: &Path) -> bool {
         let path = path.to_str().expect("UTF-8 database path");
-        match Engine::open(path, self.options.read_only, self.options.enable_views) {
+        match Engine::open(path, self.options.read_only, self.options.enable_triggers, self.options.enable_views) {
             Ok(engine) => {
                 self.connection = Some(Connection::Open(engine));
                 self.errcode = 0;
