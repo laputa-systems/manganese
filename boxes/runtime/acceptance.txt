@@ -1,17 +1,17 @@
 version 1
 box runtime
-revision e172155bf6768051a0e802fd90a2031ca5e25785
+revision 925f114a1a0d6707082b52ad8e5cf025d3736f84
 arch x86_64
 spec sha256:720f73a37a1465671da53f0cc0cd40616ad1fa14c83b92ec07f82cb53e1e2172
 corpus sha256:12f25a753ef7a4d83c03cf5c4ad84e8afee8c47b26112ae3d0aad653c346c931 seen 190 holdout 124
-oracle .work/tmp/runtime/oracle sha256:12d1447cf424671883a5457997118c2e92748f63cb16ca6cb62ec48503e610df
-oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-53ce02787558
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/runtime sha256:8345ef877649b8bb347d9da7d468b7a812442c0b8808c29c39ff396aaffd2193
-dependencies cargo-lock sha256:debc32deb968af0df43aec1529b82605e967180ac06f6ef5889f05bb0fdcdc6f tree sha256:295df0792630b40a9e26d28b061653ecc3a20288177e932f33925b2e1e26a3ea
-snapshot vendor/smolith tree 65772dd72edc7cb118df6816acad1fc8a51424d2
+oracle .work/tmp/runtime/oracle sha256:6b89b71bcd839b7435246969b148da0d186a9761692c775c9ff508777212162f
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/runtime sha256:c8ca103eade732c86f7fecd33d427a9b3166732d686c2797bc5fb3dfc74b25b7
+dependencies cargo-lock sha256:3801cea0a3bbafae4e80eb20d33d4758fa0330296b25d77366bed175e37d5fa2 tree sha256:172a99b33772e99a1f8450bab3aad1474f84e49b325fd3614f9699cc77c6d14b
+snapshot vendor/smolith tree b39d9c755f401cc55043f001fcace6f71405a393
 run seen exit 0 items 190 190
 run holdout exit 0 items 124 124
-run fuzz exit 0 seed 1795646267351277975 requested 20000 completed 20000
+run fuzz exit 0 seed 1795671478504096931 requested 20000 completed 20000
 level source-harness met
 level frozen-browser not applicable: task ordering has no page-observable surface of its own; the services built on it have their own anchors
 level integration pending: arm64 evidence (harness: run the task-ordering harness natively on arm64) and make closure have not run
