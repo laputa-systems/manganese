@@ -1,17 +1,17 @@
 version 1
 box media-demux
-revision a4462aa67b6466537b6651cf7736413c3356bec6
+revision 125a60f55d21f5a1e8403a6c8a80f6b85a5cdbd1
 arch x86_64
-spec sha256:9af05ee61c41e4db15b873bce111d5bacde3e54afbbdc30dc7e28388e871ef26
-corpus sha256:99a48b6c3239970c30d325c0dd10aedcb1158b1a71fb7681575bc2eb10db44d6 seen 688 holdout 370
-oracle .work/tmp/media-demux/oracle sha256:b1d56f038f48d6ea2e9acb81f8fe68b00eb314b0d9b50eaec096c96b0b525ba7
+spec sha256:ef055f338e1135d2d3557da2a2d26cd739a23c1e80cdc6f3f05924a1e8042275
+corpus sha256:c922c865b6a821d199aa0acae32fe32e4e7f144964928ae94653dfc1acd23c2e seen 766 holdout 432
+oracle .work/tmp/media-demux/oracle sha256:fff1f3e216cfebea1191b0c46165a5d86729de7459fee5fc2f081fa4bf3c5790
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/media-demux sha256:e384de53bcbbd93ac4ad217e8c80c90b01a39423324df99bbb65a49a4916e261
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/media-demux sha256:12d153da0dc282e9ea172ad6f7c5936c8a75af9525d5a6f6e1f142c5443877d9
 dependencies cargo-lock sha256:ee81937dd2e01da5f2c10761bd1b401d09826cd875d02bc96451a10019fc683c tree sha256:ca923687020c27ce56cadd5103f5680323fc0603feb3285ef12fc92c9668bd72
 snapshot vendor/symphonia tree 9f1fc204c206d7f64f2fffc6ef5c34fcb54e2bf7
-run seen exit 0 items 688 688
-run holdout exit 0 items 370 370
-run fuzz exit 0 seed 1795710508529537505 requested 20000 completed 20000
+run seen exit 0 items 766 766
+run holdout exit 0 items 432 432
+run fuzz exit 0 seed 1795714667498353393 requested 20000 completed 20000
 run anchor make media-demux-anchor exit 0
 level source-harness met
 level frozen-browser met: make media-demux-anchor
