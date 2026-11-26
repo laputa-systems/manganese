@@ -37,11 +37,18 @@ pub(super) fn emit_rename_table_rows(
     } else {
         stored_old_name
     };
+    let written_new_name = resolver.mangle_name(
+        NamespaceRef {
+            database_id: ctx.database_id,
+            id: table.namespace,
+        },
+        table.written_new_name,
+    );
     emit_rewrite_of_every_row(
         program,
         ctx,
         AlterTableFunc::RenameTable,
-        &[old_name_argument.to_string(), stored_new_name.to_string()],
+        &[old_name_argument.to_string(), written_new_name],
         table.written_old_name,
     );
     if table.is_virtual {
@@ -110,6 +117,9 @@ pub(super) fn emit_rename_column_rows(
         col_type: None,
         constraints: vec![],
     };
+    // The text of the definition quotes a name that needs quotes, so
+    // whether the statement quotes the new name goes on its own.
+    let quoted = if column.new_name.quoted() { "1" } else { "0" };
     emit_rewrite_of_every_row(
         program,
         ctx,
@@ -118,6 +128,7 @@ pub(super) fn emit_rename_column_rows(
             resolver.mangle_name(namespace, column.table),
             column.written_old_name.to_string(),
             new_definition.to_string(),
+            quoted.to_string(),
         ],
         column.written_table_name,
     );
