@@ -18,12 +18,8 @@ HOST = 'www.example.test'
 SOURCE = pathlib.Path(sys.argv[1] if len(sys.argv) > 1 else '/work/src')
 
 cases = []
-serial_counter = [0x1000]
-
-
 def serial():
-    serial_counter[0] += 1
-    return serial_counter[0]
+    return None
 
 
 def der(item):
@@ -31,6 +27,7 @@ def der(item):
 
 
 def add(label, chain, trust=(), time=T, host=HOST):
+    label = re.sub(r'[^a-z0-9_-]', '_', label.lower())
     hostname = host.encode() if isinstance(host, str) else host
     cases.append((label, Record(time, hostname, [der(c) for c in chain], [t if isinstance(t, Trust) else Trust(t[0], der(t[1])) for t in trust])))
 
@@ -581,6 +578,11 @@ def signature_cases():
         add(f'ec-leaf-{curve}', [cert, ec_inter], [(ANCHOR, ec_root)])
         inter = ca('EC Intermediate', key('ecinter2', 'ec', curve=curve), ec_root)
         add(f'ec-intermediate-{curve}', [leaf(inter), inter], [(ANCHOR, ec_root)])
+    p521_root = ca('P521 Root', key('p521root', 'ec', curve='P-521'))
+    p521_inter = ca('P521 Intermediate', key('p521inter', 'ec', curve='P-521'), p521_root)
+    for digest in ('sha256', 'sha384', 'sha512'):
+        add(f'p521-chain-{digest}', [leaf(p521_inter, signature=Signature('ecdsa', digest)), ca('P521 Intermediate', key('p521inter', 'ec', curve='P-521'), p521_root, signature=Signature('ecdsa', digest))], [(ANCHOR, p521_root)])
+        add(f'p521-leaf-signed-{digest}', [leaf(p521_inter, signature=Signature('ecdsa', digest)), p521_inter], [(ANCHOR, p521_root)])
     for digest in ('sha1', 'sha256', 'sha384', 'sha512'):
         add(f'ec-sig-{digest}', [leaf(ec_inter, signature=Signature('ecdsa', digest)), ec_inter], [(ANCHOR, ec_root)])
     add('ec-sig-null-params', [leaf(ec_inter, signature=Signature('ecdsa', 'sha256', algorithm=seq(oid('1.2.840.10045.4.3.2'), null()))), ec_inter], [(ANCHOR, ec_root)])

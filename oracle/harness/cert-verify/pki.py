@@ -396,18 +396,22 @@ class Certificate:
         self.der, self.key, self.subject = der, key, subject
 
 
-def certificate(subject, key, issuer=None, issuer_key=None, serial=1, not_before=0, not_after=0, extensions=(),
+def certificate(subject, key, issuer=None, issuer_key=None, serial=None, not_before=0, not_after=0, extensions=(),
                 signature=None, outer_algorithm=None, version=3, spki=None, not_before_tlv=None, not_after_tlv=None,
                 issuer_unique_id=None, subject_unique_id=None, tbs_override=None, extra_tbs=b''):
     issuer = subject if issuer is None else issuer
     issuer_key = key if issuer_key is None else issuer_key
     signature = signature or default_signature(issuer_key)
     validity = seq(not_before_tlv or cert_time(not_before), not_after_tlv or cert_time(not_after))
+    public_key = spki if spki is not None else key.spki()
+    if serial is None:
+        digest = hashlib.sha256(b''.join([subject, issuer, validity, public_key, signature.algorithm, *extensions, extra_tbs])).digest()
+        serial = (int.from_bytes(digest[:8], 'big') >> 1) | 1
     fields = b''
     if version != 1:
         fields += explicit(0, integer(version - 1))
     fields += (integer(serial) if isinstance(serial, int) else raw_integer(serial))
-    fields += signature.algorithm + issuer + validity + subject + (spki if spki is not None else key.spki())
+    fields += signature.algorithm + issuer + validity + subject + public_key
     if issuer_unique_id is not None:
         fields += implicit(1, b'\0' + issuer_unique_id)
     if subject_unique_id is not None:

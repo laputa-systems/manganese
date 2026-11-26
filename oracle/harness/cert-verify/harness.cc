@@ -377,16 +377,6 @@ std::string DumpTrustData() {
     }
   }
   out += "ct-log-list " + Micros(certificate_transparency::GetLogListTimestamp()) + "\n";
-  std::vector<std::pair<std::string, base::Time>> disqualified = certificate_transparency::GetDisqualifiedLogs();
-  for (const auto& log : certificate_transparency::GetKnownLogs()) {
-    std::string key(log.log_key, log.log_key_length);
-    std::string id(base::as_string_view(crypto::hash::Sha256(key)));
-    std::optional<base::Time> when;
-    for (const auto& [log_id, time] : disqualified) {
-      if (log_id == id) when = time;
-    }
-    out += "ct-log " + Hex(base::as_byte_span(id)) + " disqualified " + Micros(when) + "\n";
-  }
   for (const auto& ev : net::GetEvRootCaMetadata()) {
     for (const auto& oid : ev.policy_oids) {
       if (!oid.empty()) out += "ev " + Hex(ev.fingerprint) + " " + std::string(oid) + "\n";

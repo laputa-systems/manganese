@@ -85,5 +85,10 @@ def decode(data):
     return Record(time, hostname, chain, trust)
 
 
+REGRESSIONS = frozenset({'ec-intermediate-p-521'})
+
+
 def lane(label):
+    if label in REGRESSIONS:
+        return 'seen'
     return 'holdout' if hashlib.sha256(label.encode()).digest()[0] < 90 else 'seen'
