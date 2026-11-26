@@ -41,7 +41,7 @@ impl Engine {
         let flags = if read_only { OpenFlags::ReadOnly } else { OpenFlags::Create };
         let options = OpenOptions::new(Arc::new(SqliteDialect))
             .flags(flags)
-            .db_opts(DatabaseOpts::new());
+            .db_opts(DatabaseOpts::new().with_views(true).with_vacuum(true).with_without_rowid(true).with_attach(true));
         let database = Database::open(io.clone(), path, options).map_err(|error| error_code(&error))?;
         let connection = database
             .connect(ConnectOpts::new(SessionRole::Superuser))
