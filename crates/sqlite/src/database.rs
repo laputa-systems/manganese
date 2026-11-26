@@ -308,9 +308,12 @@ impl Database {
     pub fn bind(&mut self, id: StatementId, index: usize, value: &SqlValue) {
         let Some(Connection::Open(engine)) = &self.connection else { return };
         let Some(statement) = self.statements.get_mut(&id) else { return };
-        if let Some(prepared) = statement.engine.as_mut() {
-            engine.bind(prepared, index + 1, value);
+        let Some(prepared) = statement.engine.as_mut() else { return };
+        if statement.ran {
+            self.errcode = engine::SQLITE_MISUSE;
+            return;
         }
+        engine.bind(prepared, index + 1, value);
     }
 
     pub fn step(&mut self, id: StatementId) -> bool {

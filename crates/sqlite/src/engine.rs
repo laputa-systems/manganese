@@ -18,6 +18,7 @@ use crate::chromium_config;
 use crate::sql_value::SqlValue;
 
 pub const SQLITE_ERROR: i32 = 1;
+pub const SQLITE_MISUSE: i32 = 21;
 pub const SQLITE_ROW: i32 = 100;
 pub const SQLITE_DONE: i32 = 101;
 
