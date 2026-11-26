@@ -1,0 +1,18 @@
+version 1
+box jpeg-encode
+revision 18c7b6a38135eadfb97199d007a29d74e49caebe
+arch x86_64
+spec sha256:96f0d5873beebaab863584c73984d357559e115e5c13e18e2d3eb90a07f5492e
+corpus sha256:8b72012998fa08d874ee0d012a8ff2d3f79e1992f25ca8374c8304a6e235667e seen 1092 holdout 1092
+oracle .work/tmp/jpeg-encode/oracle sha256:deff111cf1738105dc43a624c28859b0722d0c1535463550d6ad3fbc0946c3f0
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/jpeg-encode sha256:8d0fcd69ea0087a435f25d6c031c8329cfc5605d4f5395b81503a02deaf15b3e
+dependencies cargo-lock sha256:b062b5fd545fdd472235339047dd286141a1667b5a9190beae782ebe5bc4ecfb tree sha256:665767f3f446a838675063e92570bca16a4334a07b8a425bcccf2f4b6aed567d
+snapshot vendor/img tree cd7f4e9bfd8673bcac590145cfac4928d3ec6268
+run seen exit 0 items 1092 1092
+run holdout exit 0 items 1092 1092
+run fuzz exit 0 seed 1795720933724226662 requested 20000 completed 20000
+run anchor make jpeg-encode-anchor exit 0
+level source-harness met
+level frozen-browser met: make jpeg-encode-anchor
+level integration pending: arm64 evidence (public_api: canvas toDataURL in the frozen arm64 browser) and make closure have not run

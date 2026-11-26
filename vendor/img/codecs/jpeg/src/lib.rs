@@ -19,5 +19,9 @@ mod tables;
 mod upsample;
 
 pub use decompress::{ColorSpace, Component, ConsumeStatus, Decompress, ReadHeader, SavedMarker};
+pub use encoder::{ColorSpace as EncodeColorSpace, Downsample, Error as EncodeError, Options as EncodeOptions};
+pub use encoder::encode as encode_stream;
 pub use error::{Error, Warning};
 pub use source::{Source, SourceState};
+
+pub mod encoder;

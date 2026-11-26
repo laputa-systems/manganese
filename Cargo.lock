@@ -708,6 +708,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "jpeg-encode"
+version = "0.1.0"
+dependencies = [
+ "img-jpeg",
+]
+
+[[package]]
 name = "laputa-async-channel"
 version = "0.3.0"
 dependencies = [
