@@ -279,7 +279,10 @@ impl Database {
     fn ensure_trigger_sequence_rows(&mut self, sql: &str) {
         let changes = self.last_change_count();
         let upper: Vec<u8> = sql.as_bytes().iter().map(|byte| byte.to_ascii_uppercase()).collect();
-        if !upper.starts_with(b"INSERT") || !upper.windows(11).any(|window| window == b" OR IGNORE ") {
+        if !self.options.enable_triggers
+            || !upper.starts_with(b"INSERT")
+            || !upper.windows(11).any(|window| window == b" OR IGNORE ")
+        {
             return;
         }
         let Some(tables) = self.query_rows(b"SELECT name, sql FROM sqlite_schema WHERE type='table'") else { return };
