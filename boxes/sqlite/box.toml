@@ -1,0 +1,22 @@
+seam = "Chromium sql::Database, sql::Statement, sql::Transaction and sql::MetaTable over the SQLite amalgamation with Chromium's configuration (exclusive locking, TRUNCATE rollback journal or WAL, secure_delete, ICU, SQLITE_DQS=0, upsert, window, JSON, EXPLAIN and ANALYZE omitted); callers are History, Favicons, Top Sites, Shortcuts, Web Data, Login Data, Cookies, Trust Tokens, Network Action Predictor, QuotaManager, DIPS, ServerCertificate, Shared Dictionary, Affiliation, heavy ad intervention, declarative performance observer, segmentation UKM and the GPU persistent cache"
+streaming = "MGB1 requests are step scripts in a private directory: place database, journal or WAL images, open with DatabaseOptions flags, page size and cache size, execute, prepare, bind, step with typed column getters, reset, finalize, transactions, meta-table calls, raze, poison, vacuum, checkpoint, schema queries, change counts, crash by snapshotting the files, residue search and logical dumps; responses carry each step's results, SQLite type tags, rows and extended error codes"
+reentrancy = "none: each request runs one synchronous script against one connection at a time"
+callbacks = "none: no error callback or WAL hook is installed"
+threading = "One thread per process; SQLite is built thread-safe with no worker threads"
+wire_version = 1
+corpus_sources = "SQLite databases from a frozen-browser profile (archive sha256:7456dfed53ab69f8458c2b499da9794d4dc3b69221d7181c2b2c7c2b529bb996) read, written and crashed with their callers' options; the callers' own schemas from those files with generated rows; expression, affinity, collation and date probes; Chromium's omitted features; statement, transaction and meta-table API sequences; crash, hot-journal and WAL images written by the oracle; secure_delete residue and journal-mode switches; seeds 4101 (seen) and 4102 (holdout)"
+environment = "x86_64 Linux musl; the oracle compiles Chromium 156's sql and third_party/sqlite (3.53.4) sources with their ninja flags"
+comparison = "exact"
+observable_surface = "Statement results, column values through each typed getter, extended error codes, change counts and row ids, schema text and table contents as callers and a reopened profile read them, the database file digest after opening without writes, sidecar journal and WAL presence after close, and residue of deleted text in the profile files"
+varying_relationships = "none: every recorded result is deterministic for the declared environment"
+ordering = "Script step order, row order of each statement and the rowid order of dumps"
+oracle_defects = "none: no known oracle defects"
+improvements = "none: no required oracle improvements"
+anchor = "make sqlite-anchor opens every SQLite database of a fresh frozen-browser profile through the source oracle and the candidate and requires equal dumps and unchanged files"
+arm64_evidence = "public_api: the SQLite databases of a frozen arm64 browser profile through the same anchor"
+holdout_percent = 30
+oracle = ".work/tmp/sqlite/oracle"
+candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/sqlite"
+fuzz = "driver"
+fuzz_driver = "oracle/harness/sqlite/fuzz.py"
+acceptance_cases = 20000

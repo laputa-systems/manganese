@@ -1,0 +1,121 @@
+use std::num::NonZero;
+use std::sync::Arc;
+
+use turso_core::Connection;
+use turso_core::ConnectOpts;
+use turso_core::Database;
+use turso_core::DatabaseOpts;
+use turso_core::LimboError;
+use turso_core::OpenFlags;
+use turso_core::OpenOptions;
+use turso_core::PlatformIO;
+use turso_core::SessionRole;
+use turso_core::StepResult;
+use turso_core::IO;
+use turso_sqlite::SqliteDialect;
+
+use crate::sql_value::SqlValue;
+
+pub const SQLITE_ERROR: i32 = 1;
+pub const SQLITE_ROW: i32 = 100;
+pub const SQLITE_DONE: i32 = 101;
+
+pub struct Engine {
+    io: Arc<dyn IO>,
+    _database: Arc<Database>,
+    connection: Arc<Connection>,
+}
+
+pub struct EngineStatement {
+    statement: turso_core::Statement,
+    pub row: Vec<SqlValue>,
+}
+
+pub fn error_code(error: &LimboError) -> i32 {
+    error.sqlite_extended_result_code()
+}
+
+impl Engine {
+    pub fn open(path: &str, read_only: bool) -> Result<Self, i32> {
+        let io: Arc<dyn IO> = Arc::new(PlatformIO::new().map_err(|error| error_code(&error))?);
+        let flags = if read_only { OpenFlags::ReadOnly } else { OpenFlags::Create };
+        let options = OpenOptions::new(Arc::new(SqliteDialect))
+            .flags(flags)
+            .db_opts(DatabaseOpts::new());
+        let database = Database::open(io.clone(), path, options).map_err(|error| error_code(&error))?;
+        let connection = database
+            .connect(ConnectOpts::new(SessionRole::Superuser))
+            .map_err(|error| error_code(&error))?;
+        Ok(Self { io, _database: database, connection })
+    }
+
+    pub fn prepare(&self, sql: &str) -> Result<(EngineStatement, usize), i32> {
+        let statement = self.connection.prepare(sql).map_err(|error| error_code(&error))?;
+        let tail = statement.tail_offset();
+        Ok((EngineStatement { statement, row: Vec::new() }, tail))
+    }
+
+    pub fn changes(&self) -> i64 {
+        self.connection.changes()
+    }
+
+    pub fn last_insert_rowid(&self) -> i64 {
+        self.connection.last_insert_rowid()
+    }
+
+    pub fn autocommit(&self) -> bool {
+        self.connection.get_auto_commit()
+    }
+
+    pub fn step(&self, statement: &mut EngineStatement) -> Result<bool, i32> {
+        loop {
+            match statement.statement.step_with_structured_errors() {
+                Ok(StepResult::Row) => {
+                    let row = statement.statement.row().expect("a stepped row");
+                    statement.row = row.get_values().map(|value| SqlValue::from_turso(value.as_ref())).collect();
+                    return Ok(true);
+                }
+                Ok(StepResult::Done) => {
+                    statement.row.clear();
+                    return Ok(false);
+                }
+                Ok(StepResult::IO | StepResult::Yield | StepResult::Sleep { .. }) => {
+                    self.io.step().map_err(|error| error_code(&error))?;
+                }
+                Ok(StepResult::Busy | StepResult::Interrupt) => {
+                    statement.row.clear();
+                    return Err(5);
+                }
+                Err(error) => {
+                    statement.row.clear();
+                    return Err(error_code(&error));
+                }
+            }
+        }
+    }
+
+    pub fn reset(&self, statement: &mut EngineStatement) {
+        statement.row.clear();
+        statement.statement.reset_best_effort();
+    }
+
+    pub fn clear_bindings(&self, statement: &mut EngineStatement) {
+        statement.statement.clear_bindings();
+    }
+
+    pub fn bind(&self, statement: &mut EngineStatement, index: usize, value: &SqlValue) {
+        if let Some(index) = NonZero::new(index) {
+            if index.get() <= statement.statement.parameters_count() {
+                let _ = statement.statement.bind_at(index, value.to_turso());
+            }
+        }
+    }
+
+    pub fn column_count(statement: &EngineStatement) -> usize {
+        statement.statement.num_columns()
+    }
+
+    pub fn close(self) {
+        let _ = self.connection.close();
+    }
+}

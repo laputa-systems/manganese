@@ -145,3 +145,11 @@ protobuf-harness:
 sqlite-harness:
 	mkdir -p .work/tmp/sqlite
 	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/sqlite "$$tag" python3 -B /lane/oracle/harness/sqlite/build.py
+
+.PHONY: sqlite-record
+sqlite-record:
+	python3 -B oracle/harness/sqlite/record.py
+
+.PHONY: sqlite-anchor
+sqlite-anchor:
+	python3 -B oracle/harness/sqlite/anchor.py
