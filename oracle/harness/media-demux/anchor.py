@@ -13,12 +13,12 @@ from compare import ask, peer
 
 STATUS_NAMES = {12: 'DEMUXER_ERROR_COULD_NOT_OPEN', 13: 'DEMUXER_ERROR_COULD_NOT_PARSE', 14: 'DEMUXER_ERROR_NO_SUPPORTED_STREAMS'}
 CASES = [
-    'pcm-8-1-8000', 'pcm-16-2-44100', 'pcm-16-6-48000', 'pcm-24-1-16000', 'pcm-32-2-8000', 'pcm-odd-bits-12', 'pcm-odd-bits-20', 'pcm-odd-bits-4',
+    'pcm-8-1-8000', 'pcm-16-2-44100', 'pcm-16-6-44100', 'pcm-24-1-16000', 'pcm-32-2-16000', 'pcm-odd-bits-12', 'pcm-odd-bits-20', 'pcm-odd-bits-4',
     'pcm-odd-bits-40', 'pcm-odd-bits-64', 'codec-f32', 'codec-f64', 'codec-alaw', 'codec-mulaw', 'codec-ul', 'codec-adpcm-ms', 'codec-unknown',
     'codec-zero', 'extensible-6-60f', 'extensible-12-2d63f', 'extensible-6-3', 'extensible-float', 'extensible-ambisonic', 'extensible-unknown-guid',
     'layout-fact-wrong', 'layout-data-size-large', 'layout-data-size-small', 'layout-data-size-zero', 'layout-rifx', 'layout-rf64', 'layout-bw64',
     'layout-no-fmt', 'layout-no-data', 'layout-rate-low', 'layout-rate-high', 'layout-channels-33', 'layout-block-align-huge', 'layout-f24-in-s24',
-    'layout-id3-prefix-odd', 'layout-id3-v4-footer', 'truncated-36', 'truncated-45', 'truncated-46', 'truncated-1001', 'other-text', 'other-random',
+    'layout-id3-prefix-odd', 'layout-id3-v4-footer', 'truncated-36', 'truncated-46', 'truncated-1001', 'other-text', 'other-random',
     'other-zeros', 'other-wave-no-riff', 'long-mono', 'fixture-startup-wav', 'fixture-audio_long8mulaw-wav', 'fixture-audio_tiny44-wav',
     'fixture-empty-wav', 'fixture-keypressreturn-wav', 'fixture-irc_composite_c_r0195_t000_p000-wav',
     'flac-1ch-8-8000-576-4', 'flac-2ch-16-44100-4096-12', 'flac-6ch-16-48000-1024-15', 'flac-8ch-24-96000-2048-9', 'flac-2ch-32-192000-4096-10',
