@@ -114,6 +114,34 @@ The cert-verify box (O04, O05) compares Chromium's certificate verification deci
 
 The shared trusted HTTPS fixture (`oracle/harness/https/`) now owns the trust setup and SOCKS plumbing that this anchor used to implement for itself. `fixture.py` exposes `issue`, `spki`, `pem`, `enterprise_policy`, `trust_entries`, `harness`, `expected_view`, `observed_view` and `run`; `sidecar.py` is the single TLS-over-SOCKS5 server and CDP navigation observer mounted into the launch sidecar. A consumer supplies cases (`name`, `host`, `chain`, `key`, optional `path`), an enterprise policy and matching trust entries, and calls `run` with the MGB1 oracle path and either an explicit `pinned_time` (Unix seconds used for every harness `Record`) or `None` (each case uses the navigation's `started` time, which cert-verify needs for its boundary cases). `run` writes the policy to `/etc/chromium/policies/managed/manganese-https-fixture.json` before launch, starts the frozen browser with the appliance's fixed `--proxy-server=socks5://127.0.0.1:1080` and `--proxy-bypass-list=<-loopback>` switches, serves each chain over real TLS on the SOCKS5 CONNECT to `host:443`, and writes `observed.json` and `evidence.json` into the run directory. The consumer-facing interface is: SOCKS bind `127.0.0.1:1080` and target port `443`, recorded as `socks_bind` and each case's `socks_connect.host/port/reply`; the chain as PEM and per-certificate DER SHA-256 in `evidence.chains`; the trust policy and its install path in `evidence.trust_policy` and `evidence.policy_path`, with `ANCHOR_ENFORCED`, `ANCHOR_CONSTRAINED`, `HINT` and `DISTRUSTED_SPKI` entries built by `enterprise_policy` and `trust_entries`; the verification time in each `comparisons[i].pinned_time`; and the comparison fields `error`, `ct` and `chain`, each with the browser view, the harness view and the handshake and SOCKS evidence that produced them. `make https-fixture` builds a canonical one-case fixture under `.work/tmp/https/fixture/` (a `fixture.json` manifest plus chain and key PEM), `make https-fixture-inspect` prints that manifest, and `make https-fixture-witness` drives the source harness and the frozen browser through one successfully verified navigation to `https://verified.https.test/`, asserting `error OK`, an intact three-certificate chain and agreement on error, CT compliance and verified chain. The witness is the reference capture for the http1, TLS-handshake and HTTP/2 boxes; it adds no H2 or TLS client, wire observations or public-root CT success cases.
 
+## Service-assembly witness: `headless-fetch`
+
+`make assembly A=headless-fetch` runs `crates/asm-headless-fetch`'s tests against the accepted
+component crates, with an in-test SOCKS5 stub standing in for transport plumbing. It proves four
+bounded behaviors: the real DevTools endpoint starts and keeps answering; a real `http1` client
+fetch reaches a loopback origin through the SOCKS5 CONNECT path; firing a controlled runtime
+deadline while that fetch is in flight cancels it and releases the retained connection handle; and
+the endpoint listener and relay thread stop without a live child or an open socket. Two negative
+controls fail when the deadline is not raced against the fetch or when the connection handle is not
+released, so the four assertions are sensitive to the wiring. This is a service-assembly witness,
+not the M3 `headless-fetch` exit: CDP, NetLog and wire-capture parity for the frozen workloads is
+still unproved, as is the `socks-egress` box that will replace the in-test stub.
+
+The witness needed no change to any accepted crate. The APIs it consumed were already public:
+
+- `devtools-endpoint`: `Endpoint::start`, `Endpoint::local_addr`, `launch::config`,
+  `launch::registry`, `SequenceIds::new`, and `ProtocolSource::Bytes`. No endpoint API was exposed
+  or extracted; shutdown is the existing `Drop` behaviour.
+- `runtime`: `Deadline::controlled`, `DeadlineTrigger::fire` and `Deadline::wait`. The controlled
+  deadline was used as published by the runtime box; no cancellation future or task API was added.
+- `http1`: `PreparedRequest::new`, `client::send`, `Connected`, `Response::next_chunk`,
+  `RequestInfo`, `RequestUrl::parse`, `ConnectionVerdict::default` and the public `SocketLiveness`
+  trait. The `Spawn` argument of `client::send` was already the seam that lets an assembly own the
+  connection task; no client API was exposed or extracted, and no box contract was redesigned.
+
+The only shared-file change is the `Cargo.lock` entry for the new assembly crate; `Cargo.toml`
+already includes `crates/*` as workspace members. The parent integrates that lock change serially.
+
 ## Moving one box to parity
 
 1. Write `boxes/<id>/box.toml` and the box's harness, build the harness in the oracle lane, and record goldens for the corpus and a separate holdout set.

@@ -1,0 +1,12 @@
+[package]
+name = "asm-headless-fetch"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+devtools-endpoint = { path = "../devtools-endpoint" }
+runtime = { path = "../runtime" }
+http1 = { path = "../http1" }
+smol = { package = "laputa-smol", path = "../../vendor/smolith/crates/smol" }
+futures-io = "0.3.34"
