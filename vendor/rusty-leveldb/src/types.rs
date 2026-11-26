@@ -86,6 +86,20 @@ pub trait LdbIterator {
         self.reset();
         self.advance();
     }
+
+    /// seek_to_last seeks to the last element.
+    fn seek_to_last(&mut self) {
+        self.reset();
+        let mut last = None;
+        while self.advance() {
+            if let Some((key, _)) = self.current() {
+                last = Some(key.to_vec());
+            }
+        }
+        if let Some(key) = last {
+            self.seek(&key);
+        }
+    }
 }
 
 /// current_key_val is a helper allocating two vectors and filling them with the current key/value

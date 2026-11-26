@@ -168,6 +168,15 @@ impl DBIterator {
 }
 
 impl LdbIterator for DBIterator {
+    fn seek_to_last(&mut self) {
+        self.dir = Direction::Reverse;
+        self.iter.seek_to_last();
+        if self.iter.valid() {
+            self.find_prev_user_entry();
+        } else {
+            self.valid = false;
+        }
+    }
     fn status(&self) -> crate::Result<()> {
         self.iter.status()
     }

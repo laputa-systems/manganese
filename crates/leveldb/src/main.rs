@@ -104,14 +104,7 @@ fn entry(output: &mut Vec<u8>, iter: &impl LdbIterator) -> Result<(), Failure> {
 }
 
 fn seek_to_last(iter: &mut impl LdbIterator) {
-    iter.seek_to_first();
-    while iter.valid() {
-        let (key, _) = iter.current().expect("a valid iterator has an entry");
-        if !iter.advance() {
-            iter.seek(&key);
-            break;
-        }
-    }
+    LdbIterator::seek_to_last(iter);
 }
 
 fn iterate(input: &mut Input, iter: &mut impl LdbIterator, output: &mut Vec<u8>) -> Result<(), Failure> {

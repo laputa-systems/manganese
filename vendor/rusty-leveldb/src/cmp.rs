@@ -63,19 +63,21 @@ impl Cmp for DefaultCmp {
 
         let mut sep = Vec::with_capacity(a.len() + 1);
         sep.extend_from_slice(a);
-        // Try increasing a and check if it's still smaller than b. First find the last byte
-        // smaller than 0xff, and then increment that byte. Only if the separator is lesser than b,
-        // return it.
-        let mut i = a.len() - 1;
-        while i > 0 && sep[i] == 0xff {
-            i -= 1;
-        }
-        if sep[i] < 0xff {
-            sep[i] += 1;
-            if self.cmp(&sep, b) == Ordering::Less {
-                return sep;
-            } else {
-                sep[i] -= 1;
+        if !a.is_empty() {
+            // Try increasing a and check if it's still smaller than b. First find the last byte
+            // smaller than 0xff, and then increment that byte. Only if the separator is lesser than b,
+            // return it.
+            let mut i = a.len() - 1;
+            while i > 0 && sep[i] == 0xff {
+                i -= 1;
+            }
+            if sep[i] < 0xff {
+                sep[i] += 1;
+                if self.cmp(&sep, b) == Ordering::Less {
+                    return sep;
+                } else {
+                    sep[i] -= 1;
+                }
             }
         }
 

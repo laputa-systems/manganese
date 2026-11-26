@@ -131,6 +131,13 @@ impl MergingIter {
 }
 
 impl LdbIterator for MergingIter {
+    fn seek_to_last(&mut self) {
+        for i in 0..self.iters.len() {
+            self.iters[i].seek_to_last();
+        }
+        self.direction = Direction::Reverse;
+        self.find_largest();
+    }
     fn status(&self) -> crate::Result<()> {
         for iter in &self.iters {
             iter.status()?;

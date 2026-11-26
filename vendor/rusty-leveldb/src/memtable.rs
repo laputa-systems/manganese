@@ -85,6 +85,9 @@ pub struct MemtableIterator {
 }
 
 impl LdbIterator for MemtableIterator {
+    fn seek_to_last(&mut self) {
+        self.skipmapiter.seek_to_last();
+    }
     fn advance(&mut self) -> bool {
         if !self.skipmapiter.advance() {
             return false;

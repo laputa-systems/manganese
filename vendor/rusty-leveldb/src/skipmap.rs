@@ -326,6 +326,18 @@ impl LdbIterator for SkipMapIter {
     fn reset(&mut self) {
         self.current = self.map.borrow().head.as_ref();
     }
+    fn seek_to_last(&mut self) {
+        let map = self.map.borrow();
+        let mut current = map.head.as_ref() as *const Node;
+        loop {
+            let next = unsafe { (*current).next.as_ref() };
+            match next {
+                Some(next) => current = next.as_ref() as *const Node,
+                None => break,
+            }
+        }
+        self.current = current;
+    }
     fn seek(&mut self, key: &[u8]) {
         if let Some(node) = self.map.borrow().get_greater_or_equal(key) {
             self.current = node as *const Node;

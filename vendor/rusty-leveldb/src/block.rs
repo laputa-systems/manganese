@@ -240,6 +240,9 @@ impl BlockIter {
 }
 
 impl LdbIterator for BlockIter {
+    fn seek_to_last(&mut self) {
+        BlockIter::seek_to_last(self);
+    }
     fn advance(&mut self) -> bool {
         if self.offset >= self.restarts_off {
             self.reset();

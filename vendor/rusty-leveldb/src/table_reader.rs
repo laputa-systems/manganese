@@ -327,6 +327,18 @@ impl TableIterator {
 }
 
 impl LdbIterator for TableIterator {
+    fn seek_to_last(&mut self) {
+        self.index_block.seek_to_last();
+        if let Some((_, handle)) = current_key_val(&self.index_block) {
+            if self.load_block(&handle).is_ok() {
+                self.current_block.as_mut().unwrap().seek_to_last();
+                if self.current_block.as_ref().unwrap().valid() {
+                    return;
+                }
+            }
+        }
+        self.reset();
+    }
     fn advance(&mut self) -> bool {
         loop {
             if let Some(ref mut block) = self.current_block {
