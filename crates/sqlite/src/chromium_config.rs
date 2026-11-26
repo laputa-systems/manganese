@@ -58,7 +58,11 @@ pub fn omits(words: &[Word<'_>]) -> bool {
             TokenType::TK_OVER => next.is_some_and(|kind| kind == TokenType::TK_LP || is_identifier(kind)),
             TokenType::TK_FILTER => next == Some(TokenType::TK_LP),
             TokenType::TK_WINDOW => words.get(index + 2).is_some_and(|word| word.kind == TokenType::TK_AS),
-            TokenType::TK_ID => next == Some(TokenType::TK_LP) && word.text.len() > 7 && word.text[..7].eq_ignore_ascii_case(b"pragma_"),
+            TokenType::TK_ID => {
+                next == Some(TokenType::TK_LP)
+                    && ((word.text.len() > 7 && word.text[..7].eq_ignore_ascii_case(b"pragma_"))
+                        || word.text.eq_ignore_ascii_case(b"load_extension"))
+            }
             _ => false,
         };
         if omitted {
