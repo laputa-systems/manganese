@@ -61,8 +61,8 @@ def main() -> int:
         if session is not None:
             try:
                 session.close()
-            except OSError as error:
-                print(f'session cleanup: {error}', file=sys.stderr)
+            except Exception as error:
+                print(f'session cleanup: {type(error).__name__}: {error}', file=sys.stderr)
     if mode == 'write' and session is not None:
         copy_profile(session.profile, profile)
     print(json.dumps(result))

@@ -37,7 +37,10 @@ def page_at(client: Cdp) -> str:
             'body': base64.b64encode(b'<!doctype html><title>profile handoff</title>').decode(),
         }, session=page)
     finally:
-        client.send('Fetch.disable', session=page)
+        try:
+            client.send('Fetch.disable', session=page)
+        except Exception as error:
+            print(f'Fetch.disable cleanup: {type(error).__name__}: {error}', file=sys.stderr)
     return page
 
 
