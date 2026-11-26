@@ -28,6 +28,15 @@ holdout_status=$?
 CASES=$cases sh scripts/box "$box" fuzz > "$work/fuzz.log" 2>&1
 fuzz_status=$?
 
+improvement_status=0
+if [ -f "boxes/$box/improvement" ]; then
+    sh "boxes/$box/improvement" > "$work/improvement.log" 2>&1
+    improvement_status=$?
+    if [ "$improvement_status" != 0 ]; then
+        echo "accept: improvement failed; log in $work/improvement.log" >&2
+    fi
+fi
+
 items() { sed -n "s/^lane=$1 items=\([0-9]*\) passed=\([0-9]*\)$/\1 \2/p" "$work/$1.log" | tail -1; }
 seen_items=$(items seen)
 holdout_items=$(items holdout)
@@ -44,7 +53,7 @@ if [ "$anchor_kind" = check ]; then
 fi
 
 source_level="not met"
-if [ "$seen_status" = 0 ] && [ "$holdout_status" = 0 ] && [ "$fuzz_status" = 0 ] && [ "${fuzz_completed:-0}" = "$cases" ]; then
+if [ "$seen_status" = 0 ] && [ "$holdout_status" = 0 ] && [ "$fuzz_status" = 0 ] && [ "$improvement_status" = 0 ] && [ "${fuzz_completed:-0}" = "$cases" ]; then
     source_level=met
 fi
 case $anchor_kind in
@@ -78,6 +87,7 @@ fi
     echo "run seen exit $seen_status items ${seen_items:-unreported}"
     echo "run holdout exit $holdout_status items ${holdout_items:-unreported}"
     echo "run fuzz exit $fuzz_status seed ${fuzz_seed:-unreported} requested $cases completed ${fuzz_completed:-unreported}"
+    if [ -f "boxes/$box/improvement" ]; then echo "run improvement boxes/$box/improvement exit $improvement_status"; fi
     if [ "$anchor_kind" = check ]; then echo "run anchor make $anchor_detail exit $anchor_status"; fi
     echo "level source-harness $source_level"
     echo "level frozen-browser $browser_level"

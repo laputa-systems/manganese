@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd)
+cd "$root"
+CARGO_TARGET_DIR=$root/.work/tmp/target RUSTC_WRAPPER=kache cargo test --locked --offline -p devtools-endpoint --test endpoint a_hundred_protocol_requests_each_return_the_protocol_and_the_endpoint_keeps_serving -- --exact

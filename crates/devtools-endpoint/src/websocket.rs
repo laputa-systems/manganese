@@ -21,10 +21,19 @@ pub fn handshake_response(accept: &str, extension: Option<&str>) -> Vec<u8> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub struct DeflateAgreement {
+    pub response: String,
+    pub server_no_context_takeover: bool,
+    pub client_no_context_takeover: bool,
+    pub server_max_window_bits: u8,
+    pub client_max_window_bits: u8,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Negotiation {
     Rejected,
     Declined,
-    Deflate(String),
+    Deflate(DeflateAgreement),
 }
 
 struct Parameter {
@@ -175,7 +184,13 @@ pub fn negotiate_extensions(header: &[u8]) -> Negotiation {
         if let Some(bits) = offer.client_max_window_bits {
             response.push_str(&format!("; client_max_window_bits={}", bits.unwrap_or(15)));
         }
-        return Negotiation::Deflate(response);
+        return Negotiation::Deflate(DeflateAgreement {
+            response,
+            server_no_context_takeover: offer.server_no_context_takeover,
+            client_no_context_takeover: offer.client_no_context_takeover,
+            server_max_window_bits: offer.server_max_window_bits.unwrap_or(15).max(9),
+            client_max_window_bits: offer.client_max_window_bits.flatten().unwrap_or(15).max(9),
+        });
     }
     Negotiation::Declined
 }
@@ -247,6 +262,23 @@ pub fn text_frame(payload: &[u8]) -> Vec<u8> {
     encode(Frame::text(Payload::Borrowed(payload)))
 }
 
+pub fn compressed_text_frame(payload: &[u8]) -> Vec<u8> {
+    let mut out = vec![0xc1];
+    match payload.len() {
+        0..=125 => out.push(payload.len() as u8),
+        126..=65535 => {
+            out.push(126);
+            out.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+        }
+        _ => {
+            out.push(127);
+            out.extend_from_slice(&(payload.len() as u64).to_be_bytes());
+        }
+    }
+    out.extend_from_slice(payload);
+    out
+}
+
 pub fn pong_frame(payload: &[u8]) -> Vec<u8> {
     encode(Frame::pong(Payload::Borrowed(payload)))
 }
@@ -307,10 +339,24 @@ mod tests {
 
     #[test]
     fn extension_headers_are_negotiated_like_net_websocket_encoder() {
-        assert_eq!(negotiate_extensions(b"permessage-deflate"), Negotiation::Deflate("permessage-deflate".into()));
-        assert_eq!(negotiate_extensions(b"permessage-deflate; client_max_window_bits"), Negotiation::Deflate("permessage-deflate; client_max_window_bits=15".into()));
+        fn agreement(header: &[u8], response: &str) {
+            match negotiate_extensions(header) {
+                Negotiation::Deflate(value) => assert_eq!(value.response, response),
+                other => panic!("expected an agreement, got {other:?}"),
+            }
+        }
+        agreement(b"permessage-deflate", "permessage-deflate");
+        agreement(b"permessage-deflate; client_max_window_bits", "permessage-deflate; client_max_window_bits=15");
+        agreement(b"permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=8; client_max_window_bits=9",
+                  "permessage-deflate; server_no_context_takeover; client_no_context_takeover; server_max_window_bits=8; client_max_window_bits=9");
         assert_eq!(negotiate_extensions(b"x-other"), Negotiation::Declined);
         assert_eq!(negotiate_extensions(b""), Negotiation::Rejected);
         assert_eq!(negotiate_extensions(b"a;"), Negotiation::Rejected);
+    }
+
+    #[test]
+    fn compressed_frames_set_only_the_reserved1_bit() {
+        assert_eq!(compressed_text_frame(b"hi"), b"\xc1\x02hi");
+        assert_eq!(&compressed_text_frame(&[b'a'; 300])[..4], &[0xc1, 126, 1, 44]);
     }
 }
