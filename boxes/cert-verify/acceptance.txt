@@ -1,6 +1,6 @@
 version 1
 box cert-verify
-revision 9f9e31949c42b0fef08205d744c500b58b9e5c42
+revision d4dd3ee4cb279d00470db3615d2edd07ce171d14
 arch x86_64
 spec sha256:3be2d8a229ce70d4f3ced28bdf77121c37c3292f18eb727475d27f765ab3db17
 corpus sha256:9a748b93acc84f76eff5232f769798f60e8189d69d537eab362f9fb73339d7a4 seen 1484 holdout 812
@@ -10,7 +10,7 @@ candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/cert-verify sha256:14
 dependencies cargo-lock sha256:b826cdfff4e46ccefcc18da5c703c41e7af0ea9c1a9e9137ff782ebb4bc8ef08 tree sha256:00f8a8b14b2d9ea6e3ac5ddc2b22ac1131d2991282c9a42a4b91aba484cf16e4
 run seen exit 0 items 1484 1484
 run holdout exit 0 items 812 812
-run fuzz exit 0 seed 1795717433400086624 requested 10000 completed 10000
+run fuzz exit 0 seed 1795717655061202836 requested 10000 completed 10000
 run anchor make cert-verify-anchor exit 0
 level source-harness met
 level frozen-browser met: make cert-verify-anchor
