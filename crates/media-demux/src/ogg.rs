@@ -286,7 +286,7 @@ impl Opus {
         if packet.len() < OPUS_HEAD_SIZE || packet[8] & 0xf0 != 0 {
             return Err(AVERROR_INVALIDDATA);
         }
-        self.pre_skip = u16::from_le_bytes(packet[10..12].try_into().unwrap()) as i64;
+        self.pre_skip = u16::from_le_bytes(packet[10..12].try_into().expect("a two-byte Opus pre-skip field")) as i64;
         self.need_comments = true;
         self.trim_pending = true;
         Ok(())

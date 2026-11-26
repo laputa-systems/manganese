@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -36,11 +37,12 @@ def main() -> int:
 
     run_dir = launch.new_run_dir('profile-handoff', mode)
     archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
-    if mode != 'write':
-        copy_profile(profile, run_dir / 'profile')
-    session = launch.open_session(run_dir, archive)
-    browser = None
+    session = None
+    browser: subprocess.Popen[bytes] | None = None
     try:
+        if mode != 'write':
+            copy_profile(profile, run_dir / 'profile')
+        session = launch.open_session(run_dir, archive)
         _, browser = session.start_browser('headless')
         witness = str(Path(__file__).resolve().parent / 'sidecar.py')
         output = session.sidecar(['python3', '-B', '/witness/sidecar.py', mode, *expectation],
@@ -51,10 +53,17 @@ def main() -> int:
         result = json.loads(output)
     finally:
         if browser is not None and browser.poll() is None:
-            browser.kill()
-            browser.wait()
-        session.close()
-    if mode == 'write':
+            try:
+                browser.kill()
+                browser.wait()
+            except OSError as error:
+                print(f'browser cleanup: {error}', file=sys.stderr)
+        if session is not None:
+            try:
+                session.close()
+            except OSError as error:
+                print(f'session cleanup: {error}', file=sys.stderr)
+    if mode == 'write' and session is not None:
         copy_profile(session.profile, profile)
     print(json.dumps(result))
     return 0

@@ -28,14 +28,16 @@ def connect_when_ready(deadline_seconds: float = 60.0) -> Cdp:
 def page_at(client: Cdp) -> str:
     page = client.page()
     client.send('Fetch.enable', {'patterns': [{'urlPattern': 'https://profile.test/*'}]}, session=page)
-    client.evaluate(page, f"location.href='{ORIGIN}'; 'navigating'")
-    event = client.wait_event('Fetch.requestPaused', session=page)
-    client.send('Fetch.fulfillRequest', {
-        'requestId': event['requestId'], 'responseCode': 200,
-        'responseHeaders': [{'name': 'Content-Type', 'value': 'text/html'}],
-        'body': base64.b64encode(b'<!doctype html><title>profile handoff</title>').decode(),
-    }, session=page)
-    client.send('Fetch.disable', session=page)
+    try:
+        client.evaluate(page, f"location.href='{ORIGIN}'; 'navigating'")
+        event = client.wait_event('Fetch.requestPaused', session=page)
+        client.send('Fetch.fulfillRequest', {
+            'requestId': event['requestId'], 'responseCode': 200,
+            'responseHeaders': [{'name': 'Content-Type', 'value': 'text/html'}],
+            'body': base64.b64encode(b'<!doctype html><title>profile handoff</title>').decode(),
+        }, session=page)
+    finally:
+        client.send('Fetch.disable', session=page)
     return page
 
 

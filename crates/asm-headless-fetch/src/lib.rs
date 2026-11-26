@@ -171,7 +171,9 @@ impl Relay {
         self.stop.store(true, Ordering::SeqCst);
         let _ = self.stop_signal.try_send(());
         if let Some(thread) = self.thread.take() {
-            thread.join().expect("the relay stub exits without panic");
+            if thread.join().is_err() {
+                eprintln!("relay stub panicked during cleanup");
+            }
         }
     }
 }
