@@ -1,3 +1,4 @@
+import atexit
 import hashlib
 import os
 import pathlib
@@ -12,6 +13,15 @@ os.chdir(root)
 store = pathlib.Path(os.environ.get('MANGANESE_STORE', pathlib.Path.home() / '.local/share/manganese/store')) / 'sha256'
 store.mkdir(parents=True, exist_ok=True)
 oracle = subprocess.Popen(['.work/tmp/jpeg-encode/oracle'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+
+
+def stop_oracle():
+    if oracle.poll() is None:
+        oracle.kill()
+    oracle.wait()
+
+
+atexit.register(stop_oracle)
 oracle.stdin.write(b'MGB1')
 oracle.stdin.flush()
 if oracle.stdout.read(4) != b'MGB1':

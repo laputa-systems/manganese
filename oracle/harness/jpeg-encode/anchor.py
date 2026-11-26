@@ -46,6 +46,8 @@ def main():
     archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
     session = launch.open_session(run_dir, archive)
     browser = None
+    oracle2 = None
+    candidate = None
     try:
         _, browser = session.start_browser('headless')
         result = json.loads(session.sidecar(['python3', '-B', '/jpeg/anchor-sidecar.py', '/inputs/inputs.json'],
@@ -69,10 +71,6 @@ def main():
                 mismatches.append(f'{name} oracle/browser: {len(wanted)} vs {len(actual)} bytes')
             elif ask(candidate, record) != actual:
                 mismatches.append(f'{name} candidate/browser')
-        oracle2.stdin.close()
-        candidate.stdin.close()
-        oracle2.wait()
-        candidate.wait()
         if mismatches:
             raise RuntimeError(f'{len(mismatches)} anchor mismatches: ' + ' '.join(mismatches[:10]))
         print(f'anchor {checked} JPEG exports agree with the frozen browser and the source harness')
@@ -80,6 +78,17 @@ def main():
         if not shutdown.get('shutdown', {}).get('ok') or browser.wait(timeout=15) != 0:
             raise RuntimeError('browser shutdown failed')
     finally:
+        for process in (oracle2, candidate):
+            if process is None:
+                continue
+            try:
+                if process.stdin is not None and not process.stdin.closed:
+                    process.stdin.close()
+                if process.poll() is None:
+                    process.kill()
+                process.wait(timeout=15)
+            except OSError as error:
+                print(f'peer cleanup: {error}', file=sys.stderr)
         if browser is not None and browser.poll() is None:
             browser.kill()
             browser.wait()

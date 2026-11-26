@@ -3,7 +3,6 @@ import pathlib
 import re
 import shlex
 import subprocess
-import tempfile
 
 out = pathlib.Path('/work/out/chromium-wayland-release')
 scratch = pathlib.Path('/lane/.work/tmp/jpeg-encode')

@@ -1,3 +1,5 @@
+use std::fmt;
+
 use zlib_rs::Deflate;
 use zlib_rs::DeflateConfig;
 use zlib_rs::DeflateFlush;
@@ -13,6 +15,12 @@ fn window_bits(bits: u8) -> u8 {
 pub struct Deflater {
     stream: Deflate,
     context_takeover: bool,
+}
+
+impl fmt::Debug for Deflater {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Deflater").field("context_takeover", &self.context_takeover).finish_non_exhaustive()
+    }
 }
 
 impl Deflater {
@@ -80,6 +88,12 @@ pub struct Inflater {
     stream: Inflate,
 }
 
+impl fmt::Debug for Inflater {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Inflater").finish_non_exhaustive()
+    }
+}
+
 impl Inflater {
     pub fn new(bits: u8) -> Self {
         Self { stream: Inflate::new(false, window_bits(bits)) }
@@ -107,7 +121,7 @@ impl Inflater {
                 break;
             }
             if consumed == 0 && produced == 0 {
-                break;
+                return None;
             }
         }
         Some(out)

@@ -1,5 +1,7 @@
 //! Baseline JPEG encoder that reproduces libjpeg-turbo 3.1.0's byte output.
 
+use std::fmt;
+
 const DCTSIZE: usize = 8;
 const DCTSIZE2: usize = 64;
 const NATURAL: [usize; DCTSIZE2] = [
@@ -34,7 +36,7 @@ pub enum Downsample {
     S420,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Options<'a> {
     pub quality: u8,
     pub downsample: Downsample,
@@ -47,6 +49,14 @@ pub enum Error {
     Dimension,
     PixelCount,
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for Error {}
 
 #[derive(Clone, Copy)]
 struct Quant {
