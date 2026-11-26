@@ -15,7 +15,7 @@ unsafe extern "C" {
 }
 
 /// Kill the adapter's whole process group, so a helper it started cannot hold its pipes open.
-fn kill_group(child: &Child) {
+pub(crate) fn kill_group(child: &Child) {
     let Ok(pid) = i32::try_from(child.id()) else { return };
     // SAFETY: kill takes plain integers; a negative pid names the process group the adapter leads.
     // An already-empty group fails with ESRCH, which leaves nothing to clean up.

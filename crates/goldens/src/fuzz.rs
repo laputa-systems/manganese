@@ -1,8 +1,9 @@
-use crate::process::{Limits, Peer, Scratch, env_number, parse_positive};
+use crate::process::{Limits, Peer, Scratch, env_number, kill_group, parse_positive};
 use crate::{Declaration, Fuzz, Lane, ORACLE_RESAMPLES, OracleAgreement, Spec, compare, load_blob, lock_items, name, oracle_agreement, sha256};
 use std::fs;
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Child, Command};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_DRIVER_TIMEOUT_SECS: u64 = 24 * 60 * 60;
@@ -106,7 +107,8 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
     let candidate_path = candidate_override.unwrap_or_else(|| PathBuf::from(&spec.candidate));
     let identities = format!("{}\n{}", identity("oracle", Path::new(&spec.oracle)), identity("candidate", &candidate_path));
     if let Fuzz::Driver { program } = &spec.fuzz {
-        return drive(id, program, &spec, &candidate_path, budget, &identities);
+        let deadline = Duration::from_secs(env_number("FUZZ_TIMEOUT_SECS", DEFAULT_DRIVER_TIMEOUT_SECS)?);
+        return drive(id, program, &spec, &candidate_path, budget, &identities, Path::new("."), deadline);
     }
     let (seeds, max) = match &spec.fuzz {
         Fuzz::Bytes { max_len } => (Vec::new(), *max_len),
@@ -178,10 +180,10 @@ pub fn run(id: &str, store: &Path, candidate_override: Option<PathBuf>) -> Resul
 /// A box whose inputs are structured records generates and compares them in its own driver. The
 /// driver receives the oracle and candidate paths and the validated SEED and CASES, and must write
 /// `seed=`, `requested=` and `completed=` lines to FUZZ_RESULT; an exit status alone proves nothing.
-fn drive(id: &str, program: &str, spec: &Spec, candidate: &Path, budget: Budget, identities: &str) -> Result<(), String> {
-    let deadline = Duration::from_secs(env_number("FUZZ_TIMEOUT_SECS", DEFAULT_DRIVER_TIMEOUT_SECS)?);
-    let result = PathBuf::from(format!(".work/tmp/fuzz-{id}-{}-{}.result", budget.seed, std::process::id()));
-    fs::create_dir_all(".work/tmp").map_err(|e| format!("create .work/tmp: {e}"))?;
+fn drive(id: &str, program: &str, spec: &Spec, candidate: &Path, budget: Budget, identities: &str, root: &Path, deadline: Duration) -> Result<(), String> {
+    let scratch = root.join(".work/tmp");
+    let result = scratch.join(format!("fuzz-{id}-{}-{}.result", budget.seed, std::process::id()));
+    fs::create_dir_all(&scratch).map_err(|e| format!("create {}: {e}", scratch.display()))?;
     match fs::remove_file(&result) { Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(format!("clear {}: {e}", result.display())), _ => {} }
     let mut child = Command::new(program)
         .env("FUZZ_ORACLE", &spec.oracle)
@@ -189,19 +191,23 @@ fn drive(id: &str, program: &str, spec: &Spec, candidate: &Path, budget: Budget,
         .env("SEED", budget.seed.to_string())
         .env("CASES", budget.cases.to_string())
         .env("FUZZ_RESULT", &result)
+        .process_group(0)
         .spawn()
         .map_err(|e| format!("fuzz driver {program}: {e}"))?;
+    struct DriverGuard<'a> { child: &'a mut Child }
+    impl Drop for DriverGuard<'_> {
+        fn drop(&mut self) {
+            kill_group(self.child);
+            let _ = self.child.wait();
+        }
+    }
+    let guard = DriverGuard { child: &mut child };
     let started = Instant::now();
     let status = loop {
-        match child.try_wait().map_err(|e| format!("wait fuzz driver: {e}"))? {
+        match guard.child.try_wait().map_err(|e| format!("wait fuzz driver: {e}"))? {
             Some(status) => break status,
             None if started.elapsed() < deadline => std::thread::sleep(Duration::from_millis(100)),
-            None => {
-                // The driver is being abandoned for exceeding its deadline; its exit status adds nothing.
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err(format!("fuzz driver {program} exceeded FUZZ_TIMEOUT_SECS={}\n{identities}", deadline.as_secs()));
-            }
+            None => return Err(format!("fuzz driver {program} exceeded FUZZ_TIMEOUT_SECS={}\n{identities}", deadline.as_secs())),
         }
     };
     let report = fs::read_to_string(&result).map_err(|e| format!("fuzz driver {program} wrote no result ({e}); exit {status}\n{identities}"))?;
@@ -229,6 +235,56 @@ fn driver_completed(report: &str, budget: Budget) -> Result<u64, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn alive(pid: u32) -> bool {
+        match fs::read_to_string(format!("/proc/{pid}/stat")) {
+            Ok(stat) => stat.split_once(')').map(|(_, rest)| rest.split_whitespace().next() != Some("Z")).unwrap_or(false),
+            Err(_) => false,
+        }
+    }
+
+    #[test]
+    fn a_timed_out_driver_takes_its_peers_with_it() {
+        let dir = std::env::temp_dir().join(format!("goldens-drive-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let pidfile = dir.join("peer.pid");
+        let program = dir.join("driver");
+        fs::write(&program, format!("#!/bin/sh\nsleep 30 &\necho $! > '{}'\nwait\n", pidfile.display())).unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let spec = Spec::parse(&format!(r#"
+seam = "transport cleanup"
+streaming = "none: synthetic driver"
+reentrancy = "none: synthetic driver"
+callbacks = "none: synthetic driver"
+threading = "none: synthetic driver"
+wire_version = 1
+corpus_sources = "none: synthetic driver"
+environment = "none: synthetic driver"
+comparison = "exact"
+observable_surface = "synthetic driver"
+varying_relationships = "none: synthetic driver"
+ordering = "none: synthetic driver"
+oracle_defects = "none: synthetic driver"
+improvements = "none: synthetic driver"
+anchor = "none: synthetic driver"
+arm64_evidence = "harness: synthetic driver"
+holdout_percent = 30
+oracle = "/bin/true"
+candidate = "/bin/true"
+fuzz = "driver"
+fuzz_driver = "{}"
+acceptance_cases = 1
+"#, program.display())).unwrap();
+        let started = Instant::now();
+        let error = drive("cleanup", &program.to_string_lossy(), &spec, Path::new("/bin/true"), Budget { seed: 11, cases: 1 }, "identities", &dir, Duration::from_secs(1)).unwrap_err();
+        assert!(error.contains("exceeded FUZZ_TIMEOUT_SECS"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(10), "the driver was not bounded");
+        let pid = fs::read_to_string(&pidfile).unwrap().trim().parse::<u32>().unwrap();
+        assert!(!alive(pid), "peer {pid} survived the driver's deadline");
+        fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn budgets_need_a_positive_case_count_and_an_unsigned_seed() {

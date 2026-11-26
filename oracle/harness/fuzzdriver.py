@@ -12,6 +12,7 @@ import os
 import pathlib
 import select
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -48,7 +49,8 @@ class Peer:
         pathlib.Path('.work/tmp').mkdir(parents=True, exist_ok=True)
         self.scratch = tempfile.mkdtemp(prefix=f'fuzz-scratch-{role}-', dir='.work/tmp')
         environment = dict(os.environ, GOLDENS_SCRATCH=os.path.abspath(self.scratch))
-        self.process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, start_new_session=True, env=environment)
+        self.process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, bufsize=0, env=environment)
+        os.set_blocking(self.process.stdin.fileno(), False)
 
     def handshake(self):
         self.send(b'MGB1')
@@ -56,11 +58,22 @@ class Peer:
             raise PeerFailure(f'{self.role} wrote an invalid protocol header')
 
     def send(self, data):
-        try:
-            self.process.stdin.write(data)
-            self.process.stdin.flush()
-        except BrokenPipeError:
-            raise PeerFailure(f'{self.role} stopped reading its input') from None
+        deadline = time.monotonic() + self.timeout
+        view = memoryview(data)
+        descriptor = self.process.stdin.fileno()
+        while view:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or not select.select([], [descriptor], [], remaining)[1]:
+                raise PeerFailure(f'{self.role} did not accept the request within {self.timeout}s')
+            try:
+                written = os.write(descriptor, view)
+            except BlockingIOError:
+                continue
+            except BrokenPipeError:
+                raise PeerFailure(f'{self.role} stopped reading its input') from None
+            if written <= 0:
+                raise PeerFailure(f'{self.role} stopped reading its input')
+            view = view[written:]
 
     def read(self, length):
         deadline = time.monotonic() + self.timeout
@@ -85,8 +98,18 @@ class Peer:
 
     def finish(self):
         self.process.stdin.close()
+        deadline = time.monotonic() + self.timeout
+        descriptor = self.process.stdout.fileno()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0 or not select.select([descriptor], [], [], remaining)[0]:
+            raise PeerFailure(f'{self.role} did not exit after its input closed')
+        if os.read(descriptor, 1):
+            raise PeerFailure(f'{self.role} wrote an unrequested record')
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise PeerFailure(f'{self.role} did not exit after its input closed')
         try:
-            status = self.process.wait(self.timeout)
+            status = self.process.wait(remaining)
         except subprocess.TimeoutExpired:
             raise PeerFailure(f'{self.role} did not exit after its input closed') from None
         if status:
@@ -94,7 +117,7 @@ class Peer:
 
     def stop(self):
         try:
-            os.killpg(self.process.pid, 9)
+            os.kill(self.process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         self.process.wait()
@@ -117,30 +140,36 @@ def run(box, seed, cases, generate):
     print(f'fuzz box={box} seed={seed} cases={cases}', flush=True)
     started = time.monotonic()
     peers, completed, failure, record = [], 0, None, b''
+    saved = pathlib.Path(f'.work/tmp/fuzz-{box}-{seed}-case0.bin')
     try:
         for role, path in paths.items():
-            peers.append(Peer(role, path, timeout, max_output))
-            peers[-1].handshake()
+            peer = Peer(role, path, timeout, max_output)
+            peers.append(peer)
+            peer.handshake()
         oracle, candidate = peers
         for index in range(cases):
-            record = b''
             record = generate(oracle)
+            saved = pathlib.Path(f'.work/tmp/fuzz-{box}-{seed}-case{index}.bin')
+            saved.parent.mkdir(parents=True, exist_ok=True)
+            saved.write_bytes(record)
             expected, actual = oracle.ask(record), candidate.ask(record)
             if expected != actual:
                 failure = f'divergence\noracle hex={expected.hex()}\ncandidate hex={actual.hex()}'
                 break
+            saved.unlink(missing_ok=True)
             completed += 1
         else:
             for peer in peers:
                 peer.finish()
     except PeerFailure as error:
         failure = str(error)
+    except Exception as error:
+        failure = f'{type(error).__name__}: {error}'
     finally:
+        pathlib.Path(os.environ['FUZZ_RESULT']).write_text(f'seed={seed}\nrequested={cases}\ncompleted={completed}\n')
         for peer in peers:
             peer.stop()
-    pathlib.Path(os.environ['FUZZ_RESULT']).write_text(f'seed={seed}\nrequested={cases}\ncompleted={completed}\n')
     if failure is not None:
-        saved = pathlib.Path(f'.work/tmp/fuzz-{box}-{seed}-case{completed}.bin')
         saved.parent.mkdir(parents=True, exist_ok=True)
         saved.write_bytes(record)
         print(f'{failure}\nseed={seed} case={completed} request hex={record.hex()}\n{identities}\nsaved {saved}', file=sys.stderr, flush=True)
