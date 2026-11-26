@@ -4,7 +4,7 @@ Base: 9e928387c549fb3c303c902b741918039a4e4dc4 (2026-11-25, 0.9.0-pre.6).
 
 Branch: manganese/chromium-sqlite.
 
-Pushed commit: 97207a53f (core: look up the table of CREATE INDEX before its name).
+Pushed commit: 02c26e911 (core: make LIKE and GLOB false for BLOB operands under a feature).
 
 The snapshot holds the crates Manganese builds: core (turso_core), ast (turso_ast), macros (turso_macros), sqlite/parser (turso_parser), sqlite/frontend (turso_sqlite) and extensions/core (turso_ext), with the upstream license files and sqlite/version. Its root manifest lists only those members; every other file in those crates matches the pushed commit.
 
@@ -17,6 +17,7 @@ Fork commits on the branch, oldest first:
 - WITHOUT ROWID: secondary and UNIQUE indexes in SQLite's layout, REPLACE and every conflict clause, UPDATE and DELETE through SQLite's two-pass plan.
 - Text: TEXT keeps any bytes as SQLite does; ALTER TABLE RENAME TO and RENAME COLUMN edit stored schema text token by token; CREATE VIEW keeps its written text; CREATE INDEX resolves its table before its name.
 - secure_delete also zeroes freed pages, emptied pages and defragmented gaps; PRAGMA case_sensitive_like; upper(X,'el') as ICU 78; REGEXP with ICU syntax through fancy-regex (MIT); VACUUM leaves the last insert rowid where SQLite does.
+- A like_doesnt_match_blobs feature makes the built-in LIKE and GLOB answer false for a BLOB operand before they check NULL, as Chromium's SQLITE_LIKE_DOESNT_MATCH_BLOBS build does; it is off by default.
 - Values: SQLite 3.53.4's REAL to TEXT and TEXT to REAL conversions everywhere, concat_ws keeping empty arguments, SQLITE_ENABLE_ICU's upper, lower, LIKE and REGEXP as a dialect option (icu_casemap 2.2), and SQLite version 3.53.4.
 
 The lane branches manganese/rollback-journal, manganese/sqlite-text, manganese/lane-wor, manganese/lane-rename and manganese/lane-text in the local clone hold the original commits that were cherry-picked onto the branch.

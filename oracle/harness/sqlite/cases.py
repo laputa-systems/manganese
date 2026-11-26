@@ -19,6 +19,7 @@ SEEDS = {'seen': 4101, 'holdout': 4102}
 EXCLUDED = {
     'seen-feature-23': 'owner 2026-11-26: FTS3 is not a retained surface',
     'seen-feature-24': 'owner 2026-11-26: FTS5 is not a retained surface',
+    'seen-crash-0': 'owner 2026-11-26: state after a deleted hot journal is undefined',
     'holdout-crash-4': 'owner 2026-11-26: state after a deleted hot journal is undefined',
 }
 

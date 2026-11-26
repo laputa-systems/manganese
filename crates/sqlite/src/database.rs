@@ -375,6 +375,9 @@ impl Database {
         let connection = &self.connection;
         let Some(statement) = self.statements.get_mut(&id) else { return };
         if let (Some(prepared), Some(Connection::Open(engine))) = (statement.engine.as_mut(), connection) {
+            if self.transaction_nesting > 0 && statement.ran && !statement.halted {
+                while let Ok(true) = engine.step(prepared) {}
+            }
             engine.reset(prepared);
             if clear_bindings {
                 engine.clear_bindings(prepared);
@@ -508,6 +511,9 @@ impl Database {
         }
         for sql in drops {
             if !self.execute(&sql) {
+                if matches!(self.errcode, engine::SQLITE_BUSY | engine::SQLITE_LOCKED) {
+                    self.errcode = 0;
+                }
                 return false;
             }
         }

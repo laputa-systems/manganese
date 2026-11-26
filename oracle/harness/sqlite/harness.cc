@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -350,6 +351,7 @@ class Session {
             .set_cache_size(cache_size);
         transactions_.clear();
         statements_.clear();
+        stepped_.clear();
         meta_.reset();
         database_ = std::make_unique<sql::Database>(std::move(options),
                                                     sql::Database::Tag("Test"));
@@ -359,6 +361,7 @@ class Session {
       case kClose:
         transactions_.clear();
         statements_.clear();
+        stepped_.clear();
         meta_.reset();
         Db().Close();
         out.Bool(true);
@@ -374,42 +377,63 @@ class Session {
         auto statement =
             std::make_unique<sql::Statement>(Db().GetUniqueStatement(sql));
         bool valid = statement->is_valid();
+        stepped_.erase(slot);
         statements_[slot] = std::move(statement);
         Result(out, valid);
         return;
       }
       case kBind: {
-        sql::Statement& statement = Slot(in.U8());
+        uint8_t slot = in.U8();
         int index = in.U16();
         uint8_t tag = in.U8();
+        uint64_t bits = 0;
+        std::string bytes;
         switch (tag) {
           case kNull:
-            statement.BindNull(index);
             break;
           case kInteger:
-            statement.BindInt64(index, static_cast<int64_t>(in.U64()));
+          case kFloat:
+            bits = in.U64();
             break;
-          case kFloat: {
-            uint64_t bits = in.U64();
-            double value;
-            memcpy(&value, &bits, sizeof(value));
-            statement.BindDouble(index, value);
-            break;
-          }
           case kText:
-            statement.BindString(index, in.Bytes());
-            break;
           case kBlob:
-            statement.BindBlob(index, in.Bytes());
+            bytes = in.Bytes();
             break;
           default:
             Fail("unknown value tag");
+        }
+        if (!stepped_.count(slot)) {
+          sql::Statement& statement = Slot(slot);
+          switch (tag) {
+            case kNull:
+              statement.BindNull(index);
+              break;
+            case kInteger:
+              statement.BindInt64(index, static_cast<int64_t>(bits));
+              break;
+            case kFloat: {
+              double value;
+              memcpy(&value, &bits, sizeof(value));
+              statement.BindDouble(index, value);
+              break;
+            }
+            case kText:
+              statement.BindString(index, bytes);
+              break;
+            case kBlob:
+              statement.BindBlob(index, bytes);
+              break;
+            default:
+              Fail("unknown value tag");
+          }
         }
         out.Bool(true);
         return;
       }
       case kStep: {
-        sql::Statement& statement = Slot(in.U8());
+        uint8_t slot = in.U8();
+        sql::Statement& statement = Slot(slot);
+        stepped_.insert(slot);
         uint16_t max_rows = in.U16();
         uint8_t getter_count = in.U8();
         std::vector<uint8_t> getters;
@@ -442,15 +466,20 @@ class Session {
         return;
       }
       case kReset: {
-        sql::Statement& statement = Slot(in.U8());
+        uint8_t slot = in.U8();
+        sql::Statement& statement = Slot(slot);
+        stepped_.erase(slot);
         statement.Reset(in.U8() != 0);
         out.Bool(true);
         return;
       }
-      case kFinalize:
-        statements_.erase(in.U8());
+      case kFinalize: {
+        uint8_t slot = in.U8();
+        stepped_.erase(slot);
+        statements_.erase(slot);
         out.Bool(true);
         return;
+      }
       case kBegin: {
         uint8_t slot = in.U8();
         auto transaction = std::make_unique<sql::Transaction>(&Db());
@@ -549,6 +578,7 @@ class Session {
       case kRazeAndPoison:
         transactions_.clear();
         statements_.clear();
+        stepped_.clear();
         meta_.reset();
         out.Bool(Db().RazeAndPoison());
         return;
@@ -727,6 +757,7 @@ class Session {
   std::unique_ptr<sql::Database> database_;
   std::vector<std::unique_ptr<sql::Database>> abandoned_;
   std::map<uint8_t, std::unique_ptr<sql::Statement>> statements_;
+  std::set<uint8_t> stepped_;
   std::map<uint8_t, std::unique_ptr<sql::Transaction>> transactions_;
   std::unique_ptr<sql::MetaTable> meta_;
 };
@@ -759,12 +790,9 @@ int main(int argc, char** argv) {
   if (fwrite("MGB1", 1, 4, stdout) != 4 || fflush(stdout) != 0) {
     Fail("cannot write header");
   }
-  // Chromium's sql::Statement::Bind* releases a bound blob before
-  // sqlite3_bind_* refuses a statement that was stepped and not reset, so a
-  // later step reads the freed memory SQLite still holds as SQLITE_STATIC.
-  // Each request therefore runs in a child forked from this process, which
-  // allocates nothing after the handshake, so that memory depends only on the
-  // request.
+  // Each request runs in a child forked from this process, which allocates
+  // nothing after the handshake, so its heap depends only on the request and
+  // not on the requests that came before it in the stream.
   for (;;) {
     unsigned char header[4];
     size_t got = ReadInput(reinterpret_cast<char*>(header), 4);
