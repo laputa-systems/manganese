@@ -54,7 +54,7 @@ for archive in archives:
             symbols.setdefault(symbol, obj)
     print('indexed', archive.name, flush=True)
 
-source_objects = [obj for obj in sources if obj.startswith(('obj/third_party/perfetto/', 'obj/third_party/abseil-cpp/', 'obj/third_party/simdutf/', 'obj/third_party/crashpad/', 'obj/base/third_party/double_conversion/', 'obj/third_party/protobuf/')) and (out / obj).is_file()]
+source_objects = [obj for obj in sources if obj.startswith(('obj/third_party/perfetto/', 'obj/third_party/abseil-cpp/', 'obj/third_party/simdutf/', 'obj/third_party/crashpad/', 'obj/base/third_party/double_conversion/', 'obj/third_party/protobuf/', 'obj/third_party/boringssl/', 'obj/third_party/zlib/')) and (out / obj).is_file()]
 for start in range(0, len(source_objects), 100):
     batch = source_objects[start:start + 100]
     result = subprocess.run(['/opt/chromium-llvm/bin/llvm-nm', '-g', '--defined-only', '-A', *batch], cwd=out, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, check=True)
