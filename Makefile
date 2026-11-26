@@ -212,3 +212,15 @@ cert-verify-trust-data:
 .PHONY: cert-verify-anchor
 cert-verify-anchor:
 	python3 -B oracle/harness/cert-verify/anchor.py
+
+.PHONY: https-fixture
+https-fixture:
+	python3 -B oracle/harness/https/fixture.py build
+
+.PHONY: https-fixture-inspect
+https-fixture-inspect:
+	python3 -B oracle/harness/https/fixture.py inspect
+
+.PHONY: https-fixture-witness
+https-fixture-witness:
+	python3 -B oracle/harness/https/witness.py
