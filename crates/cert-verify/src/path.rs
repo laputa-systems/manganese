@@ -170,14 +170,31 @@ pub struct ResultPath {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CtCompliance {
+    Complies,
     NotEnoughScts,
+    NotDiverseScts,
     BuildNotTimely,
     DetailsNotAvailable,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SctOrigin {
+    Embedded,
+    Ocsp,
+    Tls,
+}
+
 #[derive(Clone, Copy, Debug)]
+pub struct VerifiedSct {
+    pub log_index: usize,
+    pub timestamp_ms: u64,
+    pub origin: SctOrigin,
+}
+
+#[derive(Clone, Debug)]
 pub struct DelegateData {
     pub ct_compliance: CtCompliance,
+    pub valid_scts: Vec<VerifiedSct>,
 }
 
 impl ResultPath {
@@ -301,7 +318,7 @@ pub fn build(target: Rc<ParsedCertificate>, sources: &Sources<'_>, time: &Genera
             certs: Vec::new(),
             trust: Trust::UNSPECIFIED,
             errors: CertPathErrors::default(),
-            delegate: DelegateData { ct_compliance: CtCompliance::DetailsNotAvailable },
+            delegate: DelegateData { ct_compliance: CtCompliance::DetailsNotAvailable, valid_scts: Vec::new() },
         };
         match iter.next_path(sources, &mut path, &mut iterations, max_iterations) {
             Step::Exhausted => {

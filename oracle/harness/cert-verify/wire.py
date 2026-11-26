@@ -26,6 +26,8 @@ class Record:
     hostname: bytes
     chain: list
     trust: list = field(default_factory=list)
+    scts: bytes = b''
+    ocsp: bytes = b''
 
 
 def encode(record):
@@ -45,6 +47,9 @@ def encode(record):
             out += struct.pack('>H', len(entry.cidrs))
             for address, mask in entry.cidrs:
                 out += bytes([len(address)]) + address + mask
+    if record.scts or record.ocsp:
+        out += struct.pack('>H', len(record.scts)) + record.scts
+        out += struct.pack('>H', len(record.ocsp)) + record.ocsp
     return bytes(out)
 
 
@@ -80,9 +85,14 @@ def decode(data):
                 width = reader.uint(1)
                 entry.cidrs.append((reader.take(width), reader.take(width)))
         trust.append(entry)
+    scts, ocsp = b'', b''
+    if reader.offset < len(data):
+        scts = reader.take(reader.uint(2))
+        if reader.offset < len(data):
+            ocsp = reader.take(reader.uint(2))
     if reader.offset != len(data):
         raise ValueError('trailing bytes')
-    return Record(time, hostname, chain, trust)
+    return Record(time, hostname, chain, trust, scts, ocsp)
 
 
 REGRESSIONS = frozenset({'ec-intermediate-p-521'})

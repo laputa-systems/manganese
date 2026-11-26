@@ -1,5 +1,6 @@
 mod cert;
 mod chain;
+mod ct;
 mod der;
 mod errors;
 mod hostname;
@@ -25,6 +26,8 @@ struct Request {
     hostname: Vec<u8>,
     chain: Vec<Vec<u8>>,
     trust: Vec<TrustEntry>,
+    scts: Vec<u8>,
+    ocsp: Vec<u8>,
 }
 
 struct Reader<'a> {
@@ -94,10 +97,18 @@ fn parse_request(input: &[u8]) -> Result<Request, &'static str> {
         }
         trust.push(entry);
     }
+    let mut scts = Vec::new();
+    let mut ocsp = Vec::new();
+    if !reader.data.is_empty() {
+        scts = reader.prefixed(2).ok_or("sct list")?.to_vec();
+        if !reader.data.is_empty() {
+            ocsp = reader.prefixed(2).ok_or("ocsp response")?.to_vec();
+        }
+    }
     if !reader.data.is_empty() {
         return Err("trailing bytes");
     }
-    Ok(Request { time, hostname, chain, trust })
+    Ok(Request { time, hostname, chain, trust, scts, ocsp })
 }
 
 fn error_name(error: i32) -> &'static str {
@@ -149,7 +160,9 @@ const STATUS_NAMES: [(u32, &str); 21] = [
 
 fn compliance_name(compliance: CtCompliance) -> &'static str {
     match compliance {
+        CtCompliance::Complies => "complies",
         CtCompliance::NotEnoughScts => "not-enough-scts",
+        CtCompliance::NotDiverseScts => "not-diverse-scts",
         CtCompliance::BuildNotTimely => "build-not-timely",
         CtCompliance::DetailsNotAvailable => "details-not-available",
     }
@@ -179,7 +192,7 @@ fn render(outcome: &Outcome) -> String {
 fn execute(verifier: &Verifier, input: &[u8]) -> String {
     match parse_request(input) {
         Err(reason) => format!("invalid {reason}\n"),
-        Ok(request) => render(&verifier.verify(request.time, &request.hostname, &request.chain, &request.trust)),
+        Ok(request) => render(&verifier.verify(request.time, &request.hostname, &request.chain, &request.trust, &request.scts, &request.ocsp)),
     }
 }
 
