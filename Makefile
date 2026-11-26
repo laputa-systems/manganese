@@ -237,3 +237,16 @@ jpeg-decode-anchor:
 .PHONY: jpeg-decode-record
 jpeg-decode-record:
 	PYTHONPATH=oracle/harness/jpeg-decode python3 -B oracle/harness/jpeg-decode/record.py
+
+.PHONY: jpeg-encode-harness
+jpeg-encode-harness:
+	mkdir -p .work/tmp/jpeg-encode
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/jpeg-encode "$$tag" python3 -B /lane/oracle/harness/jpeg-encode/build.py
+
+.PHONY: jpeg-encode-anchor
+jpeg-encode-anchor:
+	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/anchor.py
+
+.PHONY: jpeg-encode-record
+jpeg-encode-record:
+	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/record.py

@@ -1,0 +1,22 @@
+seam = "Chromium 156 canvas JPEG export: HTMLCanvasElement.toDataURL/toBlob through CanvasAsyncBlobCreator's ImageDataBuffer and blink::ImageEncoder::Encode(kMimeTypeJpeg) over Skia's SkJpegEncoder on libjpeg-turbo 3.1.0. ImageEncoderUtils::GetColorInfoForEncoder converts the canvas N32 premultiplied pixmap to unpremultiplied with an sRGB color space; ComputeJpegQuality maps the page's [0,1] quality to an integer with round-half-up (92 when absent); AlphaOption::kBlendOnBlack premultiplies the unpremultiplied samples through SkConvertPixels into libjpeg's JCS_EXT_RGBA input; quality 100 selects SkJpegEncoder::Downsample::k444 and every other quality selects k420; initializeCommon sets optimize_coding and jpeg_set_quality(force_baseline=TRUE) and writes the sRGB ICC APP2 segment"
+streaming = "MGB1 request op 1 carries u32 width, u32 height, u32 quality and width*height*4 bytes of unpremultiplied N32 BGRA samples (the pixmap Blink hands to SkJpegEncoder); a zero dimension or a truncated pixel payload makes the harness emit an empty response; the response is the exact encoded JPEG bytes or empty on encoder failure"
+reentrancy = "none: each request runs one synchronous encode over an immutable pixmap; the canvas export path encodes rows in order on its own thread but exposes no partial bytes to the page"
+callbacks = "none: libjpeg's destination manager writes into an SkDynamicMemoryWStream and the JPEG source has no client callback"
+threading = "One thread per process; the harness encodes on the calling thread"
+wire_version = 1
+corpus_sources = "Unpremultiplied N32 BGRA pixel fields generated from seeded patterns: flat colors, horizontal and vertical ramps, checkerboards, single-pixel borders, pseudo-random noise, edge blocks and alpha gradients, with alpha 255, alpha below 255 and alpha zero; widths and heights of 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 64, 65, 128 and 257 including MCU-boundary and odd sizes; quality 1, 25, 50, 75, 80, 90, 92, 95, 99 and 100 plus invalid 0 and 101; a larger seeded field at each quality; fuzz mutates pixel bytes, dimensions and quality and draws fresh seeded fields"
+environment = "x86_64 Linux musl with AVX2: libjpeg-turbo's SIMD RGB-to-YCbCr conversion, h2v2 downsampling, islow integer FDCT, quantization and Huffman encoding, which equal their C paths for 8-bit baseline; Chromium's jconfigint.h leaves __WORDSIZE undefined under musl so SIZEOF_SIZE_T is 4, which does not affect the encoder; default base::Feature states; the frozen browser's canvas has an sRGB color space so SkWriteICCProfile emits the deterministic sRGB APP2 segment; JPEG_MAX_DIMENSION bounds dimensions"
+comparison = "exact"
+observable_surface = "canvas toDataURL('image/jpeg', quality) and toBlob('image/jpeg', quality) bytes, which a page can hash and download; the sRGB ICC marker and JFIF header Skia writes into those bytes"
+varying_relationships = "none: all recorded results are deterministic for the declared environment"
+ordering = "Pixel rows are consumed top to bottom and scanlines are written in row order"
+oracle_defects = "none: no known oracle defects"
+improvements = "none: no required oracle improvements"
+anchor = "make jpeg-encode-anchor exports opaque and alpha-bearing seeded BGRA fields through the frozen x86_64 browser's putImageData and toDataURL('image/jpeg', quality), reads back the browser's unpremultiplied pixels with getImageData, and compares the exact JPEG bytes with the source harness: qualities 1 50 75 92 95 100, sizes 1x1 3x5 8x8 17x13 64x63 129x97, flat, ramp, noise and alpha patterns; color-managed non-sRGB canvases, screenshots, toBlob-specific timing and arm64 are excluded"
+arm64_evidence = "public_api: canvas toDataURL in the frozen arm64 browser"
+holdout_percent = 30
+oracle = ".work/tmp/jpeg-encode/oracle"
+candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/jpeg-encode"
+fuzz = "driver"
+fuzz_driver = "oracle/harness/jpeg-encode/fuzz.py"
+acceptance_cases = 20000
