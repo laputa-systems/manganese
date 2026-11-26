@@ -534,6 +534,12 @@ def flac_generated(lane):
              b''.join(g.stream(rng, 2, 16, 44100, 2048, 12)[0]), simple(2, 16, 44100, 0, 0, variable=True, sizes=[1024, 2048] * 6)[0]]
     for count in range(50 if seen else 30):
         add(f'mutated-{count}', mutate(rng.choice(bases), rng))
+    if seen:
+        long_frames, long_total, long_blocks = g.stream(rng, 1, 8, 8000, 4096, 150, shape='silence')
+        long_sizes = [len(f) for f in long_frames]
+        long_info = lambda samples: g.streaminfo(4096, 4096, min(long_sizes), max(long_sizes), 8000, 1, 8, samples)
+        add('layout-long-unknown-duration', g.flac_file(long_frames, 8000, 1, 8, long_total, long_blocks, info=long_info(0)))
+        add('layout-long-duration-grows', g.flac_file(long_frames, 8000, 1, 8, long_total, long_blocks, info=long_info(8000 * 20)))
     return items
 
 

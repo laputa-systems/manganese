@@ -22,11 +22,11 @@ CASES = [
     'other-zeros', 'other-wave-no-riff', 'long-mono', 'fixture-startup-wav', 'fixture-audio_long8mulaw-wav', 'fixture-audio_tiny44-wav',
     'fixture-empty-wav', 'fixture-keypressreturn-wav', 'fixture-irc_composite_c_r0195_t000_p000-wav',
     'flac-1ch-8-8000-576-4', 'flac-2ch-16-44100-4096-12', 'flac-6ch-16-48000-1024-15', 'flac-8ch-24-96000-2048-9', 'flac-2ch-32-192000-4096-10',
-    'flac-stereo-mid-side', 'flac-variable', 'flac-frames-1', 'flac-frames-11', 'flac-rate-code-13', 'flac-info-samples-zero',
+    'flac-stereo-mid-side', 'flac-variable', 'flac-frames-1', 'flac-frames-11', 'flac-rate-code-13', 'flac-layout-long-unknown-duration',
     'flac-info-samples-large', 'flac-info-bps-invalid', 'flac-meta-picture-png', 'flac-meta-picture-two', 'flac-meta-picture-type-invalid',
     'flac-meta-mask-stereo', 'flac-meta-mask-wide', 'flac-meta-cuesheet-short', 'flac-layout-trailing-junk', 'flac-layout-junk-between',
     'flac-layout-frame-crc-bad-many', 'flac-layout-mixed-rate-frames',
-    'flac-layout-frame-crc-bad', 'flac-layout-frame-numbers-gap', 'flac-layout-two-streaminfo', 'flac-layout-long-low-rate', 'flac-layout-id3-prefix',
+    'flac-layout-frame-crc-bad', 'flac-layout-long-duration-grows', 'flac-layout-two-streaminfo', 'flac-layout-long-low-rate', 'flac-layout-id3-prefix',
     'flac-truncated-1000', 'fixture-logo-flac', 'fixture-composite-flac', 'fixture-low_battery-flac', 'fixture-welcome_back-flac',
 ]
 MIME = {'probe wav': 'audio/wav', 'probe none': 'audio/wav', 'probe flac': 'audio/flac'}
