@@ -12,7 +12,8 @@ try:
     event = client.wait_event('Fetch.requestPaused', session=page)
     client.send('Fetch.fulfillRequest', {'requestId': event['requestId'], 'responseCode': 200, 'responseHeaders': [{'name': 'Content-Type', 'value': 'text/html'}], 'body': base64.b64encode(b'<!doctype html><title>jpeg</title>').decode()}, session=page)
     client.send('Fetch.disable', session=page)
-    images = json.load(open(sys.argv[1]))
+    with open(sys.argv[1]) as inputs:
+        images = json.load(inputs)
     decoded = []
     source = '''(async () => {
         const input = INPUT;
