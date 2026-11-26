@@ -16,6 +16,11 @@ import protocol as p
 
 PROFILE_ARCHIVE = '7456dfed53ab69f8458c2b499da9794d4dc3b69221d7181c2b2c7c2b529bb996'
 SEEDS = {'seen': 4101, 'holdout': 4102}
+EXCLUDED = {
+    'seen-feature-23': 'owner 2026-11-26: FTS3 is not a retained surface',
+    'seen-feature-24': 'owner 2026-11-26: FTS5 is not a retained surface',
+    'holdout-crash-4': 'owner 2026-11-26: state after a deleted hot journal is undefined',
+}
 
 VALUES = [None, 0, 1, -1, 7, 2147483647, 2147483648, -2147483649, 9223372036854775807, -9223372036854775808,
           0.5, -0.0, 1.5, 3.0, 1e20, 1e-7, 123456.789, 1.0 / 3, 2.5e300, '', 'abc', 'ABC', 'aBc ', ' 12 ', '12',
@@ -414,7 +419,7 @@ def durability_cases(lane, rng, ask):
     yield from durability_fixture_cases(lane, rng, ask)
 
 
-def crash_cases_with(rng, count):
+def crash_cases_with(rng, count, lose_journals=True):
     for index in range(count):
         wal = rng.randrange(2) == 1
         flags = p.WAL if wal else 0
@@ -430,9 +435,10 @@ def crash_cases_with(rng, count):
         script.finalize(1)
         if rng.randrange(3) == 0:
             script.execute('DELETE FROM t WHERE a % 2 = 0')
-        if rng.randrange(4) == 0:
+        committed = rng.randrange(4) == 0
+        if committed:
             script.commit(0)
-        drop = rng.randrange(4) == 0
+        drop = rng.randrange(4) == 0 and (lose_journals or wal or committed)
         script.crash(drop).open(flags, 4096, cache).dump().prepare(1, 'PRAGMA integrity_check').step(1).finalize(1)
         yield f'crash-{index}', script.close()
 
@@ -475,11 +481,14 @@ def scenarios(lane, ask):
                 durability_cases(lane, rng, ask)]
     for family in families:
         for name, script in family:
-            yield name, script.encode()
+            if f'{lane}-{name}' not in EXCLUDED:
+                yield name, script.encode()
 
 
 def fuzz_script(rng):
     choice = rng.randrange(10)
+    if choice == 9:
+        return next(crash_cases_with(rng, 1, lose_journals=False))[1]
     family = expression_cases_with if choice < 3 else statement_cases_with if choice < 5 else \
-        api_cases_with if choice < 8 else affinity_cases_with if choice < 9 else crash_cases_with
+        api_cases_with if choice < 8 else affinity_cases_with
     return next(family(rng, 1))[1]
