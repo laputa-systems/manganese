@@ -60,7 +60,7 @@ def main() -> int:
                     browser.kill()
                     browser.wait()
             except Exception as error:
-                if primary is None and cleanup_failure is None:
+                if primary is None:
                     cleanup_failure = error
                 else:
                     print(f'browser cleanup: {type(error).__name__}: {error}', file=sys.stderr)
@@ -68,7 +68,7 @@ def main() -> int:
             try:
                 session.close()
             except Exception as error:
-                if primary is None:
+                if primary is None and cleanup_failure is None:
                     cleanup_failure = error
                 else:
                     print(f'session cleanup: {type(error).__name__}: {error}', file=sys.stderr)

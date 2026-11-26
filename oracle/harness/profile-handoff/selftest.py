@@ -4,6 +4,15 @@ import tempfile
 import types
 
 
+temporary = []
+
+
+def scratch(prefix):
+    directory = tempfile.TemporaryDirectory(prefix=prefix)
+    temporary.append(directory)
+    return pathlib.Path(directory.name)
+
+
 class Client:
     def __init__(self, primary, disable_failure):
         self.primary = primary
@@ -32,24 +41,29 @@ import sidecar
 
 
 class Browser:
+    def __init__(self, failure=None):
+        self.failure = failure
+
     def poll(self):
-        return 0
+        return None if self.failure is not None else 0
 
     def kill(self):
-        pass
+        if self.failure is not None:
+            raise self.failure
 
     def wait(self, timeout=None):
         return 0
 
 
 class Session:
-    def __init__(self, primary, close_failure):
+    def __init__(self, primary, close_failure, browser_failure=None):
         self.primary = primary
         self.close_failure = close_failure
-        self.profile = pathlib.Path(tempfile.mkdtemp(prefix='profile-handoff-result-'))
+        self.browser_failure = browser_failure
+        self.profile = scratch('profile-handoff-result-')
 
     def start_browser(self, mode):
-        return None, Browser()
+        return None, Browser(self.browser_failure)
 
     def sidecar(self, *args, **kwargs):
         if self.primary is not None:
@@ -64,7 +78,7 @@ class Session:
             raise self.close_failure
 
 
-run_root = pathlib.Path(tempfile.mkdtemp(prefix='profile-handoff-run-'))
+run_root = scratch('profile-handoff-run-')
 fake_launch = types.ModuleType('launch')
 fake_launch.new_run_dir = lambda label, mode: run_root
 fake_launch.resolve_archive = lambda *args: 'archive'
@@ -89,7 +103,7 @@ def main():
     primary = ValueError('primary failed')
     expect_raised(lambda: sidecar.page_at(Client(primary, failure)), primary)
 
-    profile = pathlib.Path(tempfile.mkdtemp(prefix='profile-handoff-profile-'))
+    profile = scratch('profile-handoff-profile-')
     original_argv = sys.argv
     try:
         sys.argv = ['session.py', 'read', str(profile)]
@@ -98,8 +112,13 @@ def main():
         expect_raised(session.main, session_failure)
         fake_launch.open_session = lambda run_dir, archive: Session(primary, session_failure)
         expect_raised(session.main, primary)
+        browser_failure = RuntimeError('browser teardown failed')
+        fake_launch.open_session = lambda run_dir, archive: Session(None, session_failure, browser_failure)
+        expect_raised(session.main, browser_failure)
     finally:
         sys.argv = original_argv
+        for directory in temporary:
+            directory.cleanup()
 
     print('profile-handoff selftest: cleanup promotion and primary preservation ok')
     return 0
