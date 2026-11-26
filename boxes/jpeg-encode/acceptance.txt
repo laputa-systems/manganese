@@ -1,17 +1,17 @@
 version 1
 box jpeg-encode
-revision 7902604099865724a12763f00300666594454845
+revision a9259e8f561a3c5af359378ff6c3930c7e002ec9
 arch x86_64
 spec sha256:96f0d5873beebaab863584c73984d357559e115e5c13e18e2d3eb90a07f5492e
 corpus sha256:8b72012998fa08d874ee0d012a8ff2d3f79e1992f25ca8374c8304a6e235667e seen 1092 holdout 1092
 oracle .work/tmp/jpeg-encode/oracle sha256:deff111cf1738105dc43a624c28859b0722d0c1535463550d6ad3fbc0946c3f0
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/jpeg-encode sha256:0274634a6b15131b2f2388bcfd5c36722995cab26f051b180c6045a08baa62c1
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/jpeg-encode sha256:5af08486874536bd492f183a4bb5dd59a5b14b044a2cac01c47f99bc52165157
 dependencies cargo-lock sha256:3cc50ce8eea0555bb45a914eb79044cbc8e1e0fb9731ac61c62ab0a56acd8e89 tree sha256:e8de926fc4a55dfc1fa6aff8f420f0d8e9e195f56628238952f14c89935a8d05
-snapshot vendor/img tree cd7f4e9bfd8673bcac590145cfac4928d3ec6268
+snapshot vendor/img tree 2778f40d9b2f8d20c54c989e479efcd8177d4365
 run seen exit 0 items 1092 1092
 run holdout exit 0 items 1092 1092
-run fuzz exit 0 seed 1795724016225980998 requested 20000 completed 20000
+run fuzz exit 0 seed 1795727180677308245 requested 20000 completed 20000
 run anchor make jpeg-encode-anchor exit 0
 level source-harness met
 level frozen-browser met: make jpeg-encode-anchor
