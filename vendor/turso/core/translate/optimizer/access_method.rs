@@ -251,6 +251,7 @@ pub(super) fn choose_best_btree_candidate(
     };
     let mut best_adjusted_output = f64::MAX;
     let mut best_is_ordered = false;
+    let mut full_scans = Vec::new();
 
     // Build a mask for the rhs table itself.
     let mut rhs_table_mask = TableMask::default();
@@ -348,6 +349,13 @@ pub(super) fn choose_best_btree_candidate(
                 (IterationDirection::Forwards, false, Cost(0.0))
             };
 
+        if usable_constraint_refs.is_empty() {
+            full_scans.push(super::without_rowid_scan::FullScan {
+                index: candidate.index.clone(),
+                ordered: is_index_ordered,
+                iter_dir,
+            });
+        }
         if index_info.is_none() && !is_index_ordered {
             continue;
         }
@@ -492,6 +500,36 @@ pub(super) fn choose_best_btree_candidate(
     // The join order search calls this function for each table that it tries.
     if !has_valid_candidate {
         return Ok(None);
+    }
+    if let Some(table) = rhs_table.btree().filter(|table| !table.has_rowid) {
+        let reader = match available_indexes.update_where_columns() {
+            Some(where_columns) => super::without_rowid_scan::Reader::Update(where_columns),
+            None => super::without_rowid_scan::Reader::Select,
+        };
+        let primary_key_serves_seek = has_rowid_candidate
+            && !best_is_ordered
+            && best_choice.index.as_deref().is_some_and(|index| {
+                !best_choice.constraint_refs.is_empty()
+                    && super::without_rowid_scan::primary_key_serves_seek(
+                        rhs_table,
+                        &table,
+                        index,
+                        &best_choice.constraint_refs,
+                        reader,
+                    )
+            });
+        if primary_key_serves_seek {
+            best_choice.index = None;
+            best_choice.constraint_refs = SmallVec::new();
+            best_choice.iter_dir = IterationDirection::Forwards;
+        } else if best_choice.constraint_refs.is_empty() {
+            if let Some(scan) =
+                super::without_rowid_scan::sqlite_full_scan(rhs_table, &table, &full_scans, reader)
+            {
+                best_choice.index = scan.index.clone();
+                best_choice.iter_dir = scan.iter_dir;
+            }
+        }
     }
     Ok(Some(best_choice))
 }
@@ -2250,6 +2288,7 @@ fn materialized_subquery_ephemeral_index(
         index_method: None,
         on_conflict: None,
         constraint_name: None,
+        pk_suffix_len: 0,
     }))
 }
 

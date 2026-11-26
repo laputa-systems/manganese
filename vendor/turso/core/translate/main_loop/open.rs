@@ -514,7 +514,7 @@ pub(super) fn emit_table_read_start(
             }
             if let Some(table_cursor_id) = table_cursor_id {
                 if let Some(index_cursor_id) = index_cursor_id {
-                    program.emit_deferred_seek(index_cursor_id, table_cursor_id);
+                    program.emit_index_to_table_seek(index_cursor_id, table_cursor_id, next);
                 }
             }
         }
@@ -663,7 +663,11 @@ pub(super) fn emit_table_read_start(
                         if let Some(index_cursor_id) = index_cursor_id {
                             if let Some(table_cursor_id) = table_cursor_id {
                                 // Don't do a btree table seek until it's actually necessary to read from the table.
-                                program.emit_deferred_seek(index_cursor_id, table_cursor_id);
+                                program.emit_index_to_table_seek(
+                                    index_cursor_id,
+                                    table_cursor_id,
+                                    next,
+                                );
                             }
                         }
                     }
@@ -781,16 +785,23 @@ pub(super) fn emit_right_join_key(
     index_cursor_id: Option<CursorID>,
 ) {
     if let Some(primary_key_columns) = &right_join.primary_key_columns {
-        turso_assert!(
-            index_cursor_id.is_none(),
-            "a WITHOUT ROWID table has no secondary index to drive its loop"
-        );
+        let index = index_cursor_id.and_then(|cursor_id| match program.get_cursor_type(cursor_id) {
+            Some(CursorType::BTreeIndex(index)) => Some((cursor_id, index.clone())),
+            _ => None,
+        });
         for (key_position, &column_position) in primary_key_columns.iter().enumerate() {
-            program.emit_column_or_rowid(
-                table_cursor_id,
-                column_position,
-                right_join.key_start_reg + key_position,
-            );
+            let dest = right_join.key_start_reg + key_position;
+            match index.as_ref().and_then(|(cursor_id, index)| {
+                Some((*cursor_id, index.column_table_pos_to_index_pos(column_position)?))
+            }) {
+                Some((cursor_id, column)) => program.emit_insn(Insn::Column {
+                    cursor_id,
+                    column,
+                    dest,
+                    default: None,
+                }),
+                None => program.emit_column_or_rowid(table_cursor_id, column_position, dest),
+            }
         }
     } else if let Some(index_cursor_id) = index_cursor_id {
         // The index drives this loop, so its rowid identifies the current row.

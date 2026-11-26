@@ -3509,9 +3509,9 @@ impl Schema {
                     // maps to `Some(INVALID_DB_ID)` until a connection-scoped
                     // reparse runs with a real resolver.
                     self.handle_schema_row(
-                        &ty,
-                        &name,
-                        &table_name,
+                        ty.as_str(),
+                        name.as_str(),
+                        table_name.as_str(),
                         root_page,
                         sql,
                         syms,
@@ -3764,7 +3764,13 @@ impl Schema {
                         table.name
                     );
                     pk_index_added = true;
-
+                }
+                // The table b-tree of a WITHOUT ROWID table is its PRIMARY KEY index,
+                // so sqlite_schema has no row for that index.
+                if table.is_without_rowid_primary_key(unique_set) {
+                    continue;
+                }
+                if unique_set.is_primary_key {
                     if unique_set.columns.len() == 1 {
                         let col_name = &unique_set.columns.first().unwrap().name;
                         let Some((_, column)) = table.get_column(col_name) else {
@@ -5205,6 +5211,7 @@ impl TryClone for Index {
             index_method: self.index_method.clone(),
             on_conflict: self.on_conflict,
             constraint_name: self.constraint_name.clone(),
+            pk_suffix_len: 0,
         })
     }
 }
@@ -6116,13 +6123,16 @@ impl BTreeTable {
     /// Whether `index` is the automatic index that enforces this table's
     /// PRIMARY KEY. An INTEGER PRIMARY KEY is the rowid and has no such index.
     pub fn is_primary_key_index(&self, index: &Index) -> bool {
+        if !self.has_rowid {
+            return index.root_page == self.root_page;
+        }
         self.get_rowid_alias_column().is_none()
             && index
                 .name
                 .starts_with(crate::util::PRIMARY_KEY_AUTOMATIC_INDEX_NAME_PREFIX)
-            && index.columns.len() == self.primary_key_columns.len()
+            && index.key_columns().len() == self.primary_key_columns.len()
             && index
-                .columns
+                .key_columns()
                 .iter()
                 .zip(&self.primary_key_columns)
                 .all(|(index_col, (pk_col, _))| index_col.name.eq_ignore_ascii_case(pk_col))
@@ -6139,6 +6149,20 @@ impl BTreeTable {
     /// Build a `ColumnLayout` for this table's register mapping.
     pub fn column_layout(&self) -> Result<ColumnLayout, TryReserveError> {
         ColumnLayout::from_btree(self)
+    }
+
+    /// The stored columns in the order of the record of a row, which puts the
+    /// PRIMARY KEY of a WITHOUT ROWID table first, as SQLite does.
+    pub fn record_columns(&self) -> Vec<&Column> {
+        let mut columns: Vec<(usize, &Column)> = self
+            .columns
+            .iter()
+            .enumerate()
+            .filter(|(_, column)| !column.is_virtual_generated())
+            .map(|(position, column)| (self.logical_to_physical_column(position), column))
+            .collect();
+        columns.sort_by_key(|(physical, _)| *physical);
+        columns.into_iter().map(|(_, column)| column).collect()
     }
 
     /// Returns the column position and column for a given column name.
@@ -6473,6 +6497,85 @@ impl BTreeTable {
             .map_or(self.rowid_alias_conflict_clause, |unique_set| {
                 unique_set.conflict_clause
             })
+    }
+
+    /// Whether `unique_set` is the PRIMARY KEY of a WITHOUT ROWID table, whose
+    /// index is the table b-tree. A UNIQUE constraint on the columns of the
+    /// PRIMARY KEY is the same index, which SQLite does not create twice.
+    pub fn is_without_rowid_primary_key(&self, unique_set: &UniqueSet) -> bool {
+        !self.has_rowid
+            && (unique_set.is_primary_key
+                || (unique_set.columns.len() == self.primary_key_columns.len()
+                    && unique_set.columns.iter().zip(&self.primary_key_columns).all(
+                        |(column, (pk_name, _))| {
+                            column.name.eq_ignore_ascii_case(pk_name)
+                                && self.get_column(pk_name).is_some_and(|(_, table_column)| {
+                                    column
+                                        .collation
+                                        .map_or_else(|| table_column.collation(), CollationSeq::Text)
+                                        == self.primary_key_collation(pk_name, table_column)
+                                })
+                        },
+                    )))
+    }
+
+    /// The number that ends the name SQLite gives the PRIMARY KEY index of a
+    /// WITHOUT ROWID table: its place among the PRIMARY KEY and UNIQUE
+    /// constraints.
+    pub fn without_rowid_primary_key_number(&self) -> usize {
+        if self.without_rowid_primary_key_is_made_last() {
+            let other_sets = self
+                .unique_sets
+                .iter()
+                .filter(|unique_set| !self.is_without_rowid_primary_key(unique_set))
+                .count();
+            return other_sets + 1;
+        }
+        self.unique_sets
+            .iter()
+            .position(|unique_set| self.is_without_rowid_primary_key(unique_set))
+            .map_or(1, |position| position + 1)
+    }
+
+    /// Whether SQLite makes the PRIMARY KEY index of this WITHOUT ROWID table
+    /// after the indexes of all its UNIQUE constraints. sqlite3AddPrimaryKey
+    /// takes a PRIMARY KEY of one column of type INTEGER for the rowid, unless
+    /// the column constraint says DESC, and convertToWithoutRowidTable makes
+    /// its index at the end, unless a UNIQUE constraint on that column made
+    /// the same index before.
+    pub fn without_rowid_primary_key_is_made_last(&self) -> bool {
+        self.without_rowid_primary_key_is_taken_for_rowid()
+            && !self.unique_sets.iter().any(|unique_set| {
+                !unique_set.is_primary_key && self.is_without_rowid_primary_key(unique_set)
+            })
+    }
+
+    /// Whether sqlite3AddPrimaryKey takes the PRIMARY KEY of this WITHOUT
+    /// ROWID table for the rowid: one column of type INTEGER, unless the
+    /// column constraint says DESC. convertToWithoutRowidTable makes its
+    /// index from the column name alone, without the COLLATE of the
+    /// constraint.
+    fn without_rowid_primary_key_is_taken_for_rowid(&self) -> bool {
+        let [(name, order)] = self.primary_key_columns.as_slice() else {
+            return false;
+        };
+        let Some((_, column)) = self.get_column(name) else {
+            return false;
+        };
+        !self.has_rowid
+            && column.ty_str.eq_ignore_ascii_case("INTEGER")
+            && column.ty_params.is_empty()
+            && !(self.primary_key_is_inline && *order == SortOrder::Desc)
+    }
+
+    /// The collation of PRIMARY KEY column `column_name`, which is `column`:
+    /// the one the PRIMARY KEY constraint names, else the column's own.
+    pub fn primary_key_collation(&self, column_name: &str, column: &Column) -> CollationSeq {
+        if self.without_rowid_primary_key_is_taken_for_rowid() {
+            return column.collation();
+        }
+        self.primary_key_constraint_collation(column_name)
+            .map_or_else(|| column.collation(), CollationSeq::Text)
     }
 
     fn primary_key_constraint_collation(&self, column_name: &str) -> Option<TextCollation> {
@@ -7828,6 +7931,41 @@ pub fn create_table(
         None
     };
 
+    // sqlite3AddPrimaryKey makes no index for a PRIMARY KEY that it takes for
+    // the rowid. In a WITHOUT ROWID table convertToWithoutRowidTable makes the
+    // index later, so a later UNIQUE constraint on the same column is the one
+    // that makes the index and gives it its number.
+    let primary_key_index_is_made_later = !has_rowid
+        && match primary_key_columns.as_slice() {
+            [(name, order)] => {
+                cols.iter().any(|column| {
+                    column
+                        .name
+                        .as_ref()
+                        .is_some_and(|column_name| column_name.eq_ignore_ascii_case(name))
+                        && column.ty_str.eq_ignore_ascii_case("INTEGER")
+                        && column.ty_params.is_empty()
+                }) && !(primary_key_is_inline && *order == SortOrder::Desc)
+            }
+            _ => false,
+        };
+    // SQLite makes one index for two constraints on the same columns with the
+    // same collations, whatever their sort orders. The index of a PRIMARY KEY
+    // that SQLite takes for the rowid has no COLLATE of its own.
+    let constraint_collation = |unique_set: &UniqueSet, column: &UniqueSetColumn| {
+        let explicit = column
+            .collation
+            .filter(|_| !(primary_key_index_is_made_later && unique_set.is_primary_key));
+        explicit.map(CollationSeq::Text).or_else(|| {
+            cols.iter()
+                .find(|c| {
+                    c.name
+                        .as_ref()
+                        .is_some_and(|name| name.eq_ignore_ascii_case(&column.name))
+                })
+                .map(Column::collation)
+        })
+    };
     let mut table = BTreeTable {
         root_page,
         name: table_name,
@@ -7836,7 +7974,6 @@ pub fn create_table(
         primary_key_columns,
         primary_key_is_inline,
         has_autoincrement,
-        columns: cols,
         is_strict,
         foreign_keys,
         unique_sets: {
@@ -7847,7 +7984,7 @@ pub fn create_table(
             // Using a n^2 monkey algorithm here because n is small, CPUs are fast, life is short, and most importantly:
             // we want to preserve the order of the sets -- automatic index names in sqlite_schema must be in definition order.
             let mut i = 0;
-            while i < unique_sets.len() {
+            'sets: while i < unique_sets.len() {
                 let mut j = i + 1;
                 while j < unique_sets.len() {
                     let lengths_equal =
@@ -7857,7 +7994,11 @@ pub fn create_table(
                             .columns
                             .iter()
                             .zip(unique_sets[j].columns.iter())
-                            .all(|(a, b)| a.name.eq_ignore_ascii_case(&b.name))
+                            .all(|(a, b)| {
+                                a.name.eq_ignore_ascii_case(&b.name)
+                                    && constraint_collation(&unique_sets[i], a)
+                                        == constraint_collation(&unique_sets[j], b)
+                            })
                     {
                         // SQLite rejects duplicate constraints on the same columns when both
                         // specify ON CONFLICT with different resolve types.
@@ -7871,6 +8012,13 @@ pub fn create_table(
                                 );
                             }
                         }
+                        if primary_key_index_is_made_later
+                            && unique_sets[i].is_primary_key
+                            && !unique_sets[j].is_primary_key
+                        {
+                            unique_sets.remove(i);
+                            continue 'sets;
+                        }
                         unique_sets.remove(j);
                     } else {
                         j += 1;
@@ -7880,6 +8028,7 @@ pub fn create_table(
             }
             unique_sets
         },
+        columns: cols,
         check_constraints,
         rowid_alias_conflict_clause,
         primary_key_constraint_name,
@@ -7887,6 +8036,28 @@ pub fn create_table(
         logical_to_physical_map: vec![],
         column_dependencies: Default::default(),
     };
+    // When the PRIMARY KEY and a UNIQUE constraint make the same index, SQLite
+    // keeps the index that it made first, with its sort orders.
+    if !table.has_rowid {
+        let merged_orders = table
+            .unique_sets
+            .iter()
+            .find(|unique_set| {
+                !unique_set.is_primary_key && table.is_without_rowid_primary_key(unique_set)
+            })
+            .map(|unique_set| {
+                unique_set
+                    .columns
+                    .iter()
+                    .map(|column| column.sort_order)
+                    .collect::<Vec<_>>()
+            });
+        if let Some(orders) = merged_orders {
+            for ((_, order), merged_order) in table.primary_key_columns.iter_mut().zip(orders) {
+                *order = merged_order;
+            }
+        }
+    }
     table.prepare_generated_columns()?;
     if table.is_strict {
         for column in table.columns.iter_mut() {
@@ -8908,6 +9079,22 @@ pub struct Index {
     pub on_conflict: Option<ResolveType>,
     /// Explicit constraint name from `CONSTRAINT name UNIQUE/PRIMARY KEY`, if any.
     pub constraint_name: Option<String>,
+    /// How many of the last `columns` are not declared by the index: the
+    /// PRIMARY KEY columns that SQLite appends to each entry of an index of a
+    /// WITHOUT ROWID table, as an index of a rowid table appends the rowid.
+    /// Zero for every other index.
+    pub pk_suffix_len: usize,
+}
+
+/// The order of the PRIMARY KEY columns that an index of a WITHOUT ROWID
+/// table appends to its key.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum PrimaryKeySuffixOrder {
+    /// The order of the PRIMARY KEY, as `CREATE INDEX` builds the index.
+    PrimaryKey,
+    /// Ascending whatever the PRIMARY KEY order, as SQLite builds the index of
+    /// a UNIQUE constraint (https://sqlite.org/src/info/bba7b69f9849b5bf).
+    Ascending,
 }
 
 #[allow(dead_code)]
@@ -9074,9 +9261,10 @@ impl Index {
                         index_method: Some(descriptor),
                         on_conflict: None,
                         constraint_name: None,
+                        pk_suffix_len: 0,
                     })
                 } else {
-                    Ok(Index {
+                    let mut index = Index {
                         name: index_name,
                         table_name: normalize_ident(tbl_name.as_str()),
                         root_page,
@@ -9088,7 +9276,12 @@ impl Index {
                         index_method: None,
                         on_conflict: None,
                         constraint_name: None,
-                    })
+                        pk_suffix_len: 0,
+                    };
+                    if !table.has_rowid {
+                        index.append_primary_key_suffix(table, PrimaryKeySuffixOrder::PrimaryKey)?;
+                    }
+                    Ok(index)
                 }
             }
             _ => todo!("Expected create index statement"),
@@ -9164,6 +9357,7 @@ impl Index {
             index_method: None,
             on_conflict: conflict_clause,
             constraint_name,
+            pk_suffix_len: 0,
         })
     }
 
@@ -9206,7 +9400,7 @@ impl Index {
                 .expect("unique index columns vector was preallocated");
         }
 
-        Ok(Index {
+        let mut index = Index {
             name: normalize_ident(index_name.as_str()),
             table_name: table.name.clone(),
             root_page,
@@ -9218,7 +9412,62 @@ impl Index {
             index_method: None,
             on_conflict: conflict_clause,
             constraint_name,
-        })
+            pk_suffix_len: 0,
+        };
+        if !table.has_rowid {
+            index.append_primary_key_suffix(table, PrimaryKeySuffixOrder::Ascending)?;
+        }
+        Ok(index)
+    }
+
+    /// The columns the index is declared on, without the PRIMARY KEY columns
+    /// that an index of a WITHOUT ROWID table appends to them.
+    pub fn key_columns(&self) -> &[IndexColumn] {
+        &self.columns[..self.columns.len() - self.pk_suffix_len]
+    }
+
+    /// Appends each PRIMARY KEY column of the WITHOUT ROWID table `table` that
+    /// the key does not hold with the same collation, as SQLite's
+    /// `sqlite3CreateIndex` and `convertToWithoutRowidTable` build the index:
+    /// each entry ends with the primary key of its row.
+    pub(crate) fn append_primary_key_suffix(
+        &mut self,
+        table: &BTreeTable,
+        order: PrimaryKeySuffixOrder,
+    ) -> Result<()> {
+        let key_len = self.columns.len();
+        for (pk_name, pk_order) in &table.primary_key_columns {
+            let Some((pos_in_table, column)) = table.get_column(pk_name) else {
+                return Err(crate::LimboError::ParseError(format!(
+                    "Column {pk_name} not found in table {}",
+                    table.name
+                )));
+            };
+            let collation = table.primary_key_collation(pk_name, column);
+            let in_key = self.columns[..key_len].iter().any(|key_column| {
+                key_column.expression().is_none()
+                    && key_column.pos_in_table == pos_in_table
+                    && key_column.collation == collation
+            });
+            if in_key || self.columns[key_len..].iter().any(|c| c.pos_in_table == pos_in_table) {
+                continue;
+            }
+            self.columns.try_push(IndexColumn {
+                name: normalize_ident(pk_name),
+                order: match order {
+                    PrimaryKeySuffixOrder::PrimaryKey => *pk_order,
+                    PrimaryKeySuffixOrder::Ascending => SortOrder::Asc,
+                },
+                nulls_order: None,
+                pos_in_table,
+                collation,
+                explicit_collation: None,
+                default: column.default.clone(),
+                expr: None,
+            })?;
+        }
+        self.pk_suffix_len = self.columns.len() - key_len;
+        Ok(())
     }
 
     /// Given a column position in the table, return the position in the index.

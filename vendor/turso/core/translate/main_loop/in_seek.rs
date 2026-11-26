@@ -65,7 +65,7 @@ pub(super) fn emit_in_seek_start(
             target_pc: next_value,
         });
         if let Some(table_cursor_id) = table_cursor_id {
-            program.emit_deferred_seek(index_cursor_id, table_cursor_id);
+            program.emit_index_to_table_seek(index_cursor_id, table_cursor_id, next_value);
         }
     }
 
@@ -169,6 +169,7 @@ pub(super) fn open_in_seek_source_cursor(
                 index_method: None,
                 on_conflict: None,
                 constraint_name: None,
+                pk_suffix_len: 0,
             });
             let eph_cursor = program.alloc_cursor_id(CursorType::BTreeIndex(ephemeral_index));
             program.emit_insn(Insn::OpenEphemeral {

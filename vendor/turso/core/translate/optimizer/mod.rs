@@ -13,7 +13,7 @@ use crate::alloc::{TursoIteratorExt, TursoVecExt};
 use crate::ast::RefAct;
 use crate::ast::{self, Expr, SortOrder, SubqueryType, TableInternalId, TriggerEvent};
 use crate::schema::GeneratedType;
-use crate::translate::plan::{BitSet, ColumnMask, MultiIndexBranchAccess};
+use crate::translate::plan::{BitSet, ColumnMask, ColumnUsedMask, MultiIndexBranchAccess};
 use crate::translate::planner::{table_mask_from_expr, TableMask};
 use crate::{
     function::{AggFunc, Deterministic, Func},
@@ -92,10 +92,14 @@ pub(crate) mod lift_common_subexpressions;
 pub(crate) mod multi_index;
 pub(crate) mod order;
 pub(crate) mod unnest;
+mod without_rowid_scan;
 
 #[derive(Debug, Default)]
 pub(crate) struct AvailableIndexes {
     indexes_by_table_id: HashMap<TableInternalId, VecDeque<Arc<Index>>>,
+    /// The columns that the WHERE clause of an UPDATE of a WITHOUT ROWID
+    /// table reads, which SQLite's whereLoopAddBtree costs its indexes by.
+    update_where_columns: Option<ColumnUsedMask>,
 }
 
 impl AvailableIndexes {
@@ -104,7 +108,6 @@ impl AvailableIndexes {
             .joined_tables()
             .iter()
             .filter(|jt| matches!(jt.table, Table::BTree(_) | Table::Virtual(_))) // only b-tree tables can have indexes
-            .filter(|jt| jt.btree().is_none_or(|btree| btree.has_rowid))
             .filter_map(|jt| {
                 let indexes: VecDeque<_> =
                     resolver.with_schema(jt.namespace.database_id, |schema| {
@@ -122,7 +125,12 @@ impl AvailableIndexes {
 
         Self {
             indexes_by_table_id,
+            update_where_columns: None,
         }
+    }
+
+    pub(crate) fn update_where_columns(&self) -> Option<&ColumnUsedMask> {
+        self.update_where_columns.as_ref()
     }
 
     pub(crate) fn indexes_for_table(
@@ -1620,7 +1628,21 @@ fn optimize_update_plan(
         TableReferences::for_update_target(plan.target_table.clone(), &plan.from_tables);
     #[cfg(all(feature = "fts", not(target_family = "wasm")))]
     transform_match_to_fts_match(&mut plan.where_clause, resolver, &target_tables)?;
-    let available_indexes = AvailableIndexes::for_table_references(resolver, &target_tables);
+    let mut available_indexes = AvailableIndexes::for_table_references(resolver, &target_tables);
+    if plan.target_table.btree().is_some_and(|table| !table.has_rowid) {
+        let mut where_columns = ColumnUsedMask::default();
+        for term in &plan.where_clause {
+            walk_expr(&term.expr, &mut |expr: &ast::Expr| -> Result<WalkControl> {
+                if let ast::Expr::Column { table, column, .. } = expr {
+                    if *table == plan.target_table.internal_id {
+                        where_columns.set(*column)?;
+                    }
+                }
+                Ok(WalkControl::Continue)
+            })?;
+        }
+        available_indexes.update_where_columns = Some(where_columns);
+    }
     rewrite_or_terms(&mut plan.where_clause, &available_indexes)?;
     if let ConstantConditionEliminationResult::ImpossibleCondition = eliminate_constant_conditions(
         &mut plan.where_clause,
@@ -1669,6 +1691,9 @@ fn optimize_update_plan(
         .expect("UPDATE must optimize exactly one target table")
         .clone();
 
+    if plan.target_table.btree().is_some_and(|table| !table.has_rowid) {
+        return Ok(());
+    }
     if let Some(reason) = update_write_set_reason(plan, resolver, connection)? {
         plan.safety.require(reason);
     }
@@ -2644,12 +2669,6 @@ fn enforce_indexed_by_hints(
         match indexed {
             ast::Indexed::IndexedBy(name) => {
                 let idx_name = name.as_str();
-                if table_ref.btree().is_some_and(|btree| !btree.has_rowid) {
-                    crate::bail_parse_error!(
-                        "INDEXED BY is not supported on WITHOUT ROWID tables: {}",
-                        idx_name
-                    );
-                }
                 // Verify the index exists and belongs to this table.
                 let forced_index =
                     available_indexes.btree_index_by_name(table_ref.internal_id, idx_name);
@@ -4596,6 +4615,7 @@ fn ephemeral_index_build(
         index_method: None,
         on_conflict: None,
         constraint_name: None,
+        pk_suffix_len: 0,
     };
 
     Ok(ephemeral_index)
