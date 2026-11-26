@@ -21,7 +21,15 @@ CASES = [
     'layout-id3-prefix-odd', 'layout-id3-v4-footer', 'truncated-36', 'truncated-45', 'truncated-46', 'truncated-1001', 'other-text', 'other-random',
     'other-zeros', 'other-wave-no-riff', 'long-mono', 'fixture-startup-wav', 'fixture-audio_long8mulaw-wav', 'fixture-audio_tiny44-wav',
     'fixture-empty-wav', 'fixture-keypressreturn-wav', 'fixture-irc_composite_c_r0195_t000_p000-wav',
+    'flac-1ch-8-8000-576-4', 'flac-2ch-16-44100-4096-12', 'flac-6ch-16-48000-1024-15', 'flac-8ch-24-96000-2048-9', 'flac-2ch-32-192000-4096-10',
+    'flac-stereo-mid-side', 'flac-variable', 'flac-frames-1', 'flac-frames-11', 'flac-rate-code-13', 'flac-info-samples-zero',
+    'flac-info-samples-large', 'flac-info-bps-invalid', 'flac-meta-picture-png', 'flac-meta-picture-two', 'flac-meta-picture-type-invalid',
+    'flac-meta-mask-stereo', 'flac-meta-mask-wide', 'flac-meta-cuesheet-short', 'flac-layout-trailing-junk', 'flac-layout-junk-between',
+    'flac-layout-frame-crc-bad-many', 'flac-layout-mixed-rate-frames',
+    'flac-layout-frame-crc-bad', 'flac-layout-frame-numbers-gap', 'flac-layout-two-streaminfo', 'flac-layout-long-low-rate', 'flac-layout-id3-prefix',
+    'flac-truncated-1000', 'fixture-logo-flac', 'fixture-composite-flac', 'fixture-low_battery-flac', 'fixture-welcome_back-flac',
 ]
+MIME = {'probe wav': 'audio/wav', 'probe none': 'audio/wav', 'probe flac': 'audio/flac'}
 
 
 def expected_of(text):
@@ -46,10 +54,13 @@ def main():
         selected[prefix] = items[matches[0]]
     oracle = peer(str(root / '.work/tmp/media-demux/oracle'))
     expected = {}
+    mimes = {}
     for name, data in selected.items():
         output = ask(oracle, data).decode()
-        if not output.startswith('probe wav\n') and not output.startswith('probe none\n'):
-            raise SystemExit(f'anchor case {name} probes outside the box scope: {output.splitlines()[0]}')
+        probe = output.splitlines()[0]
+        if probe not in MIME:
+            raise SystemExit(f'anchor case {name} probes outside the box scope: {probe}')
+        mimes[name] = MIME[probe]
         expected[name] = expected_of(output)
     oracle.stdin.close()
     if oracle.wait():
@@ -57,7 +68,7 @@ def main():
     run_dir = launch.new_run_dir('media-demux-anchor', 'headless')
     cases_dir = run_dir / 'cases'
     cases_dir.mkdir()
-    (cases_dir / 'cases.json').write_text(json.dumps({name: base64.b64encode(data).decode() for name, data in selected.items()}))
+    (cases_dir / 'cases.json').write_text(json.dumps({name: {'mime': mimes[name], 'data': base64.b64encode(data).decode()} for name, data in selected.items()}))
     archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
     session = launch.open_session(run_dir, archive)
     browser = None

@@ -194,6 +194,26 @@ impl<'a> Avio<'a> {
         (requested - size) as i32
     }
 
+    pub fn read_partial(&mut self, out: &mut [u8]) -> i32 {
+        let mut len = self.buf_end - self.buf_ptr;
+        if len == 0 {
+            self.fill_buffer();
+            len = self.buf_end - self.buf_ptr;
+        }
+        let len = len.min(out.len());
+        out[..len].copy_from_slice(&self.buffer[self.buf_ptr..self.buf_ptr + len]);
+        self.buf_ptr += len;
+        if len == 0 {
+            if self.error != 0 {
+                return self.error;
+            }
+            if self.feof() {
+                return AVERROR_EOF;
+            }
+        }
+        len as i32
+    }
+
     pub fn read_size(&mut self, out: &mut [u8]) -> i32 {
         let read = self.read(out);
         if read as usize == out.len() && read >= 0 {
