@@ -142,6 +142,63 @@ The witness needed no change to any accepted crate. The APIs it consumed were al
 The only shared-file change is the `Cargo.lock` entry for the new assembly crate; `Cargo.toml`
 already includes `crates/*` as workspace members. The parent integrates that lock change serially.
 
+## Bidirectional storage witness: `profile-handoff`
+
+`make assembly A=profile-handoff` runs `crates/asm-profile-handoff`'s five named tests against the
+accepted `leveldb` crate and the frozen x86_64 archive. `oracle/harness/profile-handoff/session.py`
+copies a profile into or out of an appliance-shaped `Session`, starts the browser with the frozen
+switches, and runs `sidecar.py` through CDP: it navigates to `https://profile.test/` through
+`Fetch.enable` and writes or reads Local Storage and IndexedDB. No live service is contacted, and
+every session is bounded by `Browser.close` plus a 300 s `timeout` wrapper.
+
+The four steps and the control are:
+
+1. `step1_frozen_browser_writes_a_profile_the_rust_reader_opens`: the browser writes two Local
+   Storage values, a delete and an IndexedDB record; the Rust reader opens the resulting Local
+   Storage database, reads the values, the `VERSION` key and the delete, and sees the IndexedDB
+   directory still present.
+2. `step2_rust_changes_state_flushes_and_reopens_it`: Rust changes one value, deletes another and
+   adds a third in a synchronous `WriteBatch`, flushes, closes and reopens the database, and reads
+   the same changed state.
+3. `step3_frozen_browser_reopens_the_manganese_written_profile`: the frozen browser reopens that
+   profile and observes the changed Local Storage values, the deletion and the original IndexedDB
+   record.
+4. `step4_interrupted_write_recovers_for_both_readers`: Rust writes a further value, the active
+   write-ahead log is cut short by 16 bytes, and both the Rust reader and the frozen browser reopen
+   on the previously committed state instead of a fresh profile.
+5. `negative_control_incompatible_value_breaks_the_browser_reopen`: Rust writes the same text as
+   raw bytes without Chromium's type byte; the Rust reader sees the bytes, but the browser's
+   reopen fails its expectation. A sensitivity check writing the compatible encoding to the same
+   key makes that expectation pass, so the control detects a compatibility break rather than an
+   unavailable browser.
+
+The observable Local Storage encoding the consumer had to match is a key of
+`_<origin>\0\x01<name>` and a value with either type byte `0x01` followed by one Latin-1 byte per
+character, or type byte `0x00` followed by UTF-16LE code units; `VERSION` holds `"1"`. Using UTF-8
+after `0x01` passes for ASCII but mangles non-ASCII text in the browser, so step 3 asserts the exact
+changed string including a lambda. Internal database byte layout is not compared: the evidence is
+cross-reader and cross-writer reopen, semantics and recovery, as the owner's storage rule requires.
+
+The witness needed no change to `crates/leveldb` and exposed no new API. It consumed the already
+public `leveldb::open_db`, `leveldb::ChromiumOptions`, `leveldb::engine::{DB, ReadOptions,
+WriteBatch, LdbIterator}` and the existing `DB::get_with_options`, `DB::write`,
+`DB::flush_background_work`, `DB::close` and iterator methods. The only shared-file change is the
+`Cargo.lock` entry for the new assembly crate; the parent integrates it serially.
+
+What remains for the full M3 `profile-format` box:
+
+- The IndexedDB database uses the `idb_cmp1` comparator. `leveldb::open_db` with the public
+  `BytewiseComparator` options rejects it, so opening IndexedDB databases from Rust needs an
+  extracted comparator API (and its key encoding); this witness only checks that the browser still
+  reads its own IndexedDB record after a Local Storage handoff.
+- The Rust side writes the Local Storage LevelDB directly. The full box needs the M3 storage
+  service (P03, P04, P07, P10) to write through its own DOM Storage and IndexedDB paths, and a
+  browser-side writer that consumes a Manganese-written profile through those services.
+- Contract 5.3 also names cookies including HttpOnly, service workers, cache, Preferences and
+  signed-in sessions, and contract 8.4 names interrupted writes, a full profile disk and restart;
+  none of those surfaces are part of this bounded witness.
+- arm64 reopen evidence and the golden-box corpus/scoreboard for `profile-format` are still open.
+
 ## Moving one box to parity
 
 1. Write `boxes/<id>/box.toml` and the box's harness, build the harness in the oracle lane, and record goldens for the corpus and a separate holdout set.
