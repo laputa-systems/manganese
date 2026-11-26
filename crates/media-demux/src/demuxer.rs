@@ -12,6 +12,7 @@ use crate::format::PKT_FLAG_KEY;
 use crate::format::Packet;
 use crate::format::Step;
 use crate::format::Unemulated;
+use crate::mpegaudio;
 use crate::probe;
 use crate::probe::Format;
 use crate::rational;
@@ -29,7 +30,7 @@ const DEMUXER_ERROR_COULD_NOT_PARSE: i32 = 13;
 const DEMUXER_ERROR_NO_SUPPORTED_STREAMS: i32 = 14;
 const DEMUXER_ERROR_DETECTED_HLS: i32 = 22;
 
-pub const SCOPED_FORMATS: &[Format] = &[Format::Flac, Format::Wav];
+pub const SCOPED_FORMATS: &[Format] = &[Format::Flac, Format::Mp3, Format::Wav];
 
 fn time(value: i64) -> String {
     match value {
@@ -294,16 +295,28 @@ struct DemuxStream {
     output: String,
 }
 
-fn discard_padding(packet: &Packet) -> Step<Option<(i64, i64)>> {
+fn frames_to_time(frames: u32, samples_per_second: i32) -> i64 {
+    ((frames as i64 * MICROS.den as i64) as f64 / samples_per_second as f64) as i64
+}
+
+fn discard_padding(packet: &Packet, samples_per_second: i32) -> Option<(i64, i64)> {
     if let Some((front, back)) = packet.skip_samples
         && (front != 0 || back != 0)
     {
-        return Err(Unemulated("skip samples"));
+        return Some((frames_to_time(front, samples_per_second), frames_to_time(back, samples_per_second)));
     }
     if packet.flags & PKT_FLAG_DISCARD != 0 {
-        return Ok(Some((INFINITE, 0)));
+        return Some((INFINITE, 0));
     }
-    Ok(None)
+    None
+}
+
+fn valid_mp3_header(data: &[u8]) -> bool {
+    if data.len() < mpegaudio::HEADER_SIZE {
+        return false;
+    }
+    let header = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+    mpegaudio::check_header(header) && (header >> 12) & 0xf != 0
 }
 
 fn add_time(a: i64, b: i64) -> i64 {
@@ -320,7 +333,7 @@ struct Host {
 }
 
 impl DemuxStream {
-    fn enqueue(&mut self, packet: &mut Packet, host: &mut Host, buffered_changed: &mut bool) -> Step<()> {
+    fn enqueue(&mut self, packet: &mut Packet, container: Format, host: &mut Host, buffered_changed: &mut bool) -> Step<()> {
         let packet_dts = if packet.dts == NOPTS { packet.pts } else { packet.dts };
         if self.last_packet_pos != NOPTS {
             if packet.pos == -1 {
@@ -335,6 +348,14 @@ impl DemuxStream {
         }
         self.last_packet_pos = packet.pos;
         self.last_packet_dts = packet_dts;
+        let mut data_offset = 0;
+        if container == Format::Mp3 {
+            data_offset = packet.data.iter().take_while(|&&byte| byte == 0).count();
+            if !valid_mp3_header(&packet.data[data_offset..]) {
+                return Ok(());
+            }
+        }
+        let payload = &packet.data[data_offset..];
         let d = convert(self.time_base, packet.duration);
         let duration = if d <= 1000 { NO_TIMESTAMP } else { d };
         let timestamp = convert(self.time_base, packet.pts);
@@ -342,7 +363,7 @@ impl DemuxStream {
             host.errors.push(DEMUXER_ERROR_COULD_NOT_PARSE);
             return Ok(());
         }
-        let padding = discard_padding(packet)?;
+        let padding = discard_padding(packet, self.config.samples_per_second);
         if self.config.codec_delay != 0 {
             return Err(Unemulated("codec delay"));
         }
@@ -366,14 +387,14 @@ impl DemuxStream {
             None => "none".to_string(),
         };
         use sha2::Digest;
-        let digest = sha2::Sha256::digest(&packet.data);
+        let digest = sha2::Sha256::digest(payload);
         self.output.push_str(&format!(
             "{} {} {} {} {} {}\n",
             time(timestamp),
             time(duration),
             if key { 1 } else { 0 },
             discard,
-            packet.data.len(),
+            payload.len(),
             hex(&digest)
         ));
         Ok(())
@@ -477,7 +498,7 @@ pub fn demux(data: &[u8]) -> Step<String> {
     } else {
         max_duration = INFINITE;
     }
-    if demuxer_start == INFINITE {
+    if demuxer_start == INFINITE || ctx.iformat == Format::Mp3 {
         demuxer_start = 0;
     }
     let liveness = if max_duration != INFINITE { 1 } else { 0 };
@@ -510,7 +531,7 @@ pub fn demux(data: &[u8]) -> Step<String> {
         };
         let mut buffered_changed = false;
         if stream.enabled {
-            stream.enqueue(&mut packet, &mut host, &mut buffered_changed)?;
+            stream.enqueue(&mut packet, ctx.iformat, &mut host, &mut buffered_changed)?;
         }
         if duration_known && stream.duration != NO_TIMESTAMP && stream.duration > duration {
             duration = stream.duration;

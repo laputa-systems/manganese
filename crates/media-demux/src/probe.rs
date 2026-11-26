@@ -1,6 +1,8 @@
 use crate::avio::AVERROR_EOF;
 use crate::avio::AVERROR_INVALIDDATA;
 use crate::avio::Avio;
+use crate::id3v2;
+use crate::mpegaudio;
 
 pub const SCORE_MAX: i32 = 100;
 pub const SCORE_EXTENSION: i32 = 50;
@@ -69,84 +71,6 @@ fn tag(name: &[u8; 4]) -> u32 {
     u32::from_le_bytes(*name)
 }
 
-pub fn id3v2_match(buf: &[u8]) -> bool {
-    &buf[0..3] == b"ID3"
-        && buf[3] != 0xff
-        && buf[4] != 0xff
-        && buf[6] & 0x80 == 0
-        && buf[7] & 0x80 == 0
-        && buf[8] & 0x80 == 0
-        && buf[9] & 0x80 == 0
-}
-
-pub fn id3v2_tag_len(buf: &[u8]) -> i32 {
-    let mut len = ((buf[6] & 0x7f) as i32) << 21
-        | ((buf[7] & 0x7f) as i32) << 14
-        | ((buf[8] & 0x7f) as i32) << 7
-        | (buf[9] & 0x7f) as i32;
-    len += 10;
-    if buf[5] & 0x10 != 0 {
-        len += 10;
-    }
-    len
-}
-
-pub struct MpegAudioHeader {
-    pub frame_size: i32,
-}
-
-pub fn mpa_check_header(header: u32) -> bool {
-    header & 0xffe00000 == 0xffe00000
-        && header & (3 << 19) != 1 << 19
-        && header & (3 << 17) != 0
-        && header & (0xf << 12) != 0xf << 12
-        && header & (3 << 10) != 3 << 10
-}
-
-const MPA_BITRATE: [[[u16; 15]; 3]; 2] = [
-    [
-        [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
-        [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384],
-        [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
-    ],
-    [
-        [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
-        [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
-        [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
-    ],
-];
-const MPA_FREQ: [i32; 3] = [44100, 48000, 32000];
-
-pub enum MpegAudioDecode {
-    Invalid,
-    FreeFormat,
-    Frame(MpegAudioHeader),
-}
-
-pub fn mpegaudio_decode_header(header: u32) -> MpegAudioDecode {
-    if !mpa_check_header(header) {
-        return MpegAudioDecode::Invalid;
-    }
-    let (lsf, mpeg25) = if header & (1 << 20) != 0 { (if header & (1 << 19) != 0 { 0 } else { 1 }, 0) } else { (1, 1) };
-    let layer = 4 - ((header >> 17) & 3) as i32;
-    let sample_rate_index = ((header >> 10) & 3) as usize;
-    let sample_rate = MPA_FREQ[sample_rate_index] >> (lsf + mpeg25);
-    let bitrate_index = ((header >> 12) & 0xf) as usize;
-    let padding = ((header >> 9) & 1) as i32;
-    if bitrate_index == 0 {
-        return MpegAudioDecode::FreeFormat;
-    }
-    let kbps = MPA_BITRATE[lsf as usize][(layer - 1) as usize][bitrate_index] as i32;
-    let frame_size = match layer {
-        1 => ((kbps * 12000) / sample_rate + padding) * 4,
-        2 => (kbps * 144000) / sample_rate + padding,
-        _ => (kbps * 144000) / (sample_rate << lsf) + padding,
-    };
-    MpegAudioDecode::Frame(MpegAudioHeader { frame_size })
-}
-
-const MP3_MASK: u32 = 0xFFFE0CCF;
-
 fn mp3_read_probe(buf: &[u8], size: usize) -> i32 {
     let end = size as isize - 4;
     let mut buf0: isize = 0;
@@ -164,15 +88,15 @@ fn mp3_read_probe(buf: &[u8], size: usize) -> i32 {
         let mut framesizes = 0;
         while buf2 < end {
             let header = rb32(buf, buf2 as usize);
-            let h = match mpegaudio_decode_header(header) {
-                MpegAudioDecode::Frame(h) => h,
-                MpegAudioDecode::Invalid | MpegAudioDecode::FreeFormat => break,
+            let frame_size = match mpegaudio::decode_header(header) {
+                mpegaudio::Decoded::Frame(_, frame_size) => frame_size,
+                mpegaudio::Decoded::Invalid | mpegaudio::Decoded::FreeFormat(_) => break,
             };
-            let available = (h.frame_size as isize).min(end - buf2);
+            let available = (frame_size as isize).min(end - buf2);
             let mut header_emu = 0;
             let mut buf3 = buf2 + 4;
             while buf3 < buf2 + available {
-                if rb32(buf, buf3 as usize) & MP3_MASK == header & MP3_MASK {
+                if rb32(buf, buf3 as usize) & mpegaudio::MP3_MASK == header & mpegaudio::MP3_MASK {
                     header_emu += 1;
                 }
                 buf3 += 1;
@@ -180,12 +104,12 @@ fn mp3_read_probe(buf: &[u8], size: usize) -> i32 {
             if header_emu > 2 {
                 break;
             }
-            framesizes += h.frame_size;
-            if available < h.frame_size as isize {
+            framesizes += frame_size;
+            if available < frame_size as isize {
                 frames += 1;
                 break;
             }
-            buf2 += h.frame_size as isize;
+            buf2 += frame_size as isize;
             frames += 1;
         }
         max_frames = max_frames.max(frames);
@@ -206,7 +130,7 @@ fn mp3_read_probe(buf: &[u8], size: usize) -> i32 {
         SCORE_EXTENSION
     } else if max_frames >= 4 && size < 2 * max_framesizes as i64 {
         SCORE_EXTENSION / 2
-    } else if id3v2_match(&buf[b0..]) && 2 * id3v2_tag_len(&buf[b0..]) as i64 >= size {
+    } else if id3v2::matches(&buf[b0..]) && 2 * id3v2::tag_len(&buf[b0..]) as i64 >= size {
         if size < PROBE_BUF_MAX as i64 { SCORE_EXTENSION / 4 } else { SCORE_EXTENSION - 2 }
     } else if first_frames > 1 && whole_used {
         5
@@ -418,8 +342,8 @@ pub fn probe_input_format3(padded: &[u8], size: usize) -> ProbeResult {
     let mut offset = 0usize;
     let mut remaining = size as i64;
     let mut tag_beyond_probe = false;
-    while remaining > 10 && id3v2_match(&padded[offset..]) {
-        let id3len = id3v2_tag_len(&padded[offset..]) as i64;
+    while remaining > 10 && id3v2::matches(&padded[offset..]) {
+        let id3len = id3v2::tag_len(&padded[offset..]) as i64;
         if remaining > id3len + 16 {
             offset += id3len as usize;
             remaining -= id3len;

@@ -138,6 +138,11 @@ impl<'a> Avio<'a> {
         high | self.r8()
     }
 
+    pub fn rb24(&mut self) -> u32 {
+        let high = self.rb16() << 8;
+        high | self.r8()
+    }
+
     pub fn rb32(&mut self) -> u32 {
         let high = self.rb16() << 16;
         high | self.rb16()
@@ -336,5 +341,170 @@ impl<'a> Avio<'a> {
         let corrupt = (data.len() as i32) < size;
         let result = if !data.is_empty() { data.len() as i32 } else { read };
         RawRead { data, position, corrupt, result }
+    }
+}
+
+pub trait Reader {
+    fn r8(&mut self) -> u32;
+    fn read(&mut self, out: &mut [u8]) -> i32;
+    fn seek(&mut self, offset: i64, whence: Whence) -> i64;
+
+    fn tell(&mut self) -> i64 {
+        self.seek(0, Whence::Cur)
+    }
+
+    fn skip(&mut self, offset: i64) -> i64 {
+        self.seek(offset, Whence::Cur)
+    }
+
+    fn rb16(&mut self) -> u32 {
+        let high = self.r8() << 8;
+        high | self.r8()
+    }
+
+    fn rl16(&mut self) -> u32 {
+        let low = self.r8();
+        low | self.r8() << 8
+    }
+
+    fn rb32(&mut self) -> u32 {
+        let high = self.rb16() << 16;
+        high | self.rb16()
+    }
+
+    fn get_str(&mut self, maxlen: i32, buflen: usize) -> (i32, Vec<u8>) {
+        let limit = (buflen as i32 - 1).min(maxlen);
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < limit {
+            let byte = self.r8() as u8;
+            if byte == 0 {
+                return (i + 1, out);
+            }
+            out.push(byte);
+            i += 1;
+        }
+        while i < maxlen {
+            if self.r8() == 0 {
+                return (i + 1, out);
+            }
+            i += 1;
+        }
+        (maxlen, out)
+    }
+}
+
+impl Reader for Avio<'_> {
+    fn r8(&mut self) -> u32 {
+        Avio::r8(self)
+    }
+
+    fn read(&mut self, out: &mut [u8]) -> i32 {
+        Avio::read(self, out)
+    }
+
+    fn seek(&mut self, offset: i64, whence: Whence) -> i64 {
+        Avio::seek(self, offset, whence)
+    }
+}
+
+pub struct MemoryReader {
+    buffer: Vec<u8>,
+    ptr: usize,
+    eof_reached: bool,
+    error: i32,
+}
+
+impl MemoryReader {
+    pub fn new(buffer: Vec<u8>) -> Self {
+        MemoryReader { buffer, ptr: 0, eof_reached: false, error: 0 }
+    }
+
+    fn fill_buffer(&mut self) {
+        if self.ptr >= self.buffer.len() {
+            self.eof_reached = true;
+        }
+        if self.eof_reached {
+            return;
+        }
+        self.eof_reached = true;
+        self.error = EINVAL;
+    }
+
+    fn feof(&mut self) -> bool {
+        if self.eof_reached {
+            self.eof_reached = false;
+            self.fill_buffer();
+        }
+        self.eof_reached
+    }
+}
+
+impl Reader for MemoryReader {
+    fn r8(&mut self) -> u32 {
+        if self.ptr >= self.buffer.len() {
+            self.fill_buffer();
+        }
+        if self.ptr < self.buffer.len() {
+            let value = self.buffer[self.ptr];
+            self.ptr += 1;
+            return value as u32;
+        }
+        0
+    }
+
+    fn read(&mut self, out: &mut [u8]) -> i32 {
+        let requested = out.len();
+        let mut written = 0;
+        while written < requested {
+            let available = (self.buffer.len() - self.ptr).min(requested - written);
+            if available == 0 {
+                self.fill_buffer();
+                if self.buffer.len() == self.ptr {
+                    break;
+                }
+                continue;
+            }
+            out[written..written + available].copy_from_slice(&self.buffer[self.ptr..self.ptr + available]);
+            written += available;
+            self.ptr += available;
+        }
+        if written == 0 {
+            if self.error != 0 {
+                return self.error;
+            }
+            if self.feof() {
+                return AVERROR_EOF;
+            }
+        }
+        written as i32
+    }
+
+    fn seek(&mut self, offset: i64, whence: Whence) -> i64 {
+        let len = self.buffer.len() as i64;
+        let mut offset = offset;
+        if let Whence::Cur = whence {
+            let current = self.ptr as i64;
+            if offset == 0 {
+                return current;
+            }
+            if offset > i64::MAX - current {
+                return EINVAL as i64;
+            }
+            offset += current;
+        }
+        if offset < 0 {
+            return EINVAL as i64;
+        }
+        if offset <= len {
+            self.ptr = offset as usize;
+        } else {
+            while len < offset && !self.eof_reached {
+                self.fill_buffer();
+            }
+            return AVERROR_EOF as i64;
+        }
+        self.eof_reached = false;
+        offset
     }
 }

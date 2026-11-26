@@ -7,6 +7,11 @@ use crate::codec;
 use crate::codec::Codec;
 use crate::codec::MediaType;
 use crate::codec::sample_fmt;
+use crate::dict::Dict;
+use crate::id3v2;
+use crate::mp3;
+use crate::mp3::Mp3Decoded;
+use crate::mp3::Mp3State;
 use crate::probe;
 use crate::probe::Format;
 use crate::rational;
@@ -60,6 +65,14 @@ impl ChannelLayout {
             return None;
         }
         Some(ChannelLayout { order: LayoutOrder::Native, nb_channels: mask.count_ones() as i32, mask })
+    }
+
+    pub fn default_for(nb_channels: i32) -> ChannelLayout {
+        match nb_channels {
+            1 => ChannelLayout { order: LayoutOrder::Native, nb_channels, mask: 0x4 },
+            2 => ChannelLayout { order: LayoutOrder::Native, nb_channels, mask: 0x3 },
+            _ => ChannelLayout::unspec(nb_channels),
+        }
     }
 
     pub fn unspec(nb_channels: i32) -> ChannelLayout {
@@ -128,6 +141,7 @@ pub struct OpenDecoder {
 pub enum DecoderState {
     Pcm,
     Flac(Box<FlacDecoder>),
+    Mp3,
 }
 
 pub struct CodecContext {
@@ -217,6 +231,7 @@ pub struct Stream {
     pub skip_samples: i64,
     pub start_skip_samples: i64,
     pub first_discard_sample: i64,
+    pub last_discard_sample: i64,
     update_initial_durations_done: bool,
     codec_info_nb_frames: i32,
     codec_info_duration: i64,
@@ -254,6 +269,7 @@ impl Stream {
             skip_samples: 0,
             start_skip_samples: 0,
             first_discard_sample: 0,
+            last_discard_sample: 0,
             update_initial_durations_done: false,
             codec_info_nb_frames: 0,
             codec_info_duration: 0,
@@ -323,6 +339,9 @@ pub struct FormatContext<'a> {
     max_analyze_duration: i64,
     max_ts_probe: i32,
     pub wav: WavState,
+    pub mp3: Mp3State,
+    pub metadata: Dict,
+    pub id3v2_meta: Dict,
     pub channel_mask: Option<Vec<u8>>,
 }
 
@@ -363,6 +382,9 @@ fn open_decoder(avctx: &mut CodecContext, decoder: &codec::Decoder) -> Step<i32>
             Some(flac) => DecoderState::Flac(Box::new(flac)),
             None => return Ok(AVERROR_INVALIDDATA),
         }
+    } else if decoder.name == "mp3" {
+        params.format = sample_fmt::S16P;
+        DecoderState::Mp3
     } else {
         return Err(Unemulated("decoder initialization"));
     };
@@ -428,19 +450,28 @@ impl<'a> FormatContext<'a> {
             max_analyze_duration: 60 * 1_000_000,
             max_ts_probe: 50,
             wav: WavState::default(),
+            mp3: Mp3State::default(),
+            metadata: Dict::default(),
+            id3v2_meta: Dict::default(),
             channel_mask: None,
         };
+        let mut pictures = Vec::new();
         if matches!(iformat, Format::Aac | Format::Flac | Format::Mp3 | Format::Wav) {
-            ctx.id3v2_skip();
+            id3v2::read_dict(&mut ctx.pb, &mut ctx.id3v2_meta, &mut pictures);
         }
         let ret = match iformat {
             Format::Wav => wav::read_header(&mut ctx)?,
             Format::Flac => flac_demux::read_header(&mut ctx)?,
+            Format::Mp3 => mp3::read_header(&mut ctx)?,
             _ => return Err(Unemulated("demuxer outside the box scope")),
         };
         if ret < 0 {
             return Ok(Opened::Failed(ret));
         }
+        if ctx.metadata.is_empty() {
+            ctx.metadata = std::mem::take(&mut ctx.id3v2_meta);
+        }
+        ctx.add_pictures(pictures);
         for index in 0..ctx.streams.len() {
             if let Some(picture) = &ctx.streams[index].attached_pic {
                 let mut packet = Packet::new(picture.clone(), -1, index);
@@ -461,51 +492,13 @@ impl<'a> FormatContext<'a> {
         Ok(Opened::Context(Box::new(ctx)))
     }
 
-    fn id3v2_skip(&mut self) {
-        loop {
-            let off = self.pb.tell();
-            let mut header = [0u8; 10];
-            if self.pb.read(&mut header) != 10 {
-                self.pb.seek(off, crate::avio::Whence::Set);
-                break;
-            }
-            if !probe::id3v2_match(&header) {
-                self.pb.seek(off, crate::avio::Whence::Set);
-                break;
-            }
-            let len = ((header[6] & 0x7f) as i64) << 21
-                | ((header[7] & 0x7f) as i64) << 14
-                | ((header[8] & 0x7f) as i64) << 7
-                | (header[9] & 0x7f) as i64;
-            let version = header[3];
-            let flags = header[5];
-            let mut end = self.pb.tell() + len;
-            let parsed = match version {
-                2 => flags & 0x40 == 0,
-                3 | 4 => {
-                    if flags & 0x40 != 0 {
-                        let mut extlen: i64 = 0;
-                        for _ in 0..4 {
-                            extlen = (extlen << 7) + (self.pb.r8() & 0x7f) as i64;
-                        }
-                        let extlen = extlen as u32 as i32 as i64;
-                        let extlen = if version == 4 { extlen - 4 } else { extlen };
-                        if extlen < 0 {
-                            false
-                        } else {
-                            self.pb.skip(extlen);
-                            len - (extlen + 4) >= 0
-                        }
-                    } else {
-                        true
-                    }
-                }
-                _ => false,
-            };
-            if parsed && version == 4 && flags & 0x10 != 0 {
-                end += 10;
-            }
-            self.pb.seek(end, crate::avio::Whence::Set);
+    pub fn add_pictures(&mut self, pictures: Vec<id3v2::Picture>) {
+        for picture in pictures {
+            let index = self.new_stream();
+            let st = &mut self.streams[index];
+            st.codecpar.codec_type = MediaType::Video;
+            st.codecpar.codec_id = picture.codec;
+            st.attached_pic = Some(picture.data);
         }
     }
 
@@ -519,6 +512,7 @@ impl<'a> FormatContext<'a> {
         match self.iformat {
             Format::Wav => wav::read_packet(self),
             Format::Flac => flac_demux::read_packet(self),
+            Format::Mp3 => mp3::read_packet(self),
             _ => Err(Unemulated("demuxer outside the box scope")),
         }
     }
@@ -956,15 +950,23 @@ impl<'a> FormatContext<'a> {
             },
         };
         let st = &mut self.streams[packet.stream_index];
+        let mut discard_padding: i64 = 0;
         if st.first_discard_sample != 0 && packet.pts != NOPTS {
-            return Err(Unemulated("discard sample range"));
+            let pts = packet.pts - if is_relative(packet.pts) { RELATIVE_TS_BASE } else { 0 };
+            let to_samples = |ts: i64| rational::rescale(ts, st.time_base.num as i64 * st.codecpar.sample_rate as i64, st.time_base.den as i64);
+            let sample = to_samples(pts);
+            let duration = (st.codecpar.frame_size as i64).max(to_samples(packet.duration));
+            let end_sample = sample + duration;
+            if duration > 0 && end_sample >= st.first_discard_sample && sample < st.last_discard_sample {
+                discard_padding = (end_sample - st.first_discard_sample).min(duration);
+            }
         }
         if st.start_skip_samples != 0 && (packet.pts == 0 || packet.pts == RELATIVE_TS_BASE) {
             st.skip_samples = st.start_skip_samples;
         }
         st.skip_samples = st.skip_samples.max(0);
-        if st.skip_samples != 0 {
-            packet.skip_samples = Some((st.skip_samples as u32, 0));
+        if st.skip_samples != 0 || discard_padding != 0 {
+            packet.skip_samples = Some((st.skip_samples as u32, discard_padding as u32));
             st.skip_samples = 0;
         }
         Ok(Ok(packet))
@@ -1018,6 +1020,21 @@ impl<'a> FormatContext<'a> {
         let Some(decoder) = st.avctx.decoder.as_mut() else {
             return Err(Unemulated("decoding without an open decoder"));
         };
+        if let DecoderState::Mp3 = decoder.state {
+            let Some(data) = packet.filter(|data| !data.is_empty()) else {
+                return Ok(0);
+            };
+            return Ok(match mp3::decode(&mut st.avctx.params, data) {
+                Mp3Decoded::Failed(err) => err,
+                Mp3Decoded::Consumed { consumed, .. } if consumed < data.len() => return Err(Unemulated("MP3 packet with several frames")),
+                Mp3Decoded::Consumed { frame, .. } => {
+                    if frame {
+                        st.nb_decoded_frames += 1;
+                    }
+                    frame as i32
+                }
+            });
+        }
         let DecoderState::Flac(flac) = &mut decoder.state else {
             return Err(Unemulated("decoding during stream analysis"));
         };

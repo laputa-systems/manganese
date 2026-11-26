@@ -28,8 +28,9 @@ CASES = [
     'flac-layout-frame-crc-bad-many', 'flac-layout-mixed-rate-frames',
     'flac-layout-frame-crc-bad', 'flac-layout-long-duration-grows', 'flac-layout-two-streaminfo', 'flac-layout-long-low-rate', 'flac-layout-id3-prefix',
     'flac-truncated-1000', 'fixture-logo-flac', 'fixture-composite-flac', 'fixture-low_battery-flac', 'fixture-welcome_back-flac',
+    'mp3-long-mpeg25-8k', 'mp3-long-mpeg1-32k', 'mp3-long-xing', 'fixture-mozart-mp3',
 ]
-MIME = {'probe wav': 'audio/wav', 'probe none': 'audio/wav', 'probe flac': 'audio/flac'}
+MIME = {'probe wav': 'audio/wav', 'probe none': 'audio/wav', 'probe flac': 'audio/flac', 'probe mp3': 'audio/mpeg'}
 
 
 def expected_of(text):
