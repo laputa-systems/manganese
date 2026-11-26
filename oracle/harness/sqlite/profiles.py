@@ -46,3 +46,17 @@ def unchanged_script(name, files):
     flags, page_size, cache_size = options(name, files[0])
     script = load(p.Script(), files).open(flags, page_size, cache_size).dump().close()
     return script.digest().artifacts()
+
+
+def write_script(name, files, tables):
+    flags, page_size, cache_size = options(name, files[0])
+    script = load(p.Script(), files).open(flags, page_size, cache_size).begin(0)
+    for table in tables:
+        script.execute(f'DELETE FROM "{table}" WHERE rowid IN (SELECT rowid FROM "{table}" ORDER BY rowid LIMIT 1)')
+    return script.commit(0).close().export()
+
+
+def reopen_script(name, files):
+    flags, page_size, cache_size = options(name, files[0])
+    script = load(p.Script(), files).open(flags, page_size, cache_size)
+    return script.prepare(1, 'PRAGMA integrity_check').step(1).finalize(1).dump().close()

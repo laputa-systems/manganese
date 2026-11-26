@@ -61,9 +61,20 @@ for path in databases:
     if expected != actual:
         mismatches.append((name, protocol.compare(request, expected, actual)))
         print(f'anchor {name}: MISMATCH {mismatches[-1][1]}')
-    else:
-        tables = len(reading['dump']['tables'])
-        print(f'anchor {name}: {tables} tables agree, file unchanged')
+        continue
+    tables = [table for table in reading['dump']['tables'] if not table.startswith('sqlite_')]
+    reopened = []
+    for role, program in (('oracle', oracle), ('candidate', candidate)):
+        write = profiles.write_script(path.name, files, tables).encode()
+        exported = dict(protocol.decode(write, protocol.run(program, [write], str(run_dir / f'{role}-write'))[0]))['export']
+        written = {kind: data for kind, (present, data) in enumerate(exported) if present}
+        check = profiles.reopen_script(path.name, written).encode()
+        reopened.append(protocol.run(oracle, [check], str(run_dir / f'{role}-reopen'))[0])
+    if reopened[0] != reopened[1]:
+        mismatches.append((name, protocol.compare(check, reopened[0], reopened[1])))
+        print(f'anchor {name}: REOPEN MISMATCH {mismatches[-1][1]}')
+        continue
+    print(f'anchor {name}: {len(tables)} tables agree, file unchanged, candidate writes reopen in the oracle')
 print(f'profile workload {result}; database archive sha256:{digest}; {len(databases) - len(mismatches)}/{len(databases)} agree')
 if mismatches:
     raise SystemExit(1)
