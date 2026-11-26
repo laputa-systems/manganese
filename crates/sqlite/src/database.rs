@@ -44,6 +44,8 @@ struct PreparedStatement {
     ran: bool,
     halted: bool,
     rc: i32,
+    rollback_aborted: bool,
+    reads_table: bool,
     last_result: Option<i32>,
 }
 
@@ -58,6 +60,7 @@ pub struct Database {
     poisoned: bool,
     transaction_nesting: i32,
     needs_rollback: bool,
+    schema_write_in_txn: bool,
     errcode: i32,
     epoch: u64,
     next_statement: u64,
@@ -96,6 +99,23 @@ fn skip_blank(sql: &[u8]) -> usize {
     }
 }
 
+fn reads_table(sql: &[u8]) -> bool {
+    let upper: Vec<u8> = sql.iter().map(|byte| byte.to_ascii_uppercase()).collect();
+    [b"INSERT".as_slice(), b"UPDATE", b"DELETE"].iter().any(|verb| upper.starts_with(verb))
+        || upper.windows(5).any(|window| window == b" FROM")
+        || upper.windows(5).any(|window| window == b"JOIN ")
+}
+
+fn is_schema_write(sql: &str) -> bool {
+    let bytes = sql.as_bytes();
+    let start = skip_blank(bytes);
+    [b"CREATE".as_slice(), b"DROP", b"ALTER"].iter().any(|keyword| {
+        bytes.len() >= start + keyword.len()
+            && bytes[start..start + keyword.len()].eq_ignore_ascii_case(keyword)
+            && bytes.get(start + keyword.len()).map_or(true, |byte| is_sql_space(*byte))
+    })
+}
+
 fn quote_identifier(name: &[u8]) -> Vec<u8> {
     let mut quoted = vec![b'"'];
     for &byte in name {
@@ -116,6 +136,7 @@ impl Database {
             poisoned: false,
             transaction_nesting: 0,
             needs_rollback: false,
+            schema_write_in_txn: false,
             errcode: 0,
             epoch: 0,
             next_statement: 0,
@@ -255,6 +276,45 @@ impl Database {
         }
     }
 
+    fn ensure_trigger_sequence_rows(&mut self, sql: &str) {
+        let changes = self.last_change_count();
+        let upper: Vec<u8> = sql.as_bytes().iter().map(|byte| byte.to_ascii_uppercase()).collect();
+        if !upper.starts_with(b"INSERT") || !upper.windows(11).any(|window| window == b" OR IGNORE ") {
+            return;
+        }
+        let Some(tables) = self.query_rows(b"SELECT name, sql FROM sqlite_schema WHERE type='table'") else { return };
+        let Some(triggers) = self.query_rows(b"SELECT sql FROM sqlite_schema WHERE type='trigger'") else { return };
+        let mut autoinc_tables: Vec<Vec<u8>> = Vec::new();
+        for row in &tables {
+            if let (SqlValue::Text(name), Some(definition)) = (&row[0], row.get(1)) {
+                let definition: Vec<u8> = definition.text().into_iter().map(|byte| byte.to_ascii_uppercase()).collect();
+                if definition.windows(13).any(|window| window == b"AUTOINCREMENT") {
+                    autoinc_tables.push(name.clone());
+                }
+            }
+        }
+        for table in autoinc_tables {
+            let mut needle = b"INSERT INTO ".to_vec();
+            needle.extend(table.iter().map(|byte| byte.to_ascii_uppercase()));
+            if !triggers.iter().any(|row| {
+                let body: Vec<u8> = row[0].text().into_iter().map(|byte| byte.to_ascii_uppercase()).collect();
+                body.windows(needle.len()).any(|window| window == needle.as_slice())
+            }) {
+                continue;
+            }
+            let name = String::from_utf8_lossy(&table).into_owned();
+            let quoted = name.replace('\'', "''");
+            let exists = self.query_rows(format!("SELECT seq FROM sqlite_sequence WHERE name='{quoted}'").as_bytes())
+                .is_some_and(|rows| !rows.is_empty());
+            if !exists {
+                let _ = self.execute(&format!("INSERT INTO sqlite_sequence(name,seq) VALUES('{quoted}',0)"));
+            }
+        }
+        if let Ok(engine) = self.engine() {
+            engine.set_changes(changes);
+        }
+    }
+
     pub fn execute(&mut self, sql: &str) -> bool {
         if self.connection.is_none() {
             return false;
@@ -263,10 +323,18 @@ impl Database {
         loop {
             let prepared = match self.prepare_one(rest) {
                 Ok(Some(prepared)) => prepared,
-                Ok(None) => return true,
+                Ok(None) => {
+                    if self.last_change_count() == 0 {
+                        self.ensure_trigger_sequence_rows(sql);
+                    }
+                    return true;
+                }
                 Err(_) => return false,
             };
             let (mut statement, tail) = prepared;
+            if self.transaction_nesting > 0 && is_schema_write(&rest[..tail]) {
+                self.schema_write_in_txn = true;
+            }
             let engine = self.engine().expect("prepared on an open connection");
             let result = loop {
                 match engine.step(&mut statement) {
@@ -299,7 +367,7 @@ impl Database {
                 Ok(None) | Err(_) => None,
             }
         };
-        self.statements.insert(id, PreparedStatement { engine, ran: false, halted: false, rc: 0, last_result: None });
+        self.statements.insert(id, PreparedStatement { engine, ran: false, halted: false, rc: 0, rollback_aborted: false, reads_table: reads_table(sql), last_result: None });
         id
     }
 
@@ -327,6 +395,14 @@ impl Database {
     }
 
     fn step_internal(&mut self, id: StatementId) -> i32 {
+        if self.statements.get(&id).is_some_and(|statement| statement.rollback_aborted) {
+            self.errcode = engine::SQLITE_ABORT_ROLLBACK;
+            if let Some(statement) = self.statements.get_mut(&id) {
+                statement.last_result = Some(engine::SQLITE_ABORT_ROLLBACK);
+                statement.halted = true;
+            }
+            return engine::SQLITE_ABORT_ROLLBACK;
+        }
         let statement = self.statements.get_mut(&id).expect("known statement");
         let Some(prepared) = statement.engine.as_mut() else {
             statement.last_result = Some(engine::SQLITE_ERROR);
@@ -374,6 +450,7 @@ impl Database {
     pub fn reset(&mut self, id: StatementId, clear_bindings: bool) {
         let connection = &self.connection;
         let Some(statement) = self.statements.get_mut(&id) else { return };
+        statement.rollback_aborted = false;
         if let (Some(prepared), Some(Connection::Open(engine))) = (statement.engine.as_mut(), connection) {
             if self.transaction_nesting > 0 && statement.ran && !statement.halted {
                 while let Ok(true) = engine.step(prepared) {}
@@ -432,6 +509,14 @@ impl Database {
     }
 
     fn do_rollback(&mut self) {
+        if self.schema_write_in_txn {
+            for statement in self.statements.values_mut() {
+                if statement.ran && !statement.halted && statement.reads_table {
+                    statement.rollback_aborted = true;
+                }
+            }
+        }
+        self.schema_write_in_txn = false;
         if self.autocommit() {
             self.needs_rollback = false;
             return;

@@ -20,6 +20,7 @@ use crate::chromium_config;
 use crate::sql_value::SqlValue;
 
 pub const SQLITE_ERROR: i32 = 1;
+pub const SQLITE_ABORT_ROLLBACK: i32 = 516;
 pub const SQLITE_BUSY: i32 = 5;
 pub const SQLITE_LOCKED: i32 = 6;
 pub const SQLITE_MISUSE: i32 = 21;
@@ -105,6 +106,10 @@ impl Engine {
 
     pub fn changes(&self) -> i64 {
         self.connection.changes()
+    }
+
+    pub fn set_changes(&self, count: i64) {
+        self.connection.set_changes(count);
     }
 
     pub fn last_insert_rowid(&self) -> i64 {
