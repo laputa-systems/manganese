@@ -122,6 +122,19 @@ brotli-harness:
 brotli-anchor:
 	PYTHONPATH=oracle/harness/brotli python3 -B oracle/harness/brotli/anchor.py
 
+.PHONY: leveldb-harness
+leveldb-harness:
+	mkdir -p .work/tmp/leveldb
+	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/leveldb $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/leveldb/build.py
+
+.PHONY: leveldb-record
+leveldb-record:
+	python3 -B oracle/harness/leveldb/record.py
+
+.PHONY: leveldb-anchor
+leveldb-anchor:
+	python3 -B oracle/harness/leveldb/anchor.py
+
 .PHONY: encoding-harness
 encoding-harness:
 	mkdir -p .work/tmp/encoding

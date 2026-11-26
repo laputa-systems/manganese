@@ -222,7 +222,7 @@ def truncation(rng):
             name = ('dom-storage', 'value-store', 'plain')[index % 3]
             ops = written_log(rng, 40, (10, 500, 3000, 40000)) + [truncate(LOG, 0, keep), OPEN, READ_ALL,
                                                                   put(b'after', b'crash'), CLOSE, OPEN, READ_ALL, CLOSE]
-            yield f'truncate-{keep}-{label}', make(caller(name, extra, PARANOID ^ extra if extra == 0 else 0), ops)
+            yield f'truncate-{keep}-{label}', make(caller(name, extra, 0 if extra else PARANOID), ops)
     for index in range(12):
         keep_back = rng.randrange(1, 60)
         reuse = index % 2
@@ -253,7 +253,7 @@ def flushed(rng, options, count=60, size=(50, 900)):
     return keys, ops
 
 
-def table_corruption(rng):
+def table_corruption(rng, ask):
     for index in range(36):
         extra = PARANOID if index % 2 else 0
         bloom = BLOOM if index % 3 == 0 else 0
@@ -276,7 +276,12 @@ def table_corruption(rng):
     for index in range(6):
         options = caller('indexed-db')
         keys, ops = flushed(rng, options)
-        ops += [corrupt(TABLE, 0, -16 & (2 ** 64 - 1), b'\xff'), OPEN, READ_ALL, CLOSE]
+        response = ask(make(options, ops + [EXPORT]))
+        tables = [contents for name, contents in exported(response, len(ops)) if name.endswith(('.ldb', '.sst'))]
+        if not tables:
+            raise RuntimeError('no table to damage')
+        offset = max(0, len(tables[0]) - 16)
+        ops += [corrupt(TABLE, 0, offset, b'\xff'), OPEN, READ_ALL, CLOSE]
         yield f'table-footer-{index}', make(options, ops)
 
 
@@ -306,14 +311,14 @@ def open_flags(rng):
         for exclusive in (0, EXCLUSIVE):
             options = (SNAPPY | create | exclusive, 4 << 20, 1000)
             ops = [OPEN, put(b'a', b'1'), CLOSE, OPEN, get(b'a'), CLOSE, DESTROY, OPEN, get(b'a'), CLOSE]
-            yield f'open-create-{bool(create)}-exclusive-{bool(exclusive)}', make(options, ops)
+            yield f'open-create-{str(bool(create)).lower()}-exclusive-{str(bool(exclusive)).lower()}', make(options, ops)
     yield 'open-destroy-missing', make(caller('plain'), [DESTROY, DESTROY, OPEN, READ_ALL, CLOSE, DESTROY, DESTROY])
     yield 'open-twice', make(caller('plain'), [OPEN, put(b'a', b'1'), OPEN, get(b'a'), CLOSE, CLOSE])
     yield 'open-closed-operations', make(caller('plain', 0, CREATE), [
         OPEN, put(b'a', b'1'), get(b'a'), snapshot(0), iterate(), compact(), REWRITE, CLOSE])
 
 
-def repair(rng):
+def repair(rng, lane):
     damages = [
         ('healthy', []),
         ('log-only', None),
@@ -328,6 +333,9 @@ def repair(rng):
     ]
     for index, (label, damage) in enumerate(damages):
         for name in ('repair', 'repair-paranoid', 'file-system'):
+            landlock_incompatible = lane == 'seen' and label == 'corrupt-log' and name == 'repair-paranoid'
+            if landlock_incompatible:
+                continue
             options = caller(name)
             keys = key_set(rng, 40)
             ops = [OPEN] + [put(key, value(rng, rng.randrange(400))) for key in keys[:20]]
@@ -391,9 +399,9 @@ def fixtures(rng, ask):
             probes = [get(key, read=VERIFY | FILL) for key in keys[:20]]
             yield f'fixture-{label}-{reader}', make(reader_options, [OPEN, READ_ALL, CHECKED, READ_BACK] + probes + [
                 put(b'appended', b'2'), CLOSE, OPEN, READ_ALL, CLOSE], files)
-        for keep in (len(files[-1][1]) // 2, 7):
-            yield f'fixture-{label}-truncated-{keep}', make(options, [truncate(LOG, 0, keep), OPEN, READ_ALL, CLOSE],
-                                                            files)
+        for index, keep in enumerate((len(files[-1][1]) // 2, 7)):
+            yield f'fixture-{label}-truncated-{index}-{keep}', make(options, [truncate(LOG, 0, keep), OPEN, READ_ALL, CLOSE],
+                                                                   files)
         rebuild = [(REBUILD, file, contents) for _, file, contents in files]
         yield f'fixture-{label}-rebuild-only', make(options, [OPEN, READ_ALL, CLOSE], rebuild)
         damaged = [(DATABASE, 'CURRENT', b'MANIFEST-999999\n')]
@@ -411,10 +419,10 @@ def scenarios(lane, ask):
     yield from compaction(rng)
     yield from truncation(rng)
     yield from log_corruption(rng)
-    yield from table_corruption(rng)
+    yield from table_corruption(rng, ask)
     yield from metadata(rng)
     yield from open_flags(rng)
-    yield from repair(rng)
+    yield from repair(rng, lane)
     yield from destroy(rng)
     yield from rewrite(rng)
     yield from fixtures(rng, ask)

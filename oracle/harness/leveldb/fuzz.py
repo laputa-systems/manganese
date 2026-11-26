@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 import fuzzdriver
-from protocol import OPEN, CLOSE, REPAIR, DESTROY, batch, compact, delete, get, iterate, put, release, request, snapshot
+from protocol import OPEN, CLOSE, REPAIR, DESTROY, batch, compact, delete, get, iterate, put, release, request, seek, snapshot
 
 seed, cases = fuzzdriver.budget()
 rng = random.Random(seed)
@@ -27,8 +27,9 @@ def generate(_oracle):
         elif choice < 48:
             entries = []
             for _ in range(rng.randrange(6)):
-                op = rng.choice((1, 2))
-                entries.append((op, rng.choice(keys), rng.randbytes(rng.randrange(80))))
+                key = rng.choice(keys)
+                value = rng.randbytes(rng.randrange(80)) if rng.randrange(2) else None
+                entries.append((key, value))
             ops.append(batch(entries, rng.randrange(8) == 0))
         elif choice < 61:
             selected = rng.choice(tuple(sorted(snapshots)) + (255,))
@@ -43,8 +44,8 @@ def generate(_oracle):
             ops.append(release(identifier))
         elif choice < 88:
             selected = rng.choice(tuple(sorted(snapshots)) + (255,))
-            direction = rng.randrange(3)
-            ops.append(iterate(direction, key, selected))
+            steps = [bytes([rng.choice((0, 1, 3, 4, 5, 6))]), seek(key)]
+            ops.append(iterate(steps, selected))
         elif choice < 93:
             ops.append(compact())
         elif choice < 97:
