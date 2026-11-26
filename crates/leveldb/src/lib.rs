@@ -1,13 +1,16 @@
-use rusty_leveldb::{BloomPolicy, CompressorId, FilterPolicy, LdbIterator, Options, ReadOptions, Status, StatusCode, WriteBatch, DB, compressor};
+use rusty_leveldb::env::{Env, FileLock, Logger, RandomAccess, WritableFile};
+use rusty_leveldb::{BackgroundWork, BloomPolicy, CompressorId, CompressorList, FilterPolicy, LdbIterator, Options, PosixDiskEnv, ReadOptions, Status, StatusCode, WriteBatch, DB, compressor};
 use std::ffi::OsString;
 use std::fs;
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
 
 pub use rusty_leveldb as engine;
+
+mod snappy;
 
 const REBUILD_SUFFIX: &str = "__tmp_for_rebuild";
 const RETRY_LIMIT: Duration = Duration::from_millis(1000);
@@ -40,6 +43,87 @@ pub fn code(status: &Status) -> Code {
             panic!("rusty-leveldb returned a status with no LevelDB equivalent: {status}")
         }
     }
+}
+
+struct ChromiumEnv(PosixDiskEnv);
+
+fn io_error(status: Status) -> Status {
+    match status.code {
+        StatusCode::NotFound => Status::new(StatusCode::IOError, &status.err),
+        _ => status,
+    }
+}
+
+fn remove_backup_files(directory: &Path) {
+    let Ok(entries) = fs::read_dir(directory) else { return };
+    for entry in entries.flatten() {
+        let is_file = entry.file_type().is_ok_and(|kind| kind.is_file());
+        if is_file && entry.file_name().as_encoded_bytes().ends_with(b".bak") {
+            let _ = fs::remove_file(entry.path());
+        }
+    }
+}
+
+impl Env for ChromiumEnv {
+    fn open_sequential_file(&self, path: &Path) -> rusty_leveldb::Result<Box<dyn Read>> {
+        self.0.open_sequential_file(path).map_err(io_error)
+    }
+    fn open_random_access_file(&self, path: &Path) -> rusty_leveldb::Result<Box<dyn RandomAccess>> {
+        self.0.open_random_access_file(path).map_err(io_error)
+    }
+    fn open_writable_file(&self, path: &Path) -> rusty_leveldb::Result<Box<dyn WritableFile>> {
+        self.0.open_writable_file(path).map_err(io_error)
+    }
+    fn open_appendable_file(&self, path: &Path) -> rusty_leveldb::Result<Box<dyn WritableFile>> {
+        self.0.open_appendable_file(path).map_err(io_error)
+    }
+    fn sync_dir(&self, path: &Path) -> rusty_leveldb::Result<()> {
+        self.0.sync_dir(path).map_err(io_error)
+    }
+    fn exists(&self, path: &Path) -> rusty_leveldb::Result<bool> {
+        self.0.exists(path).map_err(io_error)
+    }
+    fn children(&self, path: &Path) -> rusty_leveldb::Result<Vec<PathBuf>> {
+        remove_backup_files(path);
+        self.0.children(path).map_err(io_error)
+    }
+    fn size_of(&self, path: &Path) -> rusty_leveldb::Result<usize> {
+        self.0.size_of(path).map_err(io_error)
+    }
+    fn delete(&self, path: &Path) -> rusty_leveldb::Result<()> {
+        self.0.delete(path).map_err(io_error)
+    }
+    fn mkdir(&self, path: &Path) -> rusty_leveldb::Result<()> {
+        self.0.mkdir(path).map_err(io_error)
+    }
+    fn rmdir(&self, path: &Path) -> rusty_leveldb::Result<()> {
+        self.0.rmdir(path).map_err(io_error)
+    }
+    fn rename(&self, from: &Path, to: &Path) -> rusty_leveldb::Result<()> {
+        self.0.rename(from, to).map_err(io_error)
+    }
+    fn lock(&self, path: &Path) -> rusty_leveldb::Result<FileLock> {
+        self.0.lock(path).map_err(io_error)
+    }
+    fn unlock(&self, lock: FileLock) -> rusty_leveldb::Result<()> {
+        self.0.unlock(lock).map_err(io_error)
+    }
+    fn new_logger(&self, path: &Path) -> rusty_leveldb::Result<Logger> {
+        self.0.new_logger(path).map_err(io_error)
+    }
+    fn micros(&self) -> u64 {
+        self.0.micros()
+    }
+    fn sleep_for(&self, micros: u32) {
+        self.0.sleep_for(micros)
+    }
+}
+
+fn compressors() -> CompressorList {
+    let mut list = CompressorList::new();
+    list.set(compressor::NoneCompressor);
+    list.set(snappy::ChromiumSnappy);
+    list
 }
 
 #[derive(Clone, Debug)]
@@ -81,8 +165,11 @@ impl ChromiumOptions {
             max_open_files: self.max_open_files.clamp(64 + NON_TABLE_CACHE_FILES, 50000),
             compressor: match self.compression {
                 Compression::None => compressor::NoneCompressor::ID,
-                Compression::Snappy => compressor::SnappyCompressor::ID,
+                Compression::Snappy => snappy::ChromiumSnappy::ID,
             },
+            env: Rc::new(Box::new(ChromiumEnv(PosixDiskEnv::new()))),
+            compressor_list: Rc::new(compressors()),
+            background_work: BackgroundWork::Deferred,
             ..Options::default()
         };
         options.filter_policy = self
@@ -133,6 +220,7 @@ fn recognized(name: &str) -> bool {
 }
 
 pub fn destroy_db(path: &Path, options: &ChromiumOptions) -> rusty_leveldb::Result<()> {
+    remove_backup_files(path);
     let Ok(entries) = fs::read_dir(path).and_then(|entries| entries.collect::<io::Result<Vec<_>>>()) else {
         return Ok(());
     };

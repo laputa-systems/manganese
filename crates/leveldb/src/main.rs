@@ -1,4 +1,4 @@
-use leveldb::engine::{LdbIterator, ReadOptions, Snapshot, WriteBatch, DB};
+use leveldb::engine::{LdbIterator, LogReader, ReadOptions, Snapshot, Table, WriteBatch, DB};
 use leveldb::{ChromiumOptions, Compression, code, destroy_db, open_db, rebuild_path, repair_db, rewrite_db};
 use std::collections::HashMap;
 use std::env;
@@ -267,11 +267,12 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
                 let read = read_options(input.byte()?);
                 let id = input.byte()?;
                 let key = input.blob()?;
-                let snapshot = session.snapshot(id)?;
-                let Some(db) = session.db.as_mut() else {
+                if session.db.is_none() {
                     output.push(CLOSED);
                     continue;
-                };
+                }
+                let snapshot = session.snapshot(id)?;
+                let db = session.db.as_mut().ok_or("the database is open")?;
                 let result = match snapshot {
                     Some(snapshot) => db.get_at_with_options(&snapshot, key, read),
                     None => db.get_with_options(key, read),
@@ -305,8 +306,7 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
             7 => {
                 let read = read_options(input.byte()?);
                 let id = input.byte()?;
-                let snapshot = session.snapshot(id)?;
-                let Some(db) = session.db.as_mut() else {
+                if session.db.is_none() {
                     for _ in 0..input.byte()? {
                         if input.byte()? == 2 {
                             input.blob()?;
@@ -314,7 +314,9 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
                     }
                     output.push(CLOSED);
                     continue;
-                };
+                }
+                let snapshot = session.snapshot(id)?;
+                let db = session.db.as_mut().ok_or("the database is open")?;
                 let iter = match snapshot {
                     Some(snapshot) => db.new_iter_at_with_options(snapshot, read),
                     None => db.new_iter_with_options(read),
@@ -331,7 +333,7 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
                     output.push(CLOSED);
                     continue;
                 };
-                let _ = db.compact_range(begin.unwrap_or(b""), end.unwrap_or(&[0xff; 64]));
+                let _ = db.compact_key_range(begin, end);
                 output.push(0);
             }
             9 => {
@@ -405,6 +407,9 @@ fn record(data: &[u8], root: &Path) -> Result<Vec<u8>, Failure> {
             }
             _ => return Err("invalid operation".into()),
         }
+        if let Some(db) = session.db.as_mut() {
+            db.flush_background_work();
+        }
     }
     if input.offset != data.len() {
         return Err("trailing input".into());
@@ -465,12 +470,94 @@ fn read_database(path: &Path) -> Result<(), Failure> {
     Ok(())
 }
 
+fn read_table(path: &Path) -> Result<(), Failure> {
+    let mut output = io::stdout().lock();
+    let table = match Table::open(ChromiumOptions::default().engine_options(), path) {
+        Ok(table) => table,
+        Err(error) => {
+            writeln!(output, "open {}", code(&error) as u8)?;
+            return Ok(());
+        }
+    };
+    let mut iter = table.iter();
+    iter.seek_to_first();
+    while iter.valid() {
+        let (key, value) = iter.current().ok_or("a valid iterator has an entry")?;
+        hex(&mut output, &key)?;
+        write!(output, " ")?;
+        hex(&mut output, &value)?;
+        writeln!(output)?;
+        iter.advance();
+    }
+    writeln!(output, "status {}", status(&iter.status()))?;
+    Ok(())
+}
+
+fn read_log(path: &Path) -> Result<(), Failure> {
+    let mut output = io::stdout().lock();
+    let file = match ChromiumOptions::default().engine_options().env.open_sequential_file(path) {
+        Ok(file) => file,
+        Err(error) => {
+            writeln!(output, "open {}", code(&error) as u8)?;
+            return Ok(());
+        }
+    };
+    let mut reader = LogReader::new(file, true);
+    let mut first_corruption = Ok(());
+    let mut record = Vec::new();
+    loop {
+        match reader.read_record(&mut record) {
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(error) => {
+                if first_corruption.is_ok() {
+                    first_corruption = Err(error);
+                }
+                continue;
+            }
+        }
+        if record.len() < 12 {
+            writeln!(output, "short {}", record.len())?;
+            continue;
+        }
+        let mut batch = WriteBatch::default();
+        batch.set_contents(&record);
+        writeln!(output, "batch {} {}", batch.sequence(), batch.count() as i32)?;
+        let mut lines = Vec::new();
+        let result = batch.try_for_each(|key, value| {
+            let mut line = Vec::new();
+            match value {
+                Some(value) => {
+                    line.extend_from_slice(b"put ");
+                    let _ = hex(&mut line, key);
+                    line.push(b' ');
+                    let _ = hex(&mut line, value);
+                }
+                None => {
+                    line.extend_from_slice(b"delete ");
+                    let _ = hex(&mut line, key);
+                }
+            }
+            line.push(b'\n');
+            lines.push(line);
+        });
+        for line in lines {
+            output.write_all(&line)?;
+        }
+        writeln!(output, "batch-status {}", status(&result))?;
+    }
+    writeln!(output, "status {}", status(&first_corruption))?;
+    Ok(())
+}
+
 fn main() -> Result<(), Failure> {
     let args: Vec<_> = env::args_os().collect();
     match args.as_slice() {
         [_] => serve(),
         [_, operation, path] if operation == "read" => read_database(Path::new(path)),
-        _ => Err("usage: leveldb [read DATABASE]".into()),
+        [_, operation, path] if operation == "read-table" => read_table(Path::new(path)),
+        [_, operation, path] if operation == "read-log" => read_log(Path::new(path)),
+        _ => Err("usage: leveldb [read DATABASE | read-table TABLE | read-log LOG]".into()),
     }
 }
 
