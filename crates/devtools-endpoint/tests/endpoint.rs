@@ -100,6 +100,36 @@ fn http_one_point_zero_requests_are_closed_without_a_response() {
 }
 
 #[test]
+fn a_not_found_with_a_malformed_following_request_is_closed_without_a_reply() {
+    for trailing in [b"\r".as_slice(), b"\n", b"\r\n"] {
+        let endpoint = endpoint();
+        let mut stream = connect(&endpoint);
+        let mut request = b"GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\n".to_vec();
+        request.extend_from_slice(trailing);
+        stream.write_all(&request).expect("the request is sent");
+        assert!(read_all(&mut stream).is_empty(), "trailing {trailing:?}");
+    }
+}
+
+#[test]
+fn a_not_found_with_a_partial_following_request_still_answers() {
+    let endpoint = endpoint();
+    let mut stream = connect(&endpoint);
+    stream.write_all(b"GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\nGET /json/list HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r").expect("the request is sent");
+    let reply = read_all(&mut stream);
+    assert!(reply.starts_with(b"HTTP/1.1 404 Not Found\r\n"), "the first response is written");
+}
+
+#[test]
+fn an_unsafe_host_error_is_sent_before_a_malformed_following_request() {
+    let endpoint = endpoint();
+    let mut stream = connect(&endpoint);
+    stream.write_all(b"GET /nothing HTTP/1.1\r\nHost: relay.example\r\n\r\n\n").expect("the request is sent");
+    let reply = read_all(&mut stream);
+    assert!(reply.starts_with(b"HTTP/1.1 500 Internal Server Error\r\n"), "the host error is written");
+}
+
+#[test]
 fn a_websocket_session_answers_browser_get_version() {
     let endpoint = endpoint();
     let mut stream = connect(&endpoint);

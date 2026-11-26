@@ -151,7 +151,15 @@ impl Connection {
             consumed += length;
         }
         self.buffer.consume(consumed);
-        match handler.route_http(&request) {
+        let route = handler.route_http(&request);
+        if let Route::Now(response) = &route {
+            let remainder = self.buffer.readable();
+            if response.status() == 404 && matches!(remainder.first(), Some(b'\r' | b'\n')) {
+                self.close();
+                return false;
+            }
+        }
+        match route {
             Route::Now(response) => self.send(&response),
             Route::Later => self.tasks.push(Task::Http(request)),
         }
