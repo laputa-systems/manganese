@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::cert;
 use crate::cert::ParsedCertificate;
+use crate::ct;
 use crate::der;
 use crate::der::GeneralizedTime;
 use crate::der::Parser;
@@ -203,6 +204,8 @@ struct Context<'a> {
     additional: TrustStoreInMemory,
     constraints: Vec<AdditionalConstraint>,
     time: i64,
+    scts: &'a [u8],
+    ocsp: &'a [u8],
 }
 
 fn compare_versions(a: &[u32], b: &[u32]) -> std::cmp::Ordering {
@@ -240,12 +243,12 @@ impl Verifier {
         self.crs_constraints.iter().find(|a| a.cert.der == cert.der).map_or(&[], |a| a.constraints.as_slice())
     }
 
-    pub fn verify(&self, time: i64, hostname: &[u8], chain: &[Vec<u8>], trust: &[TrustEntry]) -> Outcome {
+    pub fn verify(&self, time: i64, hostname: &[u8], chain: &[Vec<u8>], trust: &[TrustEntry], scts: &[u8], ocsp: &[u8]) -> Outcome {
         let host = std::str::from_utf8(hostname).ok();
         let Some(target_fields) = x509_fields(&chain[0]) else {
             return Outcome { error: ERR_SSL_SERVER_CERT_BAD_FORMAT, status: 0, ct: CtCompliance::DetailsNotAvailable, chain: Vec::new() };
         };
-        let context = Context::new(self, trust, time);
+        let context = Context::new(self, trust, time, scts, ocsp);
         let mut status = 0u32;
         let mut ct = CtCompliance::DetailsNotAvailable;
         let mut verified: Vec<Vec<u8>> = chain.to_vec();
@@ -467,7 +470,7 @@ fn map_path_errors(path: &ResultPath) -> u32 {
 }
 
 impl<'a> Context<'a> {
-    fn new(verifier: &'a Verifier, trust: &[TrustEntry], time: i64) -> Self {
+    fn new(verifier: &'a Verifier, trust: &[TrustEntry], time: i64, scts: &'a [u8], ocsp: &'a [u8]) -> Self {
         let parse = |der: &[u8]| ParsedCertificate::parse(der).map(Rc::new);
         let x509_valid = |der: &[u8]| x509_fields(der).is_some();
         let mut additional = TrustStoreInMemory::default();
@@ -511,7 +514,7 @@ impl<'a> Context<'a> {
                 additional.add(cert, Trust::UNSPECIFIED);
             }
         }
-        Self { verifier, additional, constraints, time }
+        Self { verifier, additional, constraints, time, scts, ocsp }
     }
 
     fn is_non_chrome_anchor(&self, cert: &ParsedCertificate) -> bool {
@@ -551,8 +554,26 @@ impl<'a> Context<'a> {
                 _ => return false,
             }
         }
-        if self.verifier.ct_timely(self.time) && (constraint.sct_not_after.is_some() || constraint.sct_all_after.is_some()) {
-            return false;
+        if self.verifier.ct_timely(self.time) {
+            let valid = || {
+                path.delegate
+                    .valid_scts
+                    .iter()
+                    .filter(|sct| !ct::disqualified_at(&self.verifier.data.ct_logs[sct.log_index], self.time))
+                    .map(|sct| i64::try_from(sct.timestamp_ms).unwrap_or(i64::MAX).saturating_mul(1000))
+                    .collect::<Vec<_>>()
+            };
+            if let Some(limit) = constraint.sct_not_after {
+                if !valid().iter().any(|timestamp| *timestamp <= limit) {
+                    return false;
+                }
+            }
+            if let Some(limit) = constraint.sct_all_after {
+                let timestamps = valid();
+                if timestamps.is_empty() || timestamps.iter().any(|timestamp| *timestamp <= limit) {
+                    return false;
+                }
+            }
         }
         if !constraint.permitted_dns_names.is_empty() {
             let mut permitted = GeneralNames::default();
@@ -586,6 +607,13 @@ impl<'a> Context<'a> {
     }
 
     fn check_path(&self, path: &mut ResultPath) {
+        path.delegate.valid_scts = ct::verify_scts(
+            &self.verifier.data.ct_logs,
+            &path.certs[0].der,
+            path.certs.get(1).map(|cert| cert.der.as_slice()),
+            self.scts,
+            self.ocsp,
+        );
         self.check_extra_constraints(path);
         self.check_chrome_root_constraints(path);
         if !path.is_valid() {
@@ -598,9 +626,20 @@ impl<'a> Context<'a> {
             }
         }
         let timely = self.verifier.ct_timely(self.time);
-        path.delegate.ct_compliance = if timely { CtCompliance::NotEnoughScts } else { CtCompliance::BuildNotTimely };
+        path.delegate.ct_compliance = if timely {
+            ct::compliance(
+                &self.verifier.data.ct_logs,
+                &path.delegate.valid_scts,
+                self.time,
+                path.certs[0].not_before.to_posix(),
+                path.certs[0].not_after.to_posix(),
+                self.verifier.data.ct_log_list_micros,
+            )
+        } else {
+            CtCompliance::BuildNotTimely
+        };
         let known_root = path.trusted_cert().is_some_and(|c| self.verifier.is_known_root(c));
-        if known_root && timely {
+        if known_root && timely && path.delegate.ct_compliance != CtCompliance::Complies {
             path.errors.for_cert(0).add_error(CertError::CtRequirementsNotMet);
         }
     }

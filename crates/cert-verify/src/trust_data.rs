@@ -22,10 +22,28 @@ pub struct Anchor {
     pub constraints: Vec<RootConstraint>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CtLogType {
+    Rfc6962,
+    Static,
+    Unspecified,
+}
+
+#[derive(Clone, Debug)]
+pub struct CtLog {
+    pub id: [u8; 32],
+    pub key: Vec<u8>,
+    pub log_type: CtLogType,
+    pub operator: Vec<u8>,
+    pub previous: Vec<(Vec<u8>, i64)>,
+    pub disqualified: Option<i64>,
+}
+
 pub struct TrustData {
     pub chrome_version: Vec<u32>,
     pub anchors: Vec<Anchor>,
     pub ct_log_list_micros: i64,
+    pub ct_logs: Vec<CtLog>,
     pub blocked_spkis: Vec<[u8; 32]>,
     pub interception_spkis: Vec<[u8; 32]>,
 }
@@ -71,7 +89,7 @@ fn base64(text: &str) -> Vec<u8> {
 }
 
 pub fn load() -> TrustData {
-    let mut data = TrustData { chrome_version: Vec::new(), anchors: Vec::new(), ct_log_list_micros: 0, blocked_spkis: Vec::new(), interception_spkis: Vec::new() };
+    let mut data = TrustData { chrome_version: Vec::new(), anchors: Vec::new(), ct_log_list_micros: 0, ct_logs: Vec::new(), blocked_spkis: Vec::new(), interception_spkis: Vec::new() };
     for line in TRUST_DATA.lines() {
         let fields: Vec<&str> = line.split(' ').collect();
         match fields[0] {
@@ -98,6 +116,33 @@ pub fn load() -> TrustData {
                 data.anchors.last_mut().expect("constraints follow their anchor").constraints.push(constraint);
             }
             "ct-log-list" => data.ct_log_list_micros = optional_micros(fields[1]).expect("the CT log list has a timestamp"),
+            "ct-log" => {
+                let previous = if fields[5] == "-" {
+                    Vec::new()
+                } else {
+                    fields[5]
+                        .split(',')
+                        .map(|entry| {
+                            let (name, end) = entry.rsplit_once(':').expect("previous operators have an end time");
+                            (base64(name), end.parse().expect("previous operator times are integers"))
+                        })
+                        .collect()
+                };
+                let log_type = match fields[3] {
+                    "rfc6962" => CtLogType::Rfc6962,
+                    "static" => CtLogType::Static,
+                    "unspecified" => CtLogType::Unspecified,
+                    _ => panic!("unknown CT log type"),
+                };
+                data.ct_logs.push(CtLog {
+                    id: hash(fields[1]),
+                    key: base64(fields[2]),
+                    log_type,
+                    operator: base64(fields[4]),
+                    previous,
+                    disqualified: optional_micros(fields[6]),
+                });
+            }
             "blocked-spki" => data.blocked_spkis.push(hash(fields[1])),
             "interception-spki" => data.interception_spkis.push(hash(fields[1])),
             "ev" => assert!(

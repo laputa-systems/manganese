@@ -80,6 +80,8 @@ struct Request {
   std::string hostname;
   std::vector<std::string> chain;
   std::vector<TrustEntry> trust;
+  std::string sct_list;
+  std::string ocsp_response;
 };
 
 class Reader {
@@ -152,6 +154,10 @@ std::optional<std::string> Parse(std::string_view input, Request* request) {
       }
     }
     request->trust.push_back(std::move(entry));
+  }
+  if (!reader.empty()) {
+    if (!reader.Prefixed(2, &request->sct_list)) return "sct list";
+    if (!reader.empty() && !reader.Prefixed(2, &request->ocsp_response)) return "ocsp response";
   }
   if (!reader.empty()) return "trailing bytes";
   return std::nullopt;
@@ -325,7 +331,7 @@ std::string Execute(std::string_view input) {
       BuildInstanceParams(request.trust), std::nullopt);
 
   net::CertVerifyResult result;
-  int rv = proc->Verify(cert.get(), request.hostname, std::string(), std::string(), 0, &result,
+  int rv = proc->Verify(cert.get(), request.hostname, request.ocsp_response, request.sct_list, 0, &result,
                         net::NetLogWithSource());
 
   std::string output = "error " + base::NumberToString(rv) + " " + net::ErrorToShortString(rv) + "\n";
@@ -377,6 +383,26 @@ std::string DumpTrustData() {
     }
   }
   out += "ct-log-list " + Micros(certificate_transparency::GetLogListTimestamp()) + "\n";
+  std::map<std::string, int64_t> disqualified;
+  for (const auto& [id, when] : certificate_transparency::GetDisqualifiedLogs()) {
+    disqualified[id] = (when - base::Time::UnixEpoch()).InMicroseconds();
+  }
+  for (const auto& log : certificate_transparency::GetKnownLogs()) {
+    std::string key(log.log_key, log.log_key_length);
+    std::string id(base::as_string_view(crypto::hash::Sha256(key)));
+    const char* type = log.log_type == certificate_transparency::LogType::kRFC6962 ? "rfc6962"
+                       : log.log_type == certificate_transparency::LogType::kStaticCTAPI ? "static"
+                                                                                       : "unspecified";
+    std::string previous;
+    for (size_t i = 0; i < log.previous_operators_length; ++i) {
+      previous += (previous.empty() ? "" : ",") + base::Base64Encode(log.previous_operators[i].name) + ":" +
+                  Micros(log.previous_operators[i].end_time);
+    }
+    auto found = disqualified.find(id);
+    out += "ct-log " + base::ToLowerASCII(base::HexEncode(base::as_byte_span(id))) + " " + base::Base64Encode(key) + " " + type +
+           " " + base::Base64Encode(log.current_operator) + " " + (previous.empty() ? "-" : previous) + " " +
+           (found == disqualified.end() ? std::string("-") : base::NumberToString(found->second)) + "\n";
+  }
   for (const auto& ev : net::GetEvRootCaMetadata()) {
     for (const auto& oid : ev.policy_oids) {
       if (!oid.empty()) out += "ev " + Hex(ev.fingerprint) + " " + std::string(oid) + "\n";

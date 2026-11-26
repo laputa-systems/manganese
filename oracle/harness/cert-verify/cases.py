@@ -26,10 +26,10 @@ def der(item):
     return item if isinstance(item, bytes) else item.der
 
 
-def add(label, chain, trust=(), time=T, host=HOST):
+def add(label: str, chain: list, trust: tuple = (), time: int = T, host: bytes | str = HOST, scts: bytes = b'', ocsp: bytes = b'') -> None:
     label = re.sub(r'[^a-z0-9_-]', '_', label.lower())
     hostname = host.encode() if isinstance(host, str) else host
-    cases.append((label, Record(time, hostname, [der(c) for c in chain], [t if isinstance(t, Trust) else Trust(t[0], der(t[1])) for t in trust])))
+    cases.append((label, Record(time, hostname, [der(c) for c in chain], [t if isinstance(t, Trust) else Trust(t[0], der(t[1])) for t in trust], scts, ocsp)))
 
 
 def spki_of(cert):
@@ -706,6 +706,72 @@ def suite_cases():
                 add(f'suite-net-{path.stem}-{time_label}-{host}', blocks, [(ANCHOR, test_root)], time=time, host=host)
 
 
+def read_tlv(data: bytes, offset: int) -> tuple[int, int, int]:
+    tag = data[offset]
+    length = data[offset + 1]
+    offset += 2
+    if length & 0x80:
+        count = length & 0x7f
+        length = int.from_bytes(data[offset:offset + count], 'big')
+        offset += count
+    return tag, offset, offset + length
+
+
+def embedded_sct_list(cert: bytes) -> tuple[bytes, int, int] | None:
+    _, start, end = read_tlv(cert, 0)
+    _, tbs_start, tbs_end = read_tlv(cert, start)
+    fields = []
+    offset = tbs_start
+    while offset < tbs_end:
+        tag, field_start, field_end = read_tlv(cert, offset)
+        fields.append((tag, field_start, field_end))
+        offset = field_end
+    extensions = next((field for field in fields if field[0] == 0xa3), None)
+    if extensions is None:
+        return None
+    _, sequence_start, sequence_end = read_tlv(cert, extensions[1])
+    offset = sequence_start
+    while offset < sequence_end:
+        tag, extension_start, extension_end = read_tlv(cert, offset)
+        _, fields_start, fields_end = read_tlv(cert, extension_start)
+        offset = extension_end
+        if cert[fields_start:fields_end] != bytes.fromhex('2b06010401d679020402'):
+            continue
+        extension_fields = []
+        field_offset = fields_start
+        while field_offset < fields_end:
+            _, item_start, item_end = read_tlv(cert, field_offset)
+            extension_fields.append(item_start)
+            field_offset = item_end
+        _, value_start, _ = read_tlv(cert, extension_fields[-1])
+        _, list_start, list_end = read_tlv(cert, value_start)
+        return cert[list_start:list_end], list_start, list_end
+    return None
+
+
+def public_ct_cases() -> None:
+    chain = pem_blocks(pathlib.Path(__file__).resolve().parent / 'fixtures/ct-public-chain.pem')
+    leaf, intermediate = chain[:2]
+    captured, begin, end = embedded_sct_list(leaf)
+    items = []
+    offset = 2
+    while offset < len(captured):
+        size = int.from_bytes(captured[offset:offset + 2], 'big')
+        items.append((offset, offset + 2 + size))
+        offset += 2 + size
+    host = b'upload.video.google.com'
+    add('ct-public-complies', chain, time=1795000000, host=host)
+    add('ct-public-stale-list', chain, time=1800000000, host=host)
+    add('ct-public-host-mismatch', chain, time=1795000000, host=b'other.video.google.com')
+    altered = bytearray(captured)
+    altered[items[0][1] - 3] ^= 1
+    add('ct-public-altered-sct-signature', [leaf[:begin] + bytes(altered) + leaf[end:], intermediate], time=1795000000, host=host)
+    insufficient = bytearray(captured)
+    insufficient[items[1][1] - 3] ^= 1
+    add('ct-public-insufficient-qualifying-logs', [leaf[:begin] + bytes(insufficient) + leaf[end:], intermediate], time=1795000000, host=host)
+    add('ct-public-tls-sct-list', chain, time=1795000000, host=host, scts=captured)
+
+
 def main():
     hostname_cases()
     validity_cases()
@@ -719,6 +785,7 @@ def main():
     signature_cases()
     crs_cases()
     suite_cases()
+    public_ct_cases()
     return cases
 
 
