@@ -169,7 +169,7 @@ impl<S: Source> Decompress<S> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments, reason = "libjpeg's upsample signature is the ported interface")]
 fn upsample_component(method: Method, input: &Input, output: &mut Plane, max_v: usize, output_width: usize, downsampled_width: usize, h_expand: usize, v_expand: usize) {
     match method {
         Method::H2v1 => {

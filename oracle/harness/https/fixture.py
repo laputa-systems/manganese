@@ -102,17 +102,25 @@ def trust_entries(root_der, constrained=(), hints=(), distrusted=()):
 
 def harness(oracle, records):
     process = subprocess.Popen([str(oracle)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-    process.stdin.write(b'MGB1')
-    process.stdin.flush()
-    if process.stdout.read(4) != b'MGB1':
-        raise RuntimeError('harness wrote an invalid protocol header')
-    outputs = []
-    for record in records:
-        process.stdin.write(struct.pack('>I', len(record)) + record)
+    try:
+        process.stdin.write(b'MGB1')
         process.stdin.flush()
-        outputs.append(process.stdout.read(struct.unpack('>I', process.stdout.read(4))[0]).decode())
-    process.stdin.close()
-    if process.wait():
+        if process.stdout.read(4) != b'MGB1':
+            raise RuntimeError('harness wrote an invalid protocol header')
+        outputs = []
+        for record in records:
+            process.stdin.write(struct.pack('>I', len(record)) + record)
+            process.stdin.flush()
+            outputs.append(process.stdout.read(struct.unpack('>I', process.stdout.read(4))[0]).decode())
+        process.stdin.close()
+        code = process.wait(timeout=60)
+    finally:
+        if not process.stdin.closed:
+            process.stdin.close()
+        if process.poll() is None:
+            process.kill()
+        process.wait()
+    if code:
         raise RuntimeError('harness failed')
     return outputs
 

@@ -9,6 +9,7 @@ use super::marker::MarkerReader;
 use super::source::{Source, SourceState};
 use super::tables::*;
 use super::upsample::Upsampler;
+use std::fmt;
 use std::rc::Rc;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -253,6 +254,19 @@ pub struct Decompress<S> {
     pub(crate) upsample: Option<Upsampler>,
     pub(crate) cconvert: Option<ColorDeconverter>,
     pub(crate) main: Option<MainController>,
+}
+
+impl<S: fmt::Debug> fmt::Debug for Decompress<S> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Decompress")
+            .field("src", &self.src)
+            .field("image_width", &self.image_width)
+            .field("image_height", &self.image_height)
+            .field("num_components", &self.num_components)
+            .field("out_color_space", &self.out_color_space)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<S: Source> Decompress<S> {
