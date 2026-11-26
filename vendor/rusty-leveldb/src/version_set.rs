@@ -7,7 +7,7 @@ use crate::merging_iter::MergingIter;
 use crate::options::{Options, ReadOptions};
 use crate::table_cache::TableCache;
 use crate::types::{
-    parse_file_name, share, FileMetaData, FileNum, FileType, LdbIterator, Shared, NUM_LEVELS,
+    parse_file_name, share, ErrorIter, FileMetaData, FileNum, FileType, LdbIterator, Shared, NUM_LEVELS,
 };
 use crate::version::{new_version_iter_with_options, total_size, FileMetaHandle, Version};
 use crate::version_edit::VersionEdit;
@@ -320,7 +320,7 @@ impl VersionSet {
         if level == 0 {
             let (smallest, largest) = get_range(&self.cmp, c.inputs[0].iter());
             // This call intentionally overwrites the file previously put into c.inputs[0].
-            c.inputs[0] = current.overlapping_inputs(0, &smallest, &largest);
+            c.inputs[0] = current.overlapping_inputs(0, Some(&smallest), Some(&largest));
             assert!(!c.inputs[0].is_empty());
         }
 
@@ -331,8 +331,8 @@ impl VersionSet {
     pub fn compact_range(
         &mut self,
         level: usize,
-        from: InternalKey<'_>,
-        to: InternalKey<'_>,
+        from: Option<InternalKey<'_>>,
+        to: Option<InternalKey<'_>>,
     ) -> Option<Compaction> {
         assert!(self.current.is_some());
         let mut inputs = self
@@ -349,7 +349,7 @@ impl VersionSet {
             let mut total = 0;
             for i in 0..inputs.len() {
                 total += inputs[i].borrow().size;
-                if total > self.opt.max_file_size {
+                if total >= self.opt.max_file_size {
                     inputs.truncate(i + 1);
                     break;
                 }
@@ -369,10 +369,12 @@ impl VersionSet {
         let current = current.borrow();
 
         let level = compaction.level;
+        add_boundary_inputs(&self.cmp, &current.files[level], &mut compaction.inputs[0]);
         let (mut smallest, mut largest) = get_range(&self.cmp, compaction.inputs[0].iter());
 
         // Set up level+1 inputs.
-        compaction.inputs[1] = current.overlapping_inputs(level + 1, &smallest, &largest);
+        compaction.inputs[1] = current.overlapping_inputs(level + 1, Some(&smallest), Some(&largest));
+        add_boundary_inputs(&self.cmp, &current.files[level + 1], &mut compaction.inputs[1]);
 
         let (mut allstart, mut alllimit) = get_range(
             &self.cmp,
@@ -384,7 +386,8 @@ impl VersionSet {
         // Check if we can add more inputs in the current level without having to compact more
         // inputs from level+1.
         if !compaction.inputs[1].is_empty() {
-            let expanded0 = current.overlapping_inputs(level, &allstart, &alllimit);
+            let mut expanded0 = current.overlapping_inputs(level, Some(&allstart), Some(&alllimit));
+            add_boundary_inputs(&self.cmp, &current.files[level], &mut expanded0);
             let inputs1_size = total_size(compaction.inputs[1].iter());
             let expanded0_size = total_size(expanded0.iter());
             // ...if we picked up more files in the current level, and the total size is acceptable
@@ -392,7 +395,8 @@ impl VersionSet {
                 && (inputs1_size + expanded0_size) < 25 * self.opt.max_file_size
             {
                 let (new_start, new_limit) = get_range(&self.cmp, expanded0.iter());
-                let expanded1 = current.overlapping_inputs(level + 1, &new_start, &new_limit);
+                let mut expanded1 = current.overlapping_inputs(level + 1, Some(&new_start), Some(&new_limit));
+                add_boundary_inputs(&self.cmp, &current.files[level + 1], &mut expanded1);
                 if expanded1.len() == compaction.num_inputs(1) {
                     log!(
                         self.opt.log,
@@ -429,8 +433,8 @@ impl VersionSet {
         if level + 2 < NUM_LEVELS {
             let grandparents = self.current.as_ref().unwrap().borrow().overlapping_inputs(
                 level + 2,
-                &allstart,
-                &alllimit,
+                Some(&allstart),
+                Some(&alllimit),
             );
             compaction.grandparents = Some(grandparents);
         }
@@ -570,10 +574,16 @@ impl VersionSet {
         let descfilename = self.dbname.join(current);
         let mut builder = Builder::new();
         {
-            let mut descfile = self
-                .opt
-                .env
-                .open_sequential_file(Path::new(&descfilename))?;
+            let mut descfile = match self.opt.env.open_sequential_file(Path::new(&descfilename)) {
+                Ok(file) => file,
+                Err(error) if error.code == StatusCode::NotFound => {
+                    return err(
+                        StatusCode::Corruption,
+                        &format!("CURRENT points to a non-existent file: {}", error),
+                    );
+                }
+                Err(error) => return Err(error),
+            };
             let mut logreader = LogReader::new(
                 &mut descfile,
                 // checksum=
@@ -588,6 +598,14 @@ impl VersionSet {
             let mut buf = Vec::new();
             while logreader.read_record(&mut buf)?.is_some() {
                 let edit = VersionEdit::decode_from(&buf)?;
+                if let Some(name) = edit.comparator_name() {
+                    if name != self.opt.cmp.id() {
+                        return err(
+                            StatusCode::InvalidArgument,
+                            &format!("{} does not match existing comparator {}", name, self.opt.cmp.id()),
+                        );
+                    }
+                }
                 builder.apply(&edit, &mut self.compaction_ptrs);
                 if let Some(ln) = edit.log_number {
                     log_number = Some(ln);
@@ -712,8 +730,11 @@ impl VersionSet {
                 // Add individual iterators for L0 tables.
                 for fi in 0..c.num_inputs(i) {
                     let f = &c.inputs[i][fi];
-                    let table = self.cache.borrow_mut().get_table(f.borrow().num)?;
-                    iters.push(Box::new(table.iter_with_options(options)));
+                    let table = self.cache.borrow_mut().get_table(f.borrow().num);
+                    match table {
+                        Ok(table) => iters.push(Box::new(table.iter_with_options(options))),
+                        Err(error) => iters.push(Box::new(ErrorIter(error))),
+                    }
                 }
             } else {
                 // Create concatenating iterator higher levels.
@@ -846,7 +867,7 @@ fn temp_file_name<P: AsRef<Path>>(dbname: P, file_num: FileNum) -> PathBuf {
     dbname.as_ref().join(format!("{:06}.dbtmp", file_num))
 }
 
-fn current_file_name<P: AsRef<Path>>(dbname: P) -> PathBuf {
+pub(crate) fn current_file_name<P: AsRef<Path>>(dbname: P) -> PathBuf {
     dbname.as_ref().join("CURRENT").to_owned()
 }
 
@@ -940,6 +961,32 @@ fn merge_iters<
 
 /// get_range returns the indices of the files within files that have the smallest lower bound
 /// respectively the largest upper bound.
+/// Adds to `inputs` every file of `level_files` whose smallest key shares a user key with, and
+/// sorts after, the largest input key, as LevelDB's AddBoundaryInputs does, so that a compaction
+/// never splits the entries of one user key across levels.
+fn add_boundary_inputs(cmp: &InternalKeyCmp, level_files: &[FileMetaHandle], inputs: &mut Vec<FileMetaHandle>) {
+    let Some(mut largest) = inputs.iter().map(|f| f.borrow().largest.clone()).reduce(|a, b| {
+        if cmp.cmp(&b, &a) == Ordering::Greater { b } else { a }
+    }) else {
+        return;
+    };
+    loop {
+        let mut boundary: Option<FileMetaHandle> = None;
+        for f in level_files {
+            let file = f.borrow();
+            if cmp.cmp(&file.smallest, &largest) == Ordering::Greater
+                && cmp.cmp_inner(parse_internal_key(&file.smallest).2, parse_internal_key(&largest).2) == Ordering::Equal
+                && boundary.as_ref().is_none_or(|b| cmp.cmp(&file.smallest, &b.borrow().smallest) == Ordering::Less)
+            {
+                boundary = Some(f.clone());
+            }
+        }
+        let Some(file) = boundary else { return };
+        largest = file.borrow().largest.clone();
+        inputs.push(file);
+    }
+}
+
 fn get_range<'a, C: Cmp, I: Iterator<Item = &'a FileMetaHandle>>(
     c: &C,
     files: I,
@@ -1172,9 +1219,9 @@ mod tests {
         let v = vs.current();
         let v = v.borrow();
         // num_level_bytes()
-        assert_eq!(483, v.num_level_bytes(0));
-        assert_eq!(651, v.num_level_bytes(1));
-        assert_eq!(468, v.num_level_bytes(2));
+        assert_eq!(479, v.num_level_bytes(0));
+        assert_eq!(645, v.num_level_bytes(1));
+        assert_eq!(464, v.num_level_bytes(2));
         // num_level_files()
         assert_eq!(2, v.num_level_files(0));
         assert_eq!(3, v.num_level_files(1));
@@ -1256,11 +1303,11 @@ mod tests {
                 vs.approximate_offset(&v, LookupKey::new(b"aaa", 9000).internal_key())
             );
             assert_eq!(
-                232,
+                230,
                 vs.approximate_offset(&v, LookupKey::new(b"bab", 9000).internal_key())
             );
             assert_eq!(
-                1134,
+                1124,
                 vs.approximate_offset(&v, LookupKey::new(b"fab", 9000).internal_key())
             );
         }
@@ -1272,7 +1319,7 @@ mod tests {
             let from = LookupKey::new(b"000", 1000);
             let to = LookupKey::new(b"ab", 1010);
             let c = vs
-                .compact_range(0, from.internal_key(), to.internal_key())
+                .compact_range(0, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             assert_eq!(2, c.inputs[0].len());
             assert_eq!(1, c.inputs[1].len());
@@ -1282,7 +1329,7 @@ mod tests {
             let from = LookupKey::new(b"000", 1000);
             let to = LookupKey::new(b"zzz", 1010);
             let c = vs
-                .compact_range(0, from.internal_key(), to.internal_key())
+                .compact_range(0, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             assert_eq!(2, c.inputs[0].len());
             assert_eq!(1, c.inputs[1].len());
@@ -1297,7 +1344,7 @@ mod tests {
             let from = LookupKey::new(b"dab", 1000);
             let to = LookupKey::new(b"eab", 1010);
             let c = vs
-                .compact_range(1, from.internal_key(), to.internal_key())
+                .compact_range(1, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             assert_eq!(3, c.inputs[0].len());
             assert_eq!(1, c.inputs[1].len());
@@ -1312,7 +1359,7 @@ mod tests {
             let from = LookupKey::new(b"fab", 1000);
             let to = LookupKey::new(b"fba", 1010);
             let mut c = vs
-                .compact_range(2, from.internal_key(), to.internal_key())
+                .compact_range(2, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             // pretend it's not manual
             c.manual = false;
@@ -1323,7 +1370,7 @@ mod tests {
             let to = LookupKey::new(b"zzz", 1010);
             let mid = LookupKey::new(b"abc", 1010);
             let mut c = vs
-                .compact_range(0, from.internal_key(), to.internal_key())
+                .compact_range(0, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             assert!(!c.should_stop_before(from.internal_key()));
             assert!(!c.should_stop_before(mid.internal_key()));
@@ -1333,7 +1380,7 @@ mod tests {
             let from = LookupKey::new(b"000", 1000);
             let to = LookupKey::new(b"zzz", 1010);
             let mut c = vs
-                .compact_range(0, from.internal_key(), to.internal_key())
+                .compact_range(0, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             assert!(c.is_base_level_for(b"aaa"));
             assert!(!c.is_base_level_for(b"hac"));
@@ -1342,7 +1389,7 @@ mod tests {
             let from = LookupKey::new(b"000", 1000);
             let to = LookupKey::new(b"zzz", 1010);
             let mut c = vs
-                .compact_range(0, from.internal_key(), to.internal_key())
+                .compact_range(0, Some(from.internal_key()), Some(to.internal_key()))
                 .unwrap();
             for inp in &[(0, 0, 1), (0, 1, 2), (1, 0, 3)] {
                 let f = &c.inputs[inp.0][inp.1];

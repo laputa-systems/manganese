@@ -109,6 +109,18 @@ impl WriteBatch {
     }
 
     pub(crate) fn insert_recovered(&self, mut seq: SequenceNumber, mt: &mut MemTable) -> Result<()> {
+        self.try_for_each(|key, value| {
+            match value {
+                Some(value) => mt.add(seq, ValueType::TypeValue, key, value),
+                None => mt.add(seq, ValueType::TypeDeletion, key, b""),
+            }
+            seq = seq.wrapping_add(1);
+        })
+    }
+
+    /// Calls `f` with each well-formed entry in order, a `None` value marking a deletion, and
+    /// reports malformed contents as LevelDB's WriteBatch::Iterate does.
+    pub fn try_for_each(&self, mut f: impl FnMut(&[u8], Option<&[u8]>)) -> Result<()> {
         if self.entries.len() < HEADER_SIZE {
             return err(StatusCode::Corruption, "short write batch");
         }
@@ -123,17 +135,16 @@ impl WriteBatch {
                 return err(StatusCode::Corruption, "bad write batch key");
             };
             match tag {
-                0 => mt.add(seq, ValueType::TypeDeletion, key, b""),
+                0 => f(key, None),
                 1 => {
                     let Some(value) = take_length_prefixed(&mut input) else {
                         return err(StatusCode::Corruption, "bad write batch value");
                     };
-                    mt.add(seq, ValueType::TypeValue, key, value);
+                    f(key, Some(value));
                 }
                 _ => unreachable!(),
             }
             found = found.wrapping_add(1);
-            seq = seq.wrapping_add(1);
         }
         if found != self.count() {
             return err(StatusCode::Corruption, "write batch has wrong count");

@@ -1,21 +1,9 @@
 use crate::cmp::Cmp;
-use crate::types::{current_key_val, Direction, LdbIterator};
+use crate::types::{Direction, LdbIterator};
 
 use bytes::Bytes;
 use std::cmp::Ordering;
 use std::rc::Rc;
-
-// Warning: This module is kinda messy. The original implementation is
-// not that much better though :-)
-//
-// Issues: 1) prev() may not work correctly at the beginning of a merging
-// iterator.
-
-#[derive(PartialEq)]
-enum SL {
-    Smallest,
-    Largest,
-}
 
 pub struct MergingIter {
     iters: Vec<Box<dyn LdbIterator>>,
@@ -35,108 +23,59 @@ impl MergingIter {
         }
     }
 
-    fn init(&mut self) {
-        for i in 0..self.iters.len() {
-            self.iters[i].reset();
-            self.iters[i].advance();
-            if !self.iters[i].valid() {
-                self.iters[i].reset()
-            }
-        }
-        self.find_smallest();
-    }
-
-    /// Adjusts the direction of the iterator depending on whether the last
-    /// call was next() or prev(). This basically sets all iterators to one
-    /// entry after (Forward) or one entry before (Reverse) the current() entry.
-    fn update_direction(&mut self, d: Direction) {
-        if self.direction == d {
-            return;
-        }
-
-        if let Some((key, _)) = current_key_val(self) {
-            if let Some(current) = self.current {
-                match d {
-                    Direction::Forward if self.direction == Direction::Reverse => {
-                        self.direction = Direction::Forward;
-                        for i in 0..self.iters.len() {
-                            if i != current {
-                                self.iters[i].seek(&key);
-                                // This doesn't work if two iterators are returning the exact same
-                                // keys. However, in reality, two entries will always have differing
-                                // sequence numbers.
-                                if let Some((current_key, _)) = self.iters[i].current() {
-                                    if self.cmp.cmp(&current_key, &key) == Ordering::Equal {
-                                        self.iters[i].advance();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Direction::Reverse if self.direction == Direction::Forward => {
-                        self.direction = Direction::Reverse;
-                        for i in 0..self.iters.len() {
-                            if i != current {
-                                self.iters[i].seek(&key);
-                                if self.iters[i].valid() {
-                                    self.iters[i].prev();
-                                } else {
-                                    // seek to last.
-                                    while self.iters[i].advance() {}
-                                }
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+    fn key(&self) -> Option<Bytes> {
+        self.current
+            .and_then(|current| self.iters[current].current())
+            .map(|(key, _)| key)
     }
 
     fn find_smallest(&mut self) {
-        self.find(SL::Smallest)
-    }
-    fn find_largest(&mut self) {
-        self.find(SL::Largest)
-    }
-
-    fn find(&mut self, direction: SL) {
-        if self.iters.is_empty() {
-            // Iterator stays invalid.
-            return;
-        }
-
-        let ord = if direction == SL::Smallest {
-            Ordering::Less
-        } else {
-            Ordering::Greater
-        };
-
-        let mut next_ix = 0;
-
-        for i in 1..self.iters.len() {
-            if let Some((current_key, _)) = self.iters[i].current() {
-                if let Some((smallest_key, _)) = self.iters[next_ix].current() {
-                    if self.cmp.cmp(&current_key, &smallest_key) == ord {
-                        next_ix = i;
-                    }
-                } else {
-                    next_ix = i;
+        let mut smallest: Option<(usize, Bytes)> = None;
+        for (i, iter) in self.iters.iter().enumerate() {
+            if let Some((key, _)) = iter.current() {
+                let better = match &smallest {
+                    None => true,
+                    Some((_, best)) => self.cmp.cmp(&key, best) == Ordering::Less,
+                };
+                if better {
+                    smallest = Some((i, key));
                 }
             }
         }
+        self.current = smallest.map(|(i, _)| i);
+    }
 
-        self.current = Some(next_ix);
+    fn find_largest(&mut self) {
+        let mut largest: Option<(usize, Bytes)> = None;
+        for (i, iter) in self.iters.iter().enumerate().rev() {
+            if let Some((key, _)) = iter.current() {
+                let better = match &largest {
+                    None => true,
+                    Some((_, best)) => self.cmp.cmp(&key, best) == Ordering::Greater,
+                };
+                if better {
+                    largest = Some((i, key));
+                }
+            }
+        }
+        self.current = largest.map(|(i, _)| i);
     }
 }
 
 impl LdbIterator for MergingIter {
-    fn seek_to_last(&mut self) {
-        for i in 0..self.iters.len() {
-            self.iters[i].seek_to_last();
+    fn seek_to_first(&mut self) {
+        for iter in self.iters.iter_mut() {
+            iter.seek_to_first();
         }
-        self.direction = Direction::Reverse;
+        self.find_smallest();
+        self.direction = Direction::Forward;
+    }
+    fn seek_to_last(&mut self) {
+        for iter in self.iters.iter_mut() {
+            iter.seek_to_last();
+        }
         self.find_largest();
+        self.direction = Direction::Reverse;
     }
     fn status(&self) -> crate::Result<()> {
         for iter in &self.iters {
@@ -145,59 +84,71 @@ impl LdbIterator for MergingIter {
         Ok(())
     }
     fn advance(&mut self) -> bool {
-        if let Some(current) = self.current {
-            self.update_direction(Direction::Forward);
-            if !self.iters[current].advance() {
-                // Take this iterator out of rotation; this will return false
-                // for every call to current() and thus it will be ignored
-                // from here on.
-                self.iters[current].reset();
+        let Some(key) = self.key() else {
+            self.seek_to_first();
+            return self.valid();
+        };
+        let current = self.current.expect("a merging iterator with a key has a current child");
+        if self.direction != Direction::Forward {
+            for i in 0..self.iters.len() {
+                if i != current {
+                    let child = &mut self.iters[i];
+                    child.seek(&key);
+                    if let Some((child_key, _)) = child.current() {
+                        if self.cmp.cmp(&key, &child_key) == Ordering::Equal {
+                            child.advance();
+                        }
+                    }
+                }
             }
-            self.find_smallest();
-        } else {
-            self.init();
+            self.direction = Direction::Forward;
         }
+        self.iters[current].advance();
+        self.find_smallest();
         self.valid()
     }
     fn valid(&self) -> bool {
-        if let Some(ix) = self.current {
-            self.iters[ix].valid()
-        } else {
-            false
-        }
+        self.current.is_some_and(|current| self.iters[current].valid())
     }
     fn seek(&mut self, key: &[u8]) {
-        for i in 0..self.iters.len() {
-            self.iters[i].seek(key);
+        for iter in self.iters.iter_mut() {
+            iter.seek(key);
         }
         self.find_smallest();
+        self.direction = Direction::Forward;
     }
     fn reset(&mut self) {
-        for i in 0..self.iters.len() {
-            self.iters[i].reset();
+        for iter in self.iters.iter_mut() {
+            iter.reset();
         }
         self.current = None;
+        self.direction = Direction::Forward;
     }
     fn current(&self) -> Option<(Bytes, Bytes)> {
-        if let Some(ix) = self.current {
-            self.iters[ix].current()
-        } else {
-            None
-        }
+        self.current.and_then(|current| self.iters[current].current())
     }
     fn prev(&mut self) -> bool {
-        if let Some(current) = self.current {
-            if self.iters[current].valid() {
-                self.update_direction(Direction::Reverse);
-                self.iters[current].prev();
-                self.find_largest();
-                self.valid()
-            } else {
-                false
+        let Some(key) = self.key() else {
+            return false;
+        };
+        let current = self.current.expect("a merging iterator with a key has a current child");
+        if self.direction != Direction::Reverse {
+            for i in 0..self.iters.len() {
+                if i != current {
+                    let child = &mut self.iters[i];
+                    child.seek(&key);
+                    if child.valid() {
+                        child.prev();
+                    } else {
+                        child.seek_to_last();
+                    }
+                }
             }
-        } else {
-            false
+            self.direction = Direction::Reverse;
         }
+        self.iters[current].prev();
+        self.find_largest();
+        self.valid()
     }
 }
 

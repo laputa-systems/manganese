@@ -131,6 +131,13 @@ impl Table {
         Some(FilterBlockReader::new_owned(policy.clone(), contents))
     }
 
+    pub fn open(opt: Options, path: &std::path::Path) -> Result<Table> {
+        let size = opt.env.size_of(path)?;
+        let file = Rc::new(opt.env.open_random_access_file(path)?);
+        let cache = crate::types::share(Cache::new(opt.block_cache_capacity_bytes / opt.block_size));
+        Table::new(opt, cache, file, size)
+    }
+
     /// Creates a new table reader operating on internal keys (i.e., InternalKey). This means that
     /// a different comparator (internal_key_cmp) and a different filter policy
     /// (InternalFilterPolicy) are used.
@@ -287,6 +294,29 @@ pub struct TableIterator {
 }
 
 impl TableIterator {
+    fn skip_empty_blocks_backward(&mut self) -> bool {
+        while self.index_block.prev() {
+            if let Some((_, handle)) = current_key_val(&self.index_block) {
+                match self.load_block(&handle) {
+                    Ok(()) => {
+                        self.current_block.as_mut().unwrap().seek_to_last();
+                        if self.current_block.as_ref().unwrap().valid() { return true; }
+                        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                            self.remember(error);
+                        }
+                    }
+                    Err(error) => {
+                        self.remember(error);
+                    }
+                }
+            }
+            self.current_block = None;
+        }
+        if let Err(error) = self.index_block.status() { self.remember(error); }
+        self.reset();
+        false
+    }
+
     fn remember(&mut self, error: Status) {
         if self.error.is_none() {
             self.error = Some(error);
@@ -329,14 +359,28 @@ impl TableIterator {
 impl LdbIterator for TableIterator {
     fn seek_to_last(&mut self) {
         self.index_block.seek_to_last();
-        if let Some((_, handle)) = current_key_val(&self.index_block) {
-            if self.load_block(&handle).is_ok() {
-                self.current_block.as_mut().unwrap().seek_to_last();
-                if self.current_block.as_ref().unwrap().valid() {
-                    return;
-                }
-            }
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
         }
+        self.current_block = None;
+        if let Some((_, handle)) = current_key_val(&self.index_block) {
+            match self.load_block(&handle) {
+                Ok(()) => {
+                    self.current_block.as_mut().unwrap().seek_to_last();
+                    if self.current_block.as_ref().unwrap().valid() {
+                        return;
+                    }
+                }
+                Err(error) => self.remember(error),
+            }
+            if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+                self.remember(error);
+            }
+            self.current_block = None;
+            self.skip_empty_blocks_backward();
+            return;
+        }
+        if let Err(error) = self.index_block.status() { self.remember(error); }
         self.reset();
     }
     fn advance(&mut self) -> bool {
@@ -367,6 +411,10 @@ impl LdbIterator for TableIterator {
         // first seek in index block, rewind by one entry (so we get the next smaller index entry),
         // then set current_block and seek there
         self.index_block.seek(to);
+        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
+            self.remember(error);
+        }
+        self.current_block = None;
 
         // It's possible that this is a seek past-last; reset in that case.
         if let Some((past_block, handle)) = current_key_val(&self.index_block) {
@@ -410,26 +458,7 @@ impl LdbIterator for TableIterator {
             self.remember(error);
         }
         self.current_block = None;
-        while self.index_block.prev() {
-            if let Some((_, handle)) = current_key_val(&self.index_block) {
-                match self.load_block(&handle) {
-                    Ok(()) => {
-                        self.current_block.as_mut().unwrap().seek_to_last();
-                        if self.current_block.as_ref().unwrap().valid() { return true; }
-                        if let Some(error) = self.current_block.as_ref().and_then(|block| block.status().err()) {
-                            self.remember(error);
-                        }
-                    }
-                    Err(error) => {
-                        self.remember(error);
-                    }
-                }
-            }
-            self.current_block = None;
-        }
-        if let Err(error) = self.index_block.status() { self.remember(error); }
-        self.reset();
-        false
+        self.skip_empty_blocks_backward()
     }
 
     fn reset(&mut self) {
@@ -556,13 +585,13 @@ mod tests {
         let table = Table::new_raw(opt, bc, wrap_buffer(src), size).unwrap();
         let mut iter = table.iter();
 
-        let expected_offsets = [0, 0, 0, 44, 44, 44, 89];
+        let expected_offsets = [0, 0, 0, 42, 42, 42, 86];
         for (i, (k, _)) in LdbIteratorIter::wrap(&mut iter).enumerate() {
             assert_eq!(expected_offsets[i], table.approx_offset_of(&k));
         }
 
         // Key-past-last returns offset of metaindex block.
-        assert_eq!(137, table.approx_offset_of("{aa".as_bytes()));
+        assert_eq!(132, table.approx_offset_of("{aa".as_bytes()));
     }
 
     #[test]

@@ -1,10 +1,10 @@
 use crate::cmp::{Cmp, InternalKeyCmp};
-use crate::error::{Result, Status};
-use crate::key_types::{parse_internal_key, InternalKey, LookupKey, UserKey, ValueType};
+use crate::error::{err, Result, Status, StatusCode};
+use crate::key_types::{parse_internal_key, parse_internal_key_checked, InternalKey, LookupKey, UserKey, ValueType};
 use crate::options::ReadOptions;
 use crate::table_cache::TableCache;
 use crate::table_reader::TableIterator;
-use crate::types::{FileMetaData, FileNum, LdbIterator, Shared, MAX_SEQUENCE_NUMBER, NUM_LEVELS};
+use crate::types::{ErrorIter, FileMetaData, FileNum, LdbIterator, Shared, MAX_SEQUENCE_NUMBER, NUM_LEVELS};
 
 use bytes::Bytes;
 use std::cmp::Ordering;
@@ -33,7 +33,6 @@ pub struct Version {
     pub compaction_level: Option<usize>,
 }
 
-struct DoSearchResult(Option<(Vec<u8>, Vec<u8>)>, Vec<FileMetaHandle>);
 
 impl Version {
     pub fn new(cache: Shared<TableCache>, ucmp: Rc<Box<dyn Cmp>>) -> Version {
@@ -92,7 +91,9 @@ impl Version {
                 if let Some((k, v)) = self.table_cache.borrow_mut().get_with_options(f.borrow().num, ikey, options)? {
                     // We don't need to check the sequence number; get() will not return an entry
                     // with a higher sequence number than the one in the supplied key.
-                    let (typ, _, foundkey) = parse_internal_key(&k);
+                    let Some((typ, _, foundkey)) = parse_internal_key_checked(&k) else {
+                        return err(StatusCode::Corruption, "corrupted key for lookup");
+                    };
                     if typ == ValueType::TypeValue
                         && self.user_cmp.cmp(foundkey, ukey) == Ordering::Equal
                     {
@@ -173,7 +174,7 @@ impl Version {
 
     pub fn pick_memtable_output_level(&self, min: UserKey<'_>, max: UserKey<'_>) -> usize {
         let mut level = 0;
-        if !self.overlap_in_level(0, min, max) {
+        if !self.overlap_in_level(0, Some(min), Some(max)) {
             // Go to next level as long as there is no overlap in that level and a limited overlap
             // in the next-higher level.
             let start = LookupKey::new(min, MAX_SEQUENCE_NUMBER);
@@ -181,14 +182,14 @@ impl Version {
 
             const MAX_MEM_COMPACT_LEVEL: usize = 2;
             while level < MAX_MEM_COMPACT_LEVEL {
-                if self.overlap_in_level(level + 1, min, max) {
+                if self.overlap_in_level(level + 1, Some(min), Some(max)) {
                     break;
                 }
                 if level + 2 < NUM_LEVELS {
                     let overlaps = self.overlapping_inputs(
                         level + 2,
-                        start.internal_key(),
-                        limit.internal_key(),
+                        Some(start.internal_key()),
+                        Some(limit.internal_key()),
                     );
                     let size = total_size(overlaps.iter());
                     if size > 10 * (2 << 20) {
@@ -250,7 +251,7 @@ impl Version {
         for lvl in 1..NUM_LEVELS - 1 {
             for f in &self.files[lvl] {
                 let f = f.borrow();
-                let ols = self.overlapping_inputs(lvl + 1, &f.smallest, &f.largest);
+                let ols = self.overlapping_inputs(lvl + 1, Some(&f.smallest), Some(&f.largest));
                 let sum = total_size(ols.iter());
                 if sum > max {
                     max = sum;
@@ -261,100 +262,62 @@ impl Version {
     }
 
     /// overlap_in_level returns true if the specified level's files overlap the range [smallest;
-    /// largest].
-    pub fn overlap_in_level<'a>(
+    /// largest]. An absent bound is unbounded.
+    pub fn overlap_in_level(
         &self,
         level: usize,
-        smallest: UserKey<'a>,
-        largest: UserKey<'a>,
+        smallest: Option<UserKey<'_>>,
+        largest: Option<UserKey<'_>>,
     ) -> bool {
         assert!(level < NUM_LEVELS);
-        if level == 0 {
-            some_file_overlaps_range_disjoint(
-                &InternalKeyCmp(self.user_cmp.clone()),
-                &self.files[level],
-                smallest,
-                largest,
-            )
-        } else {
-            some_file_overlaps_range(
-                &InternalKeyCmp(self.user_cmp.clone()),
-                &self.files[level],
-                smallest,
-                largest,
-            )
-        }
+        some_file_overlaps_range(
+            &InternalKeyCmp(self.user_cmp.clone()),
+            level > 0,
+            &self.files[level],
+            smallest,
+            largest,
+        )
     }
 
-    /// overlapping_inputs returns all files that may contain keys between begin and end.
+    /// overlapping_inputs returns all files that may contain keys between begin and end. An
+    /// absent bound is unbounded.
     pub fn overlapping_inputs(
         &self,
         level: usize,
-        begin: InternalKey<'_>,
-        end: InternalKey<'_>,
+        begin: Option<InternalKey<'_>>,
+        end: Option<InternalKey<'_>>,
     ) -> Vec<FileMetaHandle> {
         assert!(level < NUM_LEVELS);
-        let (mut ubegin, mut uend) = (
-            parse_internal_key(begin).2.to_vec(),
-            parse_internal_key(end).2.to_vec(),
-        );
-
-        loop {
-            match do_search(self, level, ubegin, uend) {
-                DoSearchResult(Some((newubegin, newuend)), _) => {
-                    ubegin = newubegin;
-                    uend = newuend;
-                }
-                DoSearchResult(None, result) => return result,
+        let mut user_begin = begin.map(|key| parse_internal_key(key).2.to_vec());
+        let mut user_end = end.map(|key| parse_internal_key(key).2.to_vec());
+        let mut inputs = vec![];
+        let mut i = 0;
+        while i < self.files[level].len() {
+            let handle = self.files[level][i].clone();
+            i += 1;
+            let f = handle.borrow();
+            let file_start = parse_internal_key(&f.smallest).2;
+            let file_limit = parse_internal_key(&f.largest).2;
+            if user_begin.as_ref().is_some_and(|b| self.user_cmp.cmp(file_limit, b) == Ordering::Less) {
+                continue;
             }
-        }
-
-        // the actual search happens in this inner function. This is done to enhance the control
-        // flow. It takes the smallest and largest user keys and returns a new pair of user keys if
-        // the search range should be expanded, or a list of overlapping files.
-        fn do_search(
-            myself: &Version,
-            level: usize,
-            ubegin: Vec<u8>,
-            uend: Vec<u8>,
-        ) -> DoSearchResult {
-            let mut inputs = vec![];
-            for f_ in myself.files[level].iter() {
-                let f = f_.borrow();
-                let (fsmallest, flargest) = (
-                    parse_internal_key(&f.smallest).2,
-                    parse_internal_key(&f.largest).2,
-                );
-                // Skip files that are not overlapping.
-                let ubegin_nonempty = !ubegin.is_empty();
-                let uend_nonempty = !uend.is_empty();
-                let block_before_current =
-                    ubegin_nonempty && myself.user_cmp.cmp(flargest, &ubegin) == Ordering::Less;
-                let block_after_current =
-                    uend_nonempty && myself.user_cmp.cmp(fsmallest, &uend) == Ordering::Greater;
-                let is_overlapping = !(block_before_current || block_after_current);
-                if is_overlapping {
-                    inputs.push(f_.clone());
-                    // In level 0, files may overlap each other. Check if the new file begins
-                    // before ubegin or ends after uend, and expand the range, if so. Then, restart
-                    // the search.
-                    if level == 0 {
-                        if !ubegin.is_empty()
-                            && myself.user_cmp.cmp(fsmallest, &ubegin) == Ordering::Less
-                        {
-                            return DoSearchResult(Some((fsmallest.to_vec(), uend)), inputs);
-                        } else if !uend.is_empty()
-                            && myself.user_cmp.cmp(flargest, &uend) == Ordering::Greater
-                        {
-                            return DoSearchResult(Some((ubegin, flargest.to_vec())), inputs);
-                        }
-                    }
-                } else {
-                    continue;
+            if user_end.as_ref().is_some_and(|e| self.user_cmp.cmp(file_start, e) == Ordering::Greater) {
+                continue;
+            }
+            inputs.push(handle.clone());
+            if level == 0 {
+                if user_begin.as_ref().is_some_and(|b| self.user_cmp.cmp(file_start, b) == Ordering::Less) {
+                    user_begin = Some(file_start.to_vec());
+                    inputs.clear();
+                    i = 0;
+                } else if user_end.as_ref().is_some_and(|e| self.user_cmp.cmp(file_limit, e) == Ordering::Greater) {
+                    user_end = Some(file_limit.to_vec());
+                    inputs.clear();
+                    i = 0;
                 }
             }
-            DoSearchResult(None, inputs)
         }
+        inputs
     }
 
     /// new_concat_iter returns an iterator that iterates over the files in a level. Note that this
@@ -377,12 +340,11 @@ impl Version {
     pub(crate) fn new_iters_with_options(&self, options: ReadOptions) -> Result<Vec<Box<dyn LdbIterator>>> {
         let mut iters: Vec<Box<dyn LdbIterator>> = vec![];
         for f in &self.files[0] {
-            iters.push(Box::new(
-                self.table_cache
-                    .borrow_mut()
-                    .get_table(f.borrow().num)?
-                    .iter_with_options(options),
-            ));
+            let table = self.table_cache.borrow_mut().get_table(f.borrow().num);
+            match table {
+                Ok(table) => iters.push(Box::new(table.iter_with_options(options))),
+                Err(error) => iters.push(Box::new(ErrorIter(error))),
+            }
         }
 
         for l in 1..NUM_LEVELS {
@@ -454,6 +416,28 @@ impl VersionIter {
 }
 
 impl LdbIterator for VersionIter {
+    fn seek_to_last(&mut self) {
+        self.remember_current();
+        self.current = None;
+        self.current_ix = self.files.len();
+        while self.current_ix > 0 {
+            self.current_ix -= 1;
+            let result = self.cache.borrow_mut().get_table(self.files[self.current_ix].borrow().num);
+            match result {
+                Ok(table) => {
+                    let mut iter = table.iter_with_options(self.options);
+                    iter.seek_to_last();
+                    let valid = iter.valid();
+                    self.current = Some(iter);
+                    if valid { return; }
+                    self.remember_current();
+                    self.current = None;
+                }
+                Err(error) => self.remember(error),
+            }
+        }
+        self.reset();
+    }
     fn advance(&mut self) -> bool {
         assert!(!self.files.is_empty());
         loop {
@@ -533,14 +517,11 @@ impl LdbIterator for VersionIter {
         self.current = None;
         while self.current_ix > 0 {
             self.current_ix -= 1;
-            let file = self.files[self.current_ix].borrow();
-            let result = self.cache.borrow_mut().get_table(file.num);
-            let largest = file.largest.clone();
-            drop(file);
+            let result = self.cache.borrow_mut().get_table(self.files[self.current_ix].borrow().num);
             match result {
                 Ok(table) => {
                     let mut iter = table.iter_with_options(self.options);
-                    iter.seek(&largest);
+                    iter.seek_to_last();
                     let valid = iter.valid();
                     self.current = Some(iter);
                     if valid { return true; }
@@ -566,18 +547,14 @@ pub fn total_size<'a, I: Iterator<Item = &'a FileMetaHandle>>(files: I) -> usize
     files.fold(0, |a, f| a + f.borrow().size)
 }
 
-/// key_is_after_file returns true if the given user key is larger than the largest key in f.
-fn key_is_after_file(cmp: &InternalKeyCmp, key: UserKey<'_>, f: &FileMetaHandle) -> bool {
+fn after_file(cmp: &InternalKeyCmp, key: Option<UserKey<'_>>, f: &FileMetaHandle) -> bool {
     let f = f.borrow();
-    let ulargest = parse_internal_key(&f.largest).2;
-    !key.is_empty() && cmp.cmp_inner(key, ulargest) == Ordering::Greater
+    key.is_some_and(|key| cmp.cmp_inner(key, parse_internal_key(&f.largest).2) == Ordering::Greater)
 }
 
-/// key_is_before_file returns true if the given user key is larger than the largest key in f.
-fn key_is_before_file(cmp: &InternalKeyCmp, key: UserKey<'_>, f: &FileMetaHandle) -> bool {
+fn before_file(cmp: &InternalKeyCmp, key: Option<UserKey<'_>>, f: &FileMetaHandle) -> bool {
     let f = f.borrow();
-    let usmallest = parse_internal_key(&f.smallest).2;
-    !key.is_empty() && cmp.cmp_inner(key, usmallest) == Ordering::Less
+    key.is_some_and(|key| cmp.cmp_inner(key, parse_internal_key(&f.smallest).2) == Ordering::Less)
 }
 
 /// find_file returns the index of the file in files that potentially contains the internal key
@@ -604,36 +581,23 @@ fn find_file(
     }
 }
 
-/// some_file_overlaps_range_disjoint returns true if any of the given disjoint files (i.e. level >
-/// 1) contain keys in the range defined by the user keys [smallest; largest].
-fn some_file_overlaps_range_disjoint(
-    cmp: &InternalKeyCmp,
-    files: &[FileMetaHandle],
-    smallest: UserKey<'_>,
-    largest: UserKey<'_>,
-) -> bool {
-    let ikey = LookupKey::new(smallest, MAX_SEQUENCE_NUMBER);
-    if let Some(ix) = find_file(cmp, files, ikey.internal_key()) {
-        !key_is_before_file(cmp, largest, &files[ix])
-    } else {
-        false
-    }
-}
-
-/// some_file_overlaps_range returns true if any of the given possibly overlapping files contains
-/// keys in the range [smallest; largest].
+/// some_file_overlaps_range returns true if any of the given files contains keys in the range
+/// [smallest; largest]; disjoint files are sorted and searched by binary search.
 fn some_file_overlaps_range(
     cmp: &InternalKeyCmp,
+    disjoint: bool,
     files: &[FileMetaHandle],
-    smallest: UserKey<'_>,
-    largest: UserKey<'_>,
+    smallest: Option<UserKey<'_>>,
+    largest: Option<UserKey<'_>>,
 ) -> bool {
-    for f in files {
-        if !(key_is_after_file(cmp, smallest, f) || key_is_before_file(cmp, largest, f)) {
-            return true;
-        }
+    if !disjoint {
+        return files.iter().any(|f| !(after_file(cmp, smallest, f) || before_file(cmp, largest, f)));
     }
-    false
+    let index = match smallest {
+        Some(smallest) => find_file(cmp, files, LookupKey::new(smallest, MAX_SEQUENCE_NUMBER).internal_key()),
+        None => (!files.is_empty()).then_some(0),
+    };
+    index.is_some_and(|index| !before_file(cmp, largest, &files[index]))
 }
 
 #[cfg(test)]
@@ -822,7 +786,7 @@ mod tests {
     #[test]
     fn test_version_max_next_level_overlapping() {
         let v = make_version().0;
-        assert_eq!(218, v.max_next_level_overlapping_bytes());
+        assert_eq!(216, v.max_next_level_overlapping_bytes());
     }
 
     #[test]
@@ -847,9 +811,9 @@ mod tests {
     #[test]
     fn test_version_summary() {
         let v = make_version().0;
-        let expected = "level 0: 2 files, 483 bytes ([(1, 232), (2, 251)]); level 1: 3 files, 651 \
-                        bytes ([(3, 218), (4, 216), (5, 217)]); level 2: 2 files, 468 bytes ([(6, \
-                        218), (7, 250)]); level 3: 2 files, 400 bytes ([(8, 200), (9, 200)]); ";
+        let expected = "level 0: 2 files, 479 bytes ([(1, 230), (2, 249)]); level 1: 3 files, 645 \
+                        bytes ([(3, 216), (4, 214), (5, 215)]); level 2: 2 files, 464 bytes ([(6, \
+                        216), (7, 248)]); level 3: 2 files, 396 bytes ([(8, 198), (9, 198)]); ";
         assert_eq!(expected, &v.level_summary());
     }
 
@@ -938,9 +902,9 @@ mod tests {
             (2, ("gac".as_bytes(), "gaz".as_bytes()), true),
         ] {
             if want {
-                assert!(v.overlap_in_level(level, k1, k2));
+                assert!(v.overlap_in_level(level, Some(k1), Some(k2)));
             } else {
-                assert!(!v.overlap_in_level(level, k1, k2));
+                assert!(!v.overlap_in_level(level, Some(k1), Some(k2)));
             }
         }
     }
@@ -969,7 +933,7 @@ mod tests {
             // Range is expanded in overlapping level-0 files.
             let from = LookupKey::new("aab".as_bytes(), MAX_SEQUENCE_NUMBER);
             let to = LookupKey::new("aae".as_bytes(), 0);
-            let r = v.overlapping_inputs(0, from.internal_key(), to.internal_key());
+            let r = v.overlapping_inputs(0, Some(from.internal_key()), Some(to.internal_key()));
             assert_eq!(r.len(), 2);
             assert_eq!(r[0].borrow().num, 1);
             assert_eq!(r[1].borrow().num, 2);
@@ -978,14 +942,14 @@ mod tests {
             let from = LookupKey::new("cab".as_bytes(), MAX_SEQUENCE_NUMBER);
             let to = LookupKey::new("cbx".as_bytes(), 0);
             // expect one file.
-            let r = v.overlapping_inputs(1, from.internal_key(), to.internal_key());
+            let r = v.overlapping_inputs(1, Some(from.internal_key()), Some(to.internal_key()));
             assert_eq!(r.len(), 1);
             assert_eq!(r[0].borrow().num, 3);
         }
         {
             let from = LookupKey::new("cab".as_bytes(), MAX_SEQUENCE_NUMBER);
             let to = LookupKey::new("ebx".as_bytes(), 0);
-            let r = v.overlapping_inputs(1, from.internal_key(), to.internal_key());
+            let r = v.overlapping_inputs(1, Some(from.internal_key()), Some(to.internal_key()));
             // Assert that correct number of files and correct files were returned.
             assert_eq!(r.len(), 3);
             assert_eq!(r[0].borrow().num, 3);
@@ -995,9 +959,9 @@ mod tests {
         {
             let from = LookupKey::new("hhh".as_bytes(), MAX_SEQUENCE_NUMBER);
             let to = LookupKey::new("ijk".as_bytes(), 0);
-            let r = v.overlapping_inputs(2, from.internal_key(), to.internal_key());
+            let r = v.overlapping_inputs(2, Some(from.internal_key()), Some(to.internal_key()));
             assert_eq!(r.len(), 0);
-            let r = v.overlapping_inputs(1, from.internal_key(), to.internal_key());
+            let r = v.overlapping_inputs(1, Some(from.internal_key()), Some(to.internal_key()));
             assert_eq!(r.len(), 0);
         }
     }
@@ -1027,8 +991,8 @@ mod tests {
 
         // Keys before file.
         for k in &[&[0][..], &[1], &[1, 0], &[0, 9, 9, 9]] {
-            assert!(key_is_before_file(&cmp, k, &fmh));
-            assert!(!key_is_after_file(&cmp, k, &fmh));
+            assert!(before_file(&cmp, Some(k), &fmh));
+            assert!(!after_file(&cmp, Some(k), &fmh));
         }
         // Keys in file.
         for k in &[
@@ -1038,13 +1002,13 @@ mod tests {
             &[1, 9, 9],
             &[2, 0, 0],
         ] {
-            assert!(!key_is_before_file(&cmp, k, &fmh));
-            assert!(!key_is_after_file(&cmp, k, &fmh));
+            assert!(!before_file(&cmp, Some(k), &fmh));
+            assert!(!after_file(&cmp, Some(k), &fmh));
         }
         // Keys after file.
         for k in &[&[2, 0, 1][..], &[9, 9, 9], &[9, 9, 9, 9]] {
-            assert!(!key_is_before_file(&cmp, k, &fmh));
-            assert!(key_is_after_file(&cmp, k, &fmh));
+            assert!(!before_file(&cmp, Some(k), &fmh));
+            assert!(after_file(&cmp, Some(k), &fmh));
         }
     }
 
@@ -1066,82 +1030,95 @@ mod tests {
 
         assert!(some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[2, 5, 0],
-            &[3, 1, 0]
+            Some(&[2, 5, 0]),
+            Some(&[3, 1, 0])
         ));
         assert!(some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[2, 5, 0],
-            &[7, 0, 0]
+            Some(&[2, 5, 0]),
+            Some(&[7, 0, 0])
         ));
         assert!(some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[0, 0],
-            &[2, 0, 0]
+            Some(&[0, 0]),
+            Some(&[2, 0, 0])
         ));
         assert!(some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[0, 0],
-            &[7, 0, 0]
+            Some(&[0, 0]),
+            Some(&[7, 0, 0])
         ));
         assert!(!some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[0, 0],
-            &[0, 5]
+            Some(&[0, 0]),
+            Some(&[0, 5])
         ));
         assert!(!some_file_overlaps_range(
             &cmp,
+            false,
             &files_joint,
-            &[6, 0],
-            &[7, 5]
+            Some(&[6, 0]),
+            Some(&[7, 5])
         ));
 
-        assert!(some_file_overlaps_range_disjoint(
+        assert!(some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[2, 0, 1],
-            &[2, 5, 0]
+            Some(&[2, 0, 1]),
+            Some(&[2, 5, 0])
         ));
-        assert!(some_file_overlaps_range_disjoint(
+        assert!(some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[3, 0, 1],
-            &[4, 9, 0]
+            Some(&[3, 0, 1]),
+            Some(&[4, 9, 0])
         ));
-        assert!(some_file_overlaps_range_disjoint(
+        assert!(some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[2, 0, 1],
-            &[6, 5, 0]
+            Some(&[2, 0, 1]),
+            Some(&[6, 5, 0])
         ));
-        assert!(some_file_overlaps_range_disjoint(
+        assert!(some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[0, 0, 1],
-            &[2, 5, 0]
+            Some(&[0, 0, 1]),
+            Some(&[2, 5, 0])
         ));
-        assert!(some_file_overlaps_range_disjoint(
+        assert!(some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[0, 0, 1],
-            &[6, 5, 0]
+            Some(&[0, 0, 1]),
+            Some(&[6, 5, 0])
         ));
-        assert!(!some_file_overlaps_range_disjoint(
+        assert!(!some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[0, 0, 1],
-            &[0, 1]
+            Some(&[0, 0, 1]),
+            Some(&[0, 1])
         ));
-        assert!(!some_file_overlaps_range_disjoint(
+        assert!(!some_file_overlaps_range(
             &cmp,
+            true,
             &files_disjoint,
-            &[6, 0, 1],
-            &[7, 0, 1]
+            Some(&[6, 0, 1]),
+            Some(&[7, 0, 1])
         ));
     }
 }

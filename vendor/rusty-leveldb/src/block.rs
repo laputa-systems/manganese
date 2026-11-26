@@ -353,7 +353,7 @@ impl LdbIterator for BlockIter {
     }
 
     fn valid(&self) -> bool {
-        !self.key.is_empty() && self.val_offset > 0 && self.val_offset <= self.restarts_off
+        self.val_offset > 0 && self.val_offset <= self.restarts_off
     }
 
     fn current(&self) -> Option<(Bytes, Bytes)> {

@@ -10,11 +10,11 @@ use crate::cmp::{Cmp, InternalKeyCmp};
 use crate::env::{Env, FileLock, WritableFile};
 use crate::error::{err, Result, Status, StatusCode};
 use crate::infolog::Logger;
-use crate::key_types::{parse_internal_key, InternalKey, LookupKey, ValueType};
+use crate::key_types::{parse_internal_key, parse_internal_key_checked, InternalKey, LookupKey, ValueType};
 use crate::log::{LogReader, LogWriter};
 use crate::memtable::MemTable;
 use crate::merging_iter::MergingIter;
-use crate::options::{Options, ReadOptions};
+use crate::options::{BackgroundWork, Options, ReadOptions};
 use crate::snapshot::{Snapshot, SnapshotList};
 use crate::table_builder::TableBuilder;
 use crate::table_cache::{table_file_name, TableCache};
@@ -25,7 +25,7 @@ use crate::types::{
 use crate::version::Version;
 use crate::version_edit::VersionEdit;
 use crate::version_set::{
-    manifest_file_name, read_current_file, set_current_file, Compaction, VersionSet,
+    current_file_name, manifest_file_name, set_current_file, Compaction, VersionSet,
 };
 use crate::write_batch::WriteBatch;
 
@@ -58,6 +58,10 @@ pub struct DB {
     vset: Shared<VersionSet>,
     snaps: SnapshotList,
 
+    background_scheduled: bool,
+    manual: Option<ManualCompaction>,
+    manual_active: bool,
+
     cstats: [CompactionStats; NUM_LEVELS],
 }
 
@@ -69,6 +73,7 @@ impl DB {
     /// new initializes a new DB object, but doesn't touch disk.
     fn new<P: AsRef<Path>>(name: P, mut opt: Options) -> DB {
         let name = name.as_ref();
+        opt.write_buffer_size = opt.write_buffer_size.clamp(64 << 10, 1 << 30);
         if opt.log.is_none() {
             let log = open_info_log(opt.env.as_ref().as_ref(), name);
             opt.log = Some(share(log));
@@ -100,6 +105,10 @@ impl DB {
             cache,
             vset: share(vset),
             snaps: SnapshotList::new(),
+
+            background_scheduled: false,
+            manual: None,
+            manual_active: false,
 
             cstats: Default::default(),
         }
@@ -138,7 +147,8 @@ impl DB {
         }
 
         db.delete_obsolete_files()?;
-        db.maybe_do_compaction()?;
+        db.maybe_schedule_compaction();
+        db.finish_operation();
         Ok(db)
     }
 
@@ -164,15 +174,11 @@ impl DB {
     /// recover recovers from the existing state on disk. If the wrapped result is `true`, then
     /// log_and_apply() should be called after recovery has finished.
     fn recover(&mut self, ve: &mut VersionEdit) -> Result<bool> {
-        if self.opt.error_if_exists && self.opt.env.exists(self.path.as_ref()).unwrap_or(false) {
-            return err(StatusCode::AlreadyExists, "database already exists");
-        }
-
         let _ = self.opt.env.mkdir(Path::new(&self.path));
         self.acquire_lock()?;
 
-        if let Err(e) = read_current_file(self.opt.env.as_ref().as_ref(), &self.path) {
-            if e.code == StatusCode::NotFound && self.opt.create_if_missing {
+        if !self.opt.env.exists(&current_file_name(&self.path)).unwrap_or(false) {
+            if self.opt.create_if_missing {
                 self.initialize_db()?;
             } else {
                 return err(
@@ -180,6 +186,8 @@ impl DB {
                     "database does not exist and create_if_missing is false",
                 );
             }
+        } else if self.opt.error_if_exists {
+            return err(StatusCode::InvalidArgument, "database exists and error_if_exists is true");
         }
 
         // If save_manifest is true, we should log_and_apply() later in order to write the new
@@ -260,6 +268,7 @@ impl DB {
         let mut compactions = 0;
         let mut max_seq = 0;
         let mut save_manifest = false;
+        let mut mem_started = false;
 
         loop {
             let len = match logreader.read_record(&mut scratch) {
@@ -284,6 +293,7 @@ impl DB {
             }
 
             batch.set_contents(&scratch);
+            mem_started = true;
             if let Err(error) = batch.insert_recovered(batch.sequence(), &mut mem) {
                 if self.opt.paranoid_checks {
                     return Err(error);
@@ -300,6 +310,7 @@ impl DB {
                 self.write_l0_table(&mem, ve, None)?;
                 save_manifest = true;
                 mem = MemTable::new(cmp.clone());
+                mem_started = false;
             }
             batch.clear();
         }
@@ -314,7 +325,7 @@ impl DB {
             self.log = Some(lw);
             self.log_num = Some(log_num);
             self.mem = mem;
-        } else if mem.len() > 0 {
+        } else if mem_started {
             // Log is not reused, so write out the accumulated memtable.
             save_manifest = true;
             self.write_l0_table(&mem, ve, None)?;
@@ -325,13 +336,16 @@ impl DB {
 
     /// delete_obsolete_files removes files that are no longer needed from the file system.
     fn delete_obsolete_files(&mut self) -> Result<()> {
+        if self.write_error.is_some() {
+            return Ok(());
+        }
         let files = self.vset.borrow().live_files();
         let filenames = self.opt.env.children(Path::new(&self.path))?;
         for name in filenames {
             if let Ok((num, typ)) = parse_file_name(&name) {
                 match typ {
                     FileType::Log => {
-                        if num >= self.vset.borrow().log_num {
+                        if num >= self.vset.borrow().log_num || num == self.vset.borrow().prev_log_num {
                             continue;
                         }
                     }
@@ -419,14 +433,19 @@ impl DB {
     }
 
     /// Writes an entire WriteBatch. A synchronous write persists the log before returning.
-    pub fn write(&mut self, mut batch: WriteBatch, sync: bool) -> Result<()> {
+    pub fn write(&mut self, batch: WriteBatch, sync: bool) -> Result<()> {
         assert!(self.log.is_some());
 
         if let Some(error) = &self.write_error {
             return Err(error.clone());
         }
         self.make_room_for_write(false)?;
+        let result = self.write_batch(batch, sync);
+        self.finish_operation();
+        result
+    }
 
+    fn write_batch(&mut self, mut batch: WriteBatch, sync: bool) -> Result<()> {
         let entries = batch.count() as u64;
         let log = self.log.as_mut().unwrap();
         let next = self.vset.borrow().last_seq + 1;
@@ -495,9 +514,8 @@ impl DB {
         }
 
         if do_compaction {
-            if let Err(e) = self.maybe_do_compaction() {
-                log!(self.opt.log, "error while doing compaction in get: {}", e);
-            }
+            self.maybe_schedule_compaction();
+            self.finish_operation();
         }
         Ok(result)
     }
@@ -600,9 +618,8 @@ impl DB {
     fn record_read_sample(&mut self, k: InternalKey<'_>) {
         let current = self.current();
         if current.borrow_mut().record_read_sample(k) {
-            if let Err(e) = self.maybe_do_compaction() {
-                log!(self.opt.log, "record_read_sample: compaction failed: {}", e);
-            }
+            self.maybe_schedule_compaction();
+            self.finish_operation();
         }
     }
 }
@@ -610,99 +627,181 @@ impl DB {
 impl DB {
     // COMPACTIONS //
 
-    /// make_room_for_write checks if the memtable has become too large, and triggers a compaction
-    /// if it's the case.
-    fn make_room_for_write(&mut self, force: bool) -> Result<()> {
-        if let Some(error) = &self.write_error {
-            return Err(error.clone());
-        }
-        if !force && self.mem.approx_mem_usage() < self.opt.write_buffer_size || self.mem.len() == 0
-        {
-            Ok(())
-        } else {
-            // Create new memtable.
+    /// make_room_for_write switches to a new memtable and log once the memtable is full, or when
+    /// forced, waiting for the background work LevelDB would wait for.
+    fn make_room_for_write(&mut self, mut force: bool) -> Result<()> {
+        loop {
+            if let Some(error) = &self.write_error {
+                return Err(error.clone());
+            }
+            if !force && self.mem.approx_mem_usage() <= self.opt.write_buffer_size {
+                return Ok(());
+            }
+            if self.imm.is_some() || self.current().borrow().num_level_files(0) >= L0_STOP_WRITES_TRIGGER {
+                self.background_call();
+                continue;
+            }
             let logn = self.vset.borrow_mut().new_file_number();
-            let logf = self
+            let log = match self
                 .opt
                 .env
-                .open_writable_file(Path::new(&log_file_name(&self.path, logn)));
-
-            if let Ok(log) = logf {
-                self.log = Some(LogWriter::new(BufWriter::new(log)));
-                self.log_num = Some(logn);
-
-                let mut imm = MemTable::new(self.opt.cmp.clone());
-                mem::swap(&mut imm, &mut self.mem);
-                self.imm = Some(imm);
-                self.maybe_do_compaction()
-            } else {
-                self.vset.borrow_mut().reuse_file_number(logn);
-                Err(logf.err().unwrap())
+                .open_writable_file(Path::new(&log_file_name(&self.path, logn)))
+            {
+                Ok(log) => log,
+                Err(error) => {
+                    self.vset.borrow_mut().reuse_file_number(logn);
+                    return Err(error);
+                }
+            };
+            if let Some(mut old) = self.log.take() {
+                if let Err(error) = old.flush() {
+                    self.write_error = Some(error);
+                }
             }
+            self.log = Some(LogWriter::new(BufWriter::new(log)));
+            self.log_num = Some(logn);
+            let imm = mem::replace(&mut self.mem, MemTable::new(self.opt.cmp.clone()));
+            self.imm = Some(imm);
+            force = false;
+            self.maybe_schedule_compaction();
         }
     }
 
-    /// maybe_do_compaction starts a blocking compaction if it makes sense.
-    fn maybe_do_compaction(&mut self) -> Result<()> {
+    fn maybe_schedule_compaction(&mut self) {
+        if self.background_scheduled || self.write_error.is_some() {
+            return;
+        }
+        if self.imm.is_none() && !self.manual_active && !self.vset.borrow().needs_compaction() {
+            return;
+        }
+        self.background_scheduled = true;
+    }
+
+    fn background_call(&mut self) {
+        if self.write_error.is_none() {
+            self.background_compaction();
+        }
+        self.background_scheduled = false;
+        self.maybe_schedule_compaction();
+    }
+
+    fn background_compaction(&mut self) {
         if self.imm.is_some() {
-            self.compact_memtable()?;
+            let _ = self.compact_memtable();
+            return;
         }
-        // Issue #34 PR #36: after compacting a memtable into an L0 file, it is possible that the
-        // L0 files need to be merged and promoted.
-        if self.vset.borrow().needs_compaction() {
-            let c = self.vset.borrow_mut().pick_compaction();
-            if let Some(c) = c {
-                self.start_compaction(c)
-            } else {
-                Ok(())
+        let is_manual = self.manual_active;
+        let mut manual_end = None;
+        let c = if is_manual {
+            let manual = self.manual.as_mut().expect("an active manual compaction has its range");
+            let c = self.vset.borrow_mut().compact_range(manual.level, manual.begin.as_deref(), manual.end.as_deref());
+            manual.done = c.is_none();
+            if let Some(c) = &c {
+                manual_end = Some(c.input(0, c.num_inputs(0) - 1).largest.to_vec());
             }
+            c
         } else {
-            Ok(())
+            self.vset.borrow_mut().pick_compaction()
+        };
+        let result = match c {
+            Some(c) => self.start_compaction(c),
+            None => Ok(()),
+        };
+        if is_manual {
+            let manual = self.manual.as_mut().expect("an active manual compaction has its range");
+            if result.is_err() {
+                manual.done = true;
+            }
+            if !manual.done {
+                manual.begin = manual_end;
+            }
+            self.manual_active = false;
         }
     }
 
-    /// compact_range triggers an immediate compaction on the specified key range. Repeatedly
-    /// calling this without actually adding new keys is not useful.
-    ///
-    /// Compactions in general will cause the database to find entries more quickly, and take up
-    /// less space on disk.
+    /// Runs the background work scheduled so far, as flushing Chromium's thread pool does.
+    pub fn flush_background_work(&mut self) {
+        self.maybe_schedule_compaction();
+        while self.background_scheduled {
+            self.background_call();
+        }
+    }
+
+    fn finish_operation(&mut self) {
+        if self.opt.background_work == BackgroundWork::Inline {
+            self.flush_background_work();
+        }
+    }
+
+    fn maybe_do_compaction(&mut self) -> Result<()> {
+        self.flush_background_work();
+        match &self.write_error {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        }
+    }
+
+    /// compact_range compacts the memtable and then every level from 0 up to the deepest level
+    /// that overlaps [from; to]. See compact_key_range.
     pub fn compact_range(&mut self, from: &[u8], to: &[u8]) -> Result<()> {
-        let mut max_level = 1;
+        self.compact_key_range(Some(from), Some(to))
+    }
+
+    /// compact_key_range compacts the memtable and every level overlapping [begin; end] down to
+    /// the deepest level that holds overlapping files, as LevelDB's CompactRange does. An absent
+    /// bound is unbounded.
+    pub fn compact_key_range(&mut self, begin: Option<&[u8]>, end: Option<&[u8]>) -> Result<()> {
+        let mut max_level_with_files = 1;
         {
             let v = self.vset.borrow().current();
             let v = v.borrow();
-            for l in 1..NUM_LEVELS - 1 {
-                if v.overlap_in_level(l, from, to) {
-                    max_level = l;
+            for level in 1..NUM_LEVELS {
+                if v.overlap_in_level(level, begin, end) {
+                    max_level_with_files = level;
                 }
             }
         }
 
-        // Compact memtable.
-        self.make_room_for_write(true)?;
-
-        let mut ifrom = LookupKey::new(from, MAX_SEQUENCE_NUMBER)
-            .internal_key()
-            .to_vec();
-        let iend = LookupKey::new_full(to, 0, ValueType::TypeDeletion);
-
-        for l in 0..max_level + 1 {
-            loop {
-                let c_ = self
-                    .vset
-                    .borrow_mut()
-                    .compact_range(l, &ifrom, iend.internal_key());
-                if let Some(c) = c_ {
-                    // Update ifrom to the largest key of the last file in this compaction.
-                    let ix = c.num_inputs(0) - 1;
-                    ifrom.clone_from(&c.input(0, ix).largest.into());
-                    self.start_compaction(c)?;
-                } else {
-                    break;
+        let mut flushed = self.make_room_for_write(true);
+        if flushed.is_ok() {
+            while self.imm.is_some() && self.write_error.is_none() {
+                self.background_call();
+            }
+            if self.imm.is_some() {
+                if let Some(error) = &self.write_error {
+                    flushed = Err(error.clone());
                 }
             }
         }
-        Ok(())
+
+        let begin_key = begin.map(|key| LookupKey::new(key, MAX_SEQUENCE_NUMBER).internal_key().to_vec());
+        let end_key = end.map(|key| LookupKey::new_full(key, 0, ValueType::TypeDeletion).internal_key().to_vec());
+        for level in 0..max_level_with_files {
+            self.manual_compaction(level, begin_key.clone(), end_key.clone());
+        }
+        self.finish_operation();
+        flushed?;
+        match &self.write_error {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        }
+    }
+
+    fn manual_compaction(&mut self, level: usize, begin: Option<Vec<u8>>, end: Option<Vec<u8>>) {
+        self.manual = Some(ManualCompaction { level, begin, end, done: false });
+        while self.manual.as_ref().is_some_and(|manual| !manual.done) && self.write_error.is_none() {
+            if !self.manual_active {
+                self.manual_active = true;
+                self.maybe_schedule_compaction();
+            } else {
+                self.background_call();
+            }
+        }
+        while self.background_scheduled {
+            self.background_call();
+        }
+        self.manual_active = false;
+        self.manual = None;
     }
 
     /// start_compaction dispatches the different kinds of compactions depending on the current
@@ -747,7 +846,7 @@ impl DB {
             };
             let mut state = CompactionState::new(compaction, smallest);
             if let Err(e) = self.do_compaction_work(&mut state) {
-                state.cleanup(self.opt.env.as_ref().as_ref(), &self.path);
+                state.builder.take();
                 log!(self.opt.log, "Compaction work failed: {}", e);
                 self.write_error = Some(e.clone());
                 return Err(e);
@@ -804,9 +903,7 @@ impl DB {
         let fmd = build_table(&self.path, &self.opt, memt.iter(), num)?;
         log!(self.opt.log, "L0 table {:06} has {} bytes", num, fmd.size);
 
-        // Wrote empty table.
         if fmd.size == 0 {
-            self.vset.borrow_mut().reuse_file_number(num);
             return Ok(());
         }
 
@@ -875,45 +972,37 @@ impl DB {
             let (key_bytes, val_bytes) = input.current().expect("Iterator should be valid here");
 
             if cs.compaction.should_stop_before(&key_bytes) && cs.builder.is_some() {
+                input.status()?;
                 self.finish_compaction_output(cs)?;
             }
-            let (ktyp, seq, ukey) = parse_internal_key(&key_bytes);
-            if seq == 0 {
-                // Parsing failed.
-                log!(self.opt.log, "Encountered seq=0 in key: {:?}", &key_bytes);
-                last_seq_for_key = MAX_SEQUENCE_NUMBER;
-                have_ukey = false;
-                current_ukey.clear();
+            let mut drop = false;
+            match parse_internal_key_checked(&key_bytes) {
+                None => {
+                    current_ukey.clear();
+                    have_ukey = false;
+                    last_seq_for_key = MAX_SEQUENCE_NUMBER;
+                }
+                Some((ktyp, seq, ukey)) => {
+                    if !have_ukey || self.opt.cmp.cmp(ukey, &current_ukey) != Ordering::Equal {
+                        current_ukey.clear();
+                        current_ukey.extend_from_slice(ukey);
+                        have_ukey = true;
+                        last_seq_for_key = MAX_SEQUENCE_NUMBER;
+                    }
+                    if last_seq_for_key <= cs.smallest_seq
+                        || (ktyp == ValueType::TypeDeletion
+                            && seq <= cs.smallest_seq
+                            && cs.compaction.is_base_level_for(ukey))
+                    {
+                        drop = true;
+                    }
+                    last_seq_for_key = seq;
+                }
+            }
+            if drop {
                 input.advance();
                 continue;
             }
-
-            if !have_ukey || self.opt.cmp.cmp(ukey, &current_ukey) != Ordering::Equal {
-                // First occurrence of this key.
-                current_ukey.clear();
-                current_ukey.extend_from_slice(ukey);
-                have_ukey = true;
-                last_seq_for_key = MAX_SEQUENCE_NUMBER;
-            }
-
-            // We can omit the key under the following conditions:
-            if last_seq_for_key <= cs.smallest_seq {
-                last_seq_for_key = seq;
-                input.advance();
-                continue;
-            }
-            // Entry is deletion; no older version is observable by any snapshot; and all entries
-            // in compacted levels with smaller sequence numbers will
-            if ktyp == ValueType::TypeDeletion
-                && seq <= cs.smallest_seq
-                && cs.compaction.is_base_level_for(ukey)
-            {
-                last_seq_for_key = seq;
-                input.advance();
-                continue;
-            }
-
-            last_seq_for_key = seq;
 
             if cs.builder.is_none() {
                 let fnum = self.vset.borrow_mut().new_file_number();
@@ -933,8 +1022,8 @@ impl DB {
             }
             cs.current_output().largest.clone_from(&key_bytes);
             cs.builder.as_mut().unwrap().add(&key_bytes, &val_bytes)?;
-            // NOTE: Adjust max file size based on level.
-            if cs.builder.as_ref().unwrap().size_estimate() > self.opt.max_file_size {
+            if cs.builder.as_ref().unwrap().file_size() >= self.opt.max_file_size {
+                input.status()?;
                 self.finish_compaction_output(cs)?;
             }
 
@@ -945,6 +1034,7 @@ impl DB {
         if cs.builder.is_some() {
             self.finish_compaction_output(cs)?;
         }
+        input.status()?;
 
         let mut stats = CompactionStats {
             micros: self.opt.env.micros() - start_ts,
@@ -1020,6 +1110,15 @@ impl Drop for DB {
         self.flush().ok();
         let _ = self.release_lock();
     }
+}
+
+const L0_STOP_WRITES_TRIGGER: usize = 12;
+
+struct ManualCompaction {
+    level: usize,
+    begin: Option<Vec<u8>>,
+    end: Option<Vec<u8>>,
+    done: bool,
 }
 
 struct CompactionState {
@@ -1404,27 +1503,27 @@ mod tests {
         );
 
         assert_eq!(
-            250,
+            248,
             opt.env
                 .size_of(&Path::new("db").join("000007.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            200,
+            198,
             opt.env
                 .size_of(&Path::new("db").join("000008.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            200,
+            198,
             opt.env
                 .size_of(&Path::new("db").join("000009.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            435,
+            433,
             opt.env
-                .size_of(&Path::new("db").join("000015.ldb"))
+                .size_of(&Path::new("db").join("000016.ldb"))
                 .unwrap()
         );
 
@@ -1435,6 +1534,7 @@ mod tests {
         assert!(!opt.env.exists(&Path::new("db").join("000006.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000013.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000014.ldb")).unwrap());
+        assert!(!opt.env.exists(&Path::new("db").join("000015.ldb")).unwrap());
 
         assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap().unwrap());
         assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap().unwrap());
@@ -1460,33 +1560,33 @@ mod tests {
         );
 
         assert_eq!(
-            250,
+            248,
             opt.env
                 .size_of(&Path::new("db").join("000007.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            200,
+            198,
             opt.env
                 .size_of(&Path::new("db").join("000008.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            200,
+            198,
             opt.env
                 .size_of(&Path::new("db").join("000009.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            182,
+            180,
             opt.env
                 .size_of(&Path::new("db").join("000014.ldb"))
                 .unwrap()
         );
         assert_eq!(
-            435,
+            433,
             opt.env
-                .size_of(&Path::new("db").join("000017.ldb"))
+                .size_of(&Path::new("db").join("000016.ldb"))
                 .unwrap()
         );
 
@@ -1497,7 +1597,7 @@ mod tests {
         assert!(!opt.env.exists(&Path::new("db").join("000005.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000006.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000015.ldb")).unwrap());
-        assert!(!opt.env.exists(&Path::new("db").join("000016.ldb")).unwrap());
+        assert!(!opt.env.exists(&Path::new("db").join("000017.ldb")).unwrap());
 
         assert_eq!(b"val1".to_vec(), db.get(b"aaa").unwrap().unwrap());
         assert_eq!(b"val2".to_vec(), db.get(b"cab").unwrap().unwrap());
@@ -1529,7 +1629,7 @@ mod tests {
 
         assert_eq!(LookupKey::new(b"aabc", 6).internal_key(), &f.smallest);
         assert_eq!(LookupKey::new(b"test123", 7).internal_key(), &f.largest);
-        assert_eq!(379, f.size);
+        assert_eq!(377, f.size);
         assert_eq!(123, f.num);
         assert!(opt.env.exists(path).unwrap());
 
@@ -1698,6 +1798,7 @@ mod tests {
 
         // Trigger memtable compaction.
         db.make_room_for_write(true).unwrap();
+        db.flush_background_work();
         assert_eq!(0, db.mem.len());
         assert!(db
             .opt
@@ -1710,7 +1811,7 @@ mod tests {
             .exists(&Path::new("db").join("000003.ldb"))
             .unwrap());
         assert_eq!(
-            351,
+            345,
             db.opt
                 .env
                 .size_of(&Path::new("db").join("000003.ldb"))
@@ -1742,7 +1843,7 @@ mod tests {
             .exists(&Path::new("db").join("000013.ldb"))
             .unwrap());
         assert_eq!(
-            345,
+            343,
             db.opt
                 .env
                 .size_of(&Path::new("db").join("000013.ldb"))
@@ -1794,7 +1895,7 @@ mod tests {
         assert!(opt.env.exists(&Path::new("db").join("000006.ldb")).unwrap());
         assert!(!opt.env.exists(&Path::new("db").join("000010.ldb")).unwrap());
         assert_eq!(
-            218,
+            216,
             opt.env
                 .size_of(&Path::new("db").join("000006.ldb"))
                 .unwrap()

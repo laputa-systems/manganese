@@ -5,7 +5,7 @@ use crate::types::{FileMetaData, FileNum, SequenceNumber};
 use integer_encoding::{VarIntReader, VarIntWriter};
 
 use bytes::Bytes;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::io::{Read, Write};
 
 #[derive(PartialEq, Debug, Clone)]
@@ -66,7 +66,7 @@ pub struct VersionEdit {
     pub last_seq: Option<SequenceNumber>,
 
     pub compaction_ptrs: Vec<CompactionPointer>,
-    pub deleted: HashSet<(usize, FileNum)>,
+    pub deleted: BTreeSet<(usize, FileNum)>,
     pub new_files: Vec<(usize, FileMetaData)>,
 }
 
@@ -79,7 +79,7 @@ impl VersionEdit {
             next_file_number: None,
             last_seq: None,
             compaction_ptrs: Vec::with_capacity(8),
-            deleted: HashSet::with_capacity(8),
+            deleted: BTreeSet::new(),
             new_files: Vec::with_capacity(8),
         }
     }
@@ -98,6 +98,10 @@ impl VersionEdit {
 
     pub fn set_comparator_name(&mut self, name: &str) {
         self.comparator = Some(name.to_string())
+    }
+
+    pub fn comparator_name(&self) -> Option<&str> {
+        self.comparator.as_deref()
     }
 
     pub fn set_log_num(&mut self, num: u64) {

@@ -20,6 +20,16 @@ const DEFAULT_BITS_PER_KEY: u32 = 10; // NOTE: This may need to be optimized.
 
 /// Options contains general parameters for a LevelDB instance. Most of the names are
 /// self-explanatory; the defaults are defined in the `Default` implementation.
+/// When a database runs the compactions LevelDB schedules on its background thread.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum BackgroundWork {
+    #[default]
+    Inline,
+    /// Only when an operation must wait for it or `DB::flush_background_work` is called; work
+    /// still pending when the database is dropped is abandoned, as at LevelDB shutdown.
+    Deferred,
+}
+
 #[derive(Clone)]
 pub struct Options {
     pub cmp: Rc<Box<dyn Cmp>>,
@@ -43,6 +53,7 @@ pub struct Options {
     /// The filter policy for new tables and for reading table filters; `None` writes and reads
     /// no filter, as LevelDB does without a policy.
     pub filter_policy: Option<filter::BoxedFilterPolicy>,
+    pub background_work: BackgroundWork,
 }
 
 /// Per-read checksum and block-cache policy.
@@ -90,6 +101,7 @@ impl Default for Options {
             compressor: 0,
             compressor_list: Rc::new(CompressorList::default()),
             filter_policy: Some(Rc::new(Box::new(filter::BloomPolicy::new(DEFAULT_BITS_PER_KEY)))),
+            background_work: BackgroundWork::Inline,
         }
     }
 }

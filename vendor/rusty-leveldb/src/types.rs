@@ -134,6 +134,36 @@ impl LdbIterator for Box<dyn LdbIterator> {
     fn status(&self) -> Result<()> {
         self.as_ref().status()
     }
+    fn seek_to_first(&mut self) {
+        self.as_mut().seek_to_first()
+    }
+    fn seek_to_last(&mut self) {
+        self.as_mut().seek_to_last()
+    }
+}
+
+/// An iterator over nothing that reports an error, as LevelDB's NewErrorIterator returns for a
+/// table that cannot be opened.
+pub(crate) struct ErrorIter(pub(crate) crate::error::Status);
+
+impl LdbIterator for ErrorIter {
+    fn advance(&mut self) -> bool {
+        false
+    }
+    fn current(&self) -> Option<(Bytes, Bytes)> {
+        None
+    }
+    fn seek(&mut self, _: &[u8]) {}
+    fn reset(&mut self) {}
+    fn valid(&self) -> bool {
+        false
+    }
+    fn prev(&mut self) -> bool {
+        false
+    }
+    fn status(&self) -> Result<()> {
+        Err(self.0.clone())
+    }
 }
 
 /// The unique (sequential) number of a file.

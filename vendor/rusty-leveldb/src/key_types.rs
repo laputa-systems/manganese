@@ -180,18 +180,63 @@ pub fn parse_internal_key(ikey: InternalKey) -> (ValueType, SequenceNumber, User
     (typ, seq, &ikey[0..ikey.len() - 8])
 }
 
+/// Parses an internal key as LevelDB's ParseInternalKey does: a key shorter than its tag or with
+/// an unknown value type is corrupt.
+pub fn parse_internal_key_checked(ikey: InternalKey<'_>) -> Option<(ValueType, SequenceNumber, UserKey<'_>)> {
+    if ikey.len() < 8 {
+        return None;
+    }
+    let tag: u64 = FixedInt::decode_fixed(&ikey[ikey.len() - 8..]);
+    let typ = match tag & 0xff {
+        0 => ValueType::TypeDeletion,
+        1 => ValueType::TypeValue,
+        _ => return None,
+    };
+    Some((typ, tag >> 8, &ikey[0..ikey.len() - 8]))
+}
+
 /// cmp_internal_key efficiently compares keys in InternalKey format by only parsing the parts that
 /// are actually needed for a comparison.
 pub fn cmp_internal_key(ucmp: &dyn Cmp, a: InternalKey<'_>, b: InternalKey<'_>) -> Ordering {
+    if a.len() < 8 || b.len() < 8 {
+        return cmp_user_key_of_corrupt(a, b);
+    }
     match ucmp.cmp(&a[0..a.len() - 8], &b[0..b.len() - 8]) {
         Ordering::Less => Ordering::Less,
         Ordering::Greater => Ordering::Greater,
         Ordering::Equal => {
-            let seqa = parse_tag(FixedInt::decode_fixed(&a[a.len() - 8..])).1;
-            let seqb = parse_tag(FixedInt::decode_fixed(&b[b.len() - 8..])).1;
+            let taga: u64 = FixedInt::decode_fixed(&a[a.len() - 8..]);
+            let tagb: u64 = FixedInt::decode_fixed(&b[b.len() - 8..]);
             // reverse comparison!
-            seqb.cmp(&seqa)
+            tagb.cmp(&taga)
         }
+    }
+}
+
+/// Compares the user keys of two internal keys when either is a corrupt key shorter than its
+/// tag. LevelDB's ExtractUserKey then yields a length that wraps around, so the bytewise
+/// comparison reads the key, its terminating zero byte and an unbounded tail; this compares
+/// those bytes and treats the wrapped key as the longer one.
+pub(crate) fn cmp_user_key_of_corrupt(a: &[u8], b: &[u8]) -> Ordering {
+    fn bytes(key: &[u8]) -> (Vec<u8>, bool) {
+        if key.len() < 8 {
+            let mut bytes = key.to_vec();
+            bytes.push(0);
+            (bytes, true)
+        } else {
+            (key[..key.len() - 8].to_vec(), false)
+        }
+    }
+    let (a, a_wraps) = bytes(a);
+    let (b, b_wraps) = bytes(b);
+    let common = a.len().min(b.len());
+    match a[..common].cmp(&b[..common]) {
+        Ordering::Equal => match (a_wraps, b_wraps) {
+            (true, false) => Ordering::Greater,
+            (false, true) => Ordering::Less,
+            _ => Ordering::Equal,
+        },
+        order => order,
     }
 }
 

@@ -83,11 +83,8 @@ impl SnapshotList {
             .inner
             .borrow()
             .map
-            .iter()
-            .fold(
-                MAX_SEQUENCE_NUMBER,
-                |s, (seq, _)| if *seq < s { *seq } else { s },
-            );
+            .values()
+            .fold(MAX_SEQUENCE_NUMBER, |s, seq| if *seq < s { *seq } else { s });
         if oldest == MAX_SEQUENCE_NUMBER {
             0
         } else {
@@ -101,12 +98,12 @@ impl SnapshotList {
         self.inner
             .borrow()
             .map
-            .iter()
-            .fold(0, |s, (seq, _)| if *seq > s { *seq } else { s })
+            .values()
+            .fold(0, |s, seq| if *seq > s { *seq } else { s })
     }
 
     pub fn empty(&self) -> bool {
-        self.inner.borrow().oldest == 0
+        self.inner.borrow().map.is_empty()
     }
 }
 

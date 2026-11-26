@@ -9,10 +9,92 @@ use std::rc::Rc;
 use bytes::Bytes;
 use integer_encoding::FixedInt;
 
+const ARENA_BLOCK_SIZE: usize = 4096;
+const ARENA_ALIGN: usize = 8;
+const SKIPLIST_MAX_HEIGHT: usize = 12;
+const SKIPLIST_BRANCHING: u32 = 4;
+const SKIPLIST_NODE_SIZE: usize = 16;
+const SKIPLIST_LINK_SIZE: usize = 8;
+
+/// Tracks the memory LevelDB's arena reports for a memtable with the same insertions, so that
+/// memtables fill up and are flushed at the same writes as in LevelDB.
+struct ArenaUsage {
+    usage: usize,
+    offset: usize,
+    remaining: usize,
+    seed: u32,
+}
+
+impl ArenaUsage {
+    fn new() -> ArenaUsage {
+        let mut arena = ArenaUsage {
+            usage: 0,
+            offset: 0,
+            remaining: 0,
+            seed: 0xdeadbeef & 0x7fff_ffff,
+        };
+        arena.allocate_aligned(SKIPLIST_NODE_SIZE + SKIPLIST_LINK_SIZE * (SKIPLIST_MAX_HEIGHT - 1));
+        arena
+    }
+
+    fn allocate(&mut self, bytes: usize) {
+        if bytes <= self.remaining {
+            self.offset += bytes;
+            self.remaining -= bytes;
+        } else {
+            self.allocate_fallback(bytes);
+        }
+    }
+
+    fn allocate_aligned(&mut self, bytes: usize) {
+        let slop = (ARENA_ALIGN - self.offset % ARENA_ALIGN) % ARENA_ALIGN;
+        let needed = bytes + slop;
+        if needed <= self.remaining {
+            self.offset += needed;
+            self.remaining -= needed;
+        } else {
+            self.allocate_fallback(bytes);
+        }
+    }
+
+    fn allocate_fallback(&mut self, bytes: usize) {
+        if bytes > ARENA_BLOCK_SIZE / 4 {
+            self.usage += bytes + size_of::<usize>();
+            return;
+        }
+        self.usage += ARENA_BLOCK_SIZE + size_of::<usize>();
+        self.offset = bytes;
+        self.remaining = ARENA_BLOCK_SIZE - bytes;
+    }
+
+    fn next_random(&mut self) -> u32 {
+        const M: u64 = 2147483647;
+        const A: u64 = 16807;
+        let product = u64::from(self.seed) * A;
+        let mut seed = (product >> 31) + (product & M);
+        if seed > M {
+            seed -= M;
+        }
+        self.seed = seed as u32;
+        self.seed
+    }
+
+    fn add_entry(&mut self, key_len: usize, value_len: usize) {
+        let internal_key_len = key_len + 8;
+        self.allocate(integer_encoding::VarInt::required_space(internal_key_len) + internal_key_len + integer_encoding::VarInt::required_space(value_len) + value_len);
+        let mut height = 1;
+        while height < SKIPLIST_MAX_HEIGHT && self.next_random() % SKIPLIST_BRANCHING == 0 {
+            height += 1;
+        }
+        self.allocate_aligned(SKIPLIST_NODE_SIZE + SKIPLIST_LINK_SIZE * (height - 1));
+    }
+}
+
 /// Provides Insert/Get/Iterate, based on the SkipMap implementation.
 /// MemTable uses MemtableKeys internally, that is, it stores key and value in the [Skipmap] key.
 pub struct MemTable {
     map: SkipMap,
+    arena: ArenaUsage,
 }
 
 impl MemTable {
@@ -26,6 +108,7 @@ impl MemTable {
     fn new_raw(cmp: Rc<Box<dyn Cmp>>) -> MemTable {
         MemTable {
             map: SkipMap::new(cmp),
+            arena: ArenaUsage::new(),
         }
     }
 
@@ -34,10 +117,11 @@ impl MemTable {
     }
 
     pub fn approx_mem_usage(&self) -> usize {
-        self.map.approx_memory()
+        self.arena.usage
     }
 
     pub fn add(&mut self, seq: SequenceNumber, t: ValueType, key: UserKey<'_>, value: &[u8]) {
+        self.arena.add_entry(key.len(), value.len());
         self.map
             .insert(build_memtable_key(key, value, t, seq), Vec::new())
     }
@@ -98,23 +182,7 @@ impl LdbIterator for MemtableIterator {
         self.skipmapiter.reset();
     }
     fn prev(&mut self) -> bool {
-        // Make sure this is actually needed (skipping deleted values?).
-        loop {
-            if !self.skipmapiter.prev() {
-                return false;
-            }
-            if let Some((key, _val)) = self.skipmapiter.current() {
-                let (_, _, tag, _, _) = parse_memtable_key(&key);
-
-                if tag & 0xff == ValueType::TypeValue as u64 {
-                    return true;
-                } else {
-                    continue;
-                }
-            } else {
-                return false;
-            }
-        }
+        self.skipmapiter.prev()
     }
     fn valid(&self) -> bool {
         self.skipmapiter.valid()

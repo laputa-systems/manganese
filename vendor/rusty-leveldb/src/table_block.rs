@@ -71,10 +71,13 @@ pub(crate) fn read_block_contents(
         );
     }
     let compressor_list = opt.compressor_list.clone();
+    let Ok(compressor) = compressor_list.get(compress_type) else {
+        return err(StatusCode::Corruption, "bad block type");
+    };
 
     // The compressor's decode method expects a Vec<u8>.
     // If block_data_slice is empty, to_vec() is fine.
-    compressor_list.get(compress_type)?.decode(block_data_slice.to_vec())
+    compressor.decode(block_data_slice.to_vec())
 }
 
 /// Verify checksum of block

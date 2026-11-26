@@ -2,7 +2,7 @@ use crate::block::BlockContents;
 use crate::block_builder::BlockBuilder;
 use crate::blockhandle::BlockHandle;
 use crate::cmp::InternalKeyCmp;
-use crate::compressor::{self, Compressor, CompressorId};
+use crate::compressor::{self, CompressorId};
 use crate::crc;
 use crate::error::Result;
 use crate::filter::{BoxedFilterPolicy, InternalFilterPolicy};
@@ -85,7 +85,9 @@ pub struct TableBuilder<Dst: Write> {
 
     offset: usize,
     num_entries: usize,
-    prev_block_last_key: Vec<u8>,
+    last_key: Vec<u8>,
+    pending_index_entry: bool,
+    pending_handle: BlockHandle,
 
     data_block: Option<BlockBuilder>,
     index_block: Option<BlockBuilder>,
@@ -115,20 +117,28 @@ impl<Dst: Write> TableBuilder<Dst> {
 
     /// Like new(), but doesn't wrap the comparator in an InternalKeyCmp (for testing)
     pub fn new_raw(opt: Options, dst: Dst) -> TableBuilder<Dst> {
+        let mut index_opt = opt.clone();
+        index_opt.block_restart_interval = 1;
         TableBuilder {
             opt: opt.clone(),
             dst,
             offset: 0,
-            prev_block_last_key: vec![],
+            last_key: vec![],
+            pending_index_entry: false,
+            pending_handle: BlockHandle::new(0, 0),
             num_entries: 0,
             data_block: Some(BlockBuilder::new(opt.clone())),
             filter_block: opt.filter_policy.clone().map(FilterBlockBuilder::new),
-            index_block: Some(BlockBuilder::new(opt)),
+            index_block: Some(BlockBuilder::new(index_opt)),
         }
     }
 
     pub fn entries(&self) -> usize {
         self.num_entries
+    }
+
+    pub fn file_size(&self) -> usize {
+        self.offset
     }
 
     pub fn size_estimate(&self) -> usize {
@@ -149,49 +159,53 @@ impl<Dst: Write> TableBuilder<Dst> {
     pub fn add(&mut self, key: InternalKey<'_>, val: &[u8]) -> Result<()> {
         assert!(self.data_block.is_some());
 
-        if !self.prev_block_last_key.is_empty() {
-            assert!(self.opt.cmp.cmp(&self.prev_block_last_key, key) == Ordering::Less);
+        if self.num_entries > 0 {
+            assert!(self.opt.cmp.cmp(key, &self.last_key) == Ordering::Greater);
         }
 
-        if self.data_block.as_ref().unwrap().size_estimate() > self.opt.block_size {
-            self.write_data_block(key)?;
+        if self.pending_index_entry {
+            let sep = self.opt.cmp.find_shortest_sep(&self.last_key, key);
+            self.add_index_entry(&sep);
         }
-
-        let dblock = &mut self.data_block.as_mut().unwrap();
 
         if let Some(ref mut fblock) = self.filter_block {
             fblock.add_key(key);
         }
 
+        self.last_key.clear();
+        self.last_key.extend_from_slice(key);
         self.num_entries += 1;
+        let dblock = self.data_block.as_mut().unwrap();
         dblock.add(key, val);
+
+        if dblock.size_estimate() >= self.opt.block_size {
+            self.flush()?;
+        }
         Ok(())
     }
 
-    /// Writes an index entry for the current data_block where `next_key` is the first key of the
-    /// next block.
-    /// Calls write_block() for writing the block to disk.
-    fn write_data_block(&mut self, next_key: InternalKey<'_>) -> Result<()> {
-        assert!(self.data_block.is_some());
-
-        let block = self.data_block.take().unwrap();
-        let sep = self.opt.cmp.find_shortest_sep(block.last_key(), next_key);
-        self.prev_block_last_key = Vec::from(block.last_key());
-        let contents = block.finish();
-
-        let compressor_list = self.opt.compressor_list.clone();
-        let compressor = compressor_list.get(self.opt.compressor)?;
-
-        let handle = self.write_block(contents, (self.opt.compressor, compressor))?;
-
-        let mut handle_enc = [0_u8; 16];
-        let enc_len = handle.encode_to(&mut handle_enc);
-
+    fn add_index_entry(&mut self, key: &[u8]) {
+        let mut handle_enc = [0_u8; 20];
+        let enc_len = self.pending_handle.encode_to(&mut handle_enc);
         self.index_block
             .as_mut()
             .unwrap()
-            .add(&sep, &handle_enc[0..enc_len]);
+            .add(key, &handle_enc[0..enc_len]);
+        self.pending_index_entry = false;
+    }
+
+    fn flush(&mut self) -> Result<()> {
+        assert!(self.data_block.is_some());
+        if self.data_block.as_ref().unwrap().entries() == 0 {
+            return Ok(());
+        }
+        assert!(!self.pending_index_entry);
+
+        let block = self.data_block.take().unwrap();
+        let contents = block.finish();
         self.data_block = Some(BlockBuilder::new(self.opt.clone()));
+        self.pending_handle = self.write_block(contents)?;
+        self.pending_index_entry = true;
 
         if let Some(ref mut fblock) = self.filter_block {
             fblock.start_block(self.offset);
@@ -200,21 +214,28 @@ impl<Dst: Write> TableBuilder<Dst> {
         Ok(())
     }
 
-    /// Calculates the checksum, writes the block to disk and updates the offset.
-    fn write_block(
-        &mut self,
-        block: BlockContents,
-        compressor_id_pair: (u8, &dyn Compressor),
-    ) -> Result<BlockHandle> {
-        let (ctype, compressor) = compressor_id_pair;
-        let data = compressor.encode(block.to_vec())?;
+    /// Compresses a block with the configured compressor unless that saves less than an eighth
+    /// of its size, as LevelDB does, and writes it.
+    fn write_block(&mut self, block: BlockContents) -> Result<BlockHandle> {
+        let compressor_list = self.opt.compressor_list.clone();
+        if self.opt.compressor != compressor::NoneCompressor::ID {
+            let compressor = compressor_list.get(self.opt.compressor)?;
+            let compressed = compressor.encode(block.to_vec())?;
+            if compressed.len() < block.len() - block.len() / 8 {
+                return self.write_raw_block(&compressed, self.opt.compressor);
+            }
+        }
+        self.write_raw_block(&block, compressor::NoneCompressor::ID)
+    }
 
+    /// Calculates the checksum, writes the block to disk and updates the offset.
+    fn write_raw_block(&mut self, data: &[u8], ctype: u8) -> Result<BlockHandle> {
         let mut digest = crc::digest();
 
-        digest.update(&data);
+        digest.update(data);
         digest.update(&[ctype; TABLE_BLOCK_COMPRESS_LEN]);
 
-        self.dst.write_all(&data)?;
+        self.dst.write_all(data)?;
         self.dst.write_all(&[ctype; TABLE_BLOCK_COMPRESS_LEN])?;
         self.dst.write_fixedint(mask_crc(digest.finalize()))?;
 
@@ -231,55 +252,36 @@ impl<Dst: Write> TableBuilder<Dst> {
     pub(crate) fn finish_with_writer(mut self) -> Result<(usize, Dst)> {
         assert!(self.data_block.is_some());
 
-        let compressor_list = self.opt.compressor_list.clone();
-        let compressor_id_pair = (
-            self.opt.compressor,
-            compressor_list.get(self.opt.compressor)?,
-        );
+        self.flush()?;
 
-        // If there's a pending data block, write it
-        if self.data_block.as_ref().unwrap().entries() > 0 {
-            // Find a key reliably past the last key
-            let key_past_last = self
-                .opt
-                .cmp
-                .find_short_succ(self.data_block.as_ref().unwrap().last_key());
-            self.write_data_block(&key_past_last)?;
-        }
-
-        // Create metaindex block
-        let mut meta_ix_block = BlockBuilder::new(self.opt.clone());
-
-        if self.filter_block.is_some() {
-            // if there's a filter block, write the filter block and add it to the metaindex block.
-            let fblock = self.filter_block.take().unwrap();
+        let mut filter_handle = None;
+        if let Some(fblock) = self.filter_block.take() {
             let filter_key = format!("filter.{}", fblock.filter_name());
             let fblock_data = fblock.finish();
-            let fblock_handle = self.write_block(
-                fblock_data.into(),
-                (compressor::NoneCompressor::ID, &compressor::NoneCompressor),
-            )?;
-
-            let mut handle_enc = [0_u8; 16];
-            let enc_len = fblock_handle.encode_to(&mut handle_enc);
-
-            meta_ix_block.add(filter_key.as_bytes(), &handle_enc[0..enc_len]);
+            filter_handle = Some((filter_key, self.write_raw_block(&fblock_data, compressor::NoneCompressor::ID)?));
         }
 
-        // write metaindex block
-        let meta_ix = meta_ix_block.finish();
-        let meta_ix_handle = self.write_block(meta_ix, compressor_id_pair)?;
+        let mut meta_ix_block = BlockBuilder::new(self.opt.clone());
+        if let Some((filter_key, fblock_handle)) = filter_handle {
+            let mut handle_enc = [0_u8; 20];
+            let enc_len = fblock_handle.encode_to(&mut handle_enc);
+            meta_ix_block.add(filter_key.as_bytes(), &handle_enc[0..enc_len]);
+        }
+        let meta_ix_handle = self.write_block(meta_ix_block.finish())?;
 
-        // write index block
+        if self.pending_index_entry {
+            let succ = self.opt.cmp.find_short_succ(&self.last_key);
+            self.add_index_entry(&succ);
+        }
         let index_cont = self.index_block.take().unwrap().finish();
-        let ix_handle = self.write_block(index_cont, compressor_id_pair)?;
+        let ix_handle = self.write_block(index_cont)?;
 
-        // write footer.
         let footer = Footer::new(meta_ix_handle, ix_handle);
         let mut buf = [0; FULL_FOOTER_LENGTH];
         footer.encode(&mut buf);
 
-        self.offset += self.dst.write(&buf[..])?;
+        self.dst.write_all(&buf[..])?;
+        self.offset += buf.len();
         self.dst.flush()?;
         Ok((self.offset, self.dst))
     }
@@ -336,7 +338,7 @@ mod tests {
         assert!(b.filter_block.is_some());
 
         let actual = b.finish().unwrap();
-        assert_eq!(223, actual);
+        assert_eq!(219, actual);
     }
 
     #[test]

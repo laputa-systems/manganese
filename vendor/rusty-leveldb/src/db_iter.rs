@@ -1,5 +1,6 @@
 use crate::cmp::Cmp;
-use crate::key_types::{parse_internal_key, truncate_to_userkey, LookupKey, ValueType};
+use crate::error::{Status, StatusCode};
+use crate::key_types::{cmp_user_key_of_corrupt, parse_internal_key_checked, truncate_to_userkey, LookupKey, ValueType};
 use crate::merging_iter::MergingIter;
 use crate::snapshot::Snapshot;
 use crate::types::{Direction, LdbIterator, Shared};
@@ -25,6 +26,7 @@ pub struct DBIterator {
     byte_count: isize,
 
     valid: bool,
+    status: Option<Status>,
     // temporarily stored user key.
     savedkey: Vec<u8>,
     // buffer for reading internal keys
@@ -49,6 +51,7 @@ impl DBIterator {
             byte_count: random_period(),
 
             valid: false,
+            status: None,
             savedkey: vec![],
             keybuf: vec![],
             savedval: vec![],
@@ -80,7 +83,11 @@ impl DBIterator {
                 self.savedval = val_bytes.to_vec();
                 let len = self.keybuf.len() + self.savedval.len();
                 self.record_read_sample(len);
-                let (typ, seq, ukey) = parse_internal_key(&self.keybuf);
+                let Some((typ, seq, ukey)) = parse_internal_key_checked(&self.keybuf) else {
+                    self.status = Some(corrupted_key());
+                    self.iter.advance();
+                    continue;
+                };
 
                 // Skip keys with a sequence number after our snapshot.
                 if seq <= self.ss.sequence() {
@@ -131,9 +138,13 @@ impl DBIterator {
                 self.valbuf = val_bytes.to_vec();
                 let len = self.keybuf.len() + self.valbuf.len();
                 self.record_read_sample(len);
-                let (typ, seq, ukey) = parse_internal_key(&self.keybuf);
+                let Some((typ, seq, ukey)) = parse_internal_key_checked(&self.keybuf) else {
+                    self.status = Some(corrupted_key());
+                    self.iter.prev();
+                    continue;
+                };
 
-                if seq > 0 && seq <= self.ss.sequence() {
+                if seq <= self.ss.sequence() {
                     if value_type != ValueType::TypeDeletion
                         && self.cmp.cmp(ukey, &self.savedkey) == Ordering::Less
                     {
@@ -178,7 +189,10 @@ impl LdbIterator for DBIterator {
         }
     }
     fn status(&self) -> crate::Result<()> {
-        self.iter.status()
+        match &self.status {
+            Some(status) => Err(status.clone()),
+            None => self.iter.status(),
+        }
     }
     fn advance(&mut self) -> bool {
         if !self.valid() {
@@ -259,9 +273,15 @@ impl LdbIterator for DBIterator {
                 // Scan until we hit the next-smaller key.
                 if let Some((key_bytes, _val_bytes)) = self.iter.current() {
                     self.keybuf = key_bytes.to_vec();
-                    truncate_to_userkey(&mut self.keybuf);
                 }
-                if self.cmp.cmp(&self.keybuf, &self.savedkey) == Ordering::Less {
+                let order = if self.keybuf.len() < 8 {
+                    let mut saved = self.savedkey.clone();
+                    saved.extend_from_slice(&[0; 8]);
+                    cmp_user_key_of_corrupt(&self.keybuf, &saved)
+                } else {
+                    self.cmp.cmp(&self.keybuf[..self.keybuf.len() - 8], &self.savedkey)
+                };
+                if order == Ordering::Less {
                     break;
                 }
             }
@@ -308,6 +328,10 @@ impl LdbIterator for DBIterator {
         self.savedval.clear();
         self.keybuf.clear();
     }
+}
+
+fn corrupted_key() -> Status {
+    Status::new(StatusCode::Corruption, "corrupted internal key in DBIter")
 }
 
 fn random_period() -> isize {
