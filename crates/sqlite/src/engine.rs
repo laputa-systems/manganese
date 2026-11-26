@@ -14,6 +14,7 @@ use turso_core::StepResult;
 use turso_core::IO;
 use turso_sqlite::SqliteDialect;
 
+use crate::chromium_config;
 use crate::sql_value::SqlValue;
 
 pub const SQLITE_ERROR: i32 = 1;
@@ -24,6 +25,7 @@ pub struct Engine {
     io: Arc<dyn IO>,
     _database: Arc<Database>,
     connection: Arc<Connection>,
+    views_enabled: bool,
 }
 
 pub struct EngineStatement {
@@ -36,7 +38,7 @@ pub fn error_code(error: &LimboError) -> i32 {
 }
 
 impl Engine {
-    pub fn open(path: &str, read_only: bool) -> Result<Self, i32> {
+    pub fn open(path: &str, read_only: bool, views_enabled: bool) -> Result<Self, i32> {
         let io: Arc<dyn IO> = Arc::new(PlatformIO::new().map_err(|error| error_code(&error))?);
         let flags = if read_only { OpenFlags::ReadOnly } else { OpenFlags::Create };
         let options = OpenOptions::new(Arc::new(SqliteDialect))
@@ -46,10 +48,32 @@ impl Engine {
         let connection = database
             .connect(ConnectOpts::new(SessionRole::Superuser))
             .map_err(|error| error_code(&error))?;
-        Ok(Self { io, _database: database, connection })
+        connection.set_dqs_dml(false);
+        Ok(Self { io, _database: database, connection, views_enabled })
+    }
+
+    fn view_names(&self) -> Vec<Vec<u8>> {
+        let Ok(statement) = self.connection.prepare("SELECT name FROM sqlite_schema WHERE type = 'view'") else {
+            return Vec::new();
+        };
+        let mut names = Vec::new();
+        let mut prepared = EngineStatement { statement, row: Vec::new() };
+        while let Ok(true) = self.step(&mut prepared) {
+            if let Some(SqlValue::Text(name)) = prepared.row.first() {
+                names.push(name.clone());
+            }
+        }
+        names
     }
 
     pub fn prepare(&self, sql: &str) -> Result<(EngineStatement, usize), i32> {
+        let words = chromium_config::first_statement(sql);
+        if chromium_config::omits(&words) {
+            return Err(SQLITE_ERROR);
+        }
+        if !self.views_enabled && chromium_config::names_view(&words, &self.view_names()) {
+            return Err(SQLITE_ERROR);
+        }
         let statement = self.connection.prepare(sql).map_err(|error| error_code(&error))?;
         let tail = statement.tail_offset();
         Ok((EngineStatement { statement, row: Vec::new() }, tail))
@@ -109,10 +133,6 @@ impl Engine {
                 let _ = statement.statement.bind_at(index, value.to_turso());
             }
         }
-    }
-
-    pub fn column_count(statement: &EngineStatement) -> usize {
-        statement.statement.num_columns()
     }
 
     pub fn close(self) {

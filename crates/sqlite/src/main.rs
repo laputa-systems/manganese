@@ -1,3 +1,4 @@
+mod chromium_config;
 mod database;
 mod engine;
 mod meta_table;
