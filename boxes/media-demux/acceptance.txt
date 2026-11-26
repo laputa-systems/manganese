@@ -1,0 +1,17 @@
+version 1
+box media-demux
+revision b7a2f14bb20b0025c68240f7eda27923a0321233
+arch x86_64
+spec sha256:da616b26867fd53445560892764e7bb4c4f957d21d95511d991c3f8741018592
+corpus sha256:84e8fd0a319caf3ab7eb04741495f120fa5c8228cd3bd870c1b49174241a742a seen 270 holdout 166
+oracle .work/tmp/media-demux/oracle sha256:e575a649171312bda9dafb000e8fdd32cd795d5c226addfe273a0673acadb0b0
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/media-demux sha256:53d2bb0ba7aa4358c26b04e3daa42ba18c1449f666fc2cef1bb657d8c2a8f760
+dependencies cargo-lock sha256:a3fa5631c8149fe56c01bfdb672a7bcc2643e8c8b2f84dcf96872a6307ad2d4c tree sha256:4e3fac9e8890699529d61fe7f2aaf4758bb9f5f7bda974e8558f1cba2cccb8ff
+run seen exit 0 items 270 270
+run holdout exit 0 items 166 166
+run fuzz exit 0 seed 1795687068125684613 requested 20000 completed 20000
+run anchor make media-demux-anchor exit 0
+level source-harness met
+level frozen-browser met: make media-demux-anchor
+level integration pending: arm64 evidence (public_api: HTMLMediaElement duration and MediaError of the frozen arm64 browser) and make closure have not run
