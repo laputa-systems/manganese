@@ -73,7 +73,19 @@ pub fn omits(words: &[Word<'_>]) -> bool {
 }
 
 pub fn names_view(words: &[Word<'_>], views: &[Vec<u8>]) -> bool {
-    if views.is_empty() || words.iter().any(|word| word.kind == TokenType::TK_VIEW) {
+    let reads_rows = words.first().is_some_and(|word| {
+        matches!(
+            word.kind,
+            TokenType::TK_SELECT
+                | TokenType::TK_INSERT
+                | TokenType::TK_UPDATE
+                | TokenType::TK_DELETE
+                | TokenType::TK_REPLACE
+                | TokenType::TK_WITH
+                | TokenType::TK_VALUES
+        )
+    });
+    if views.is_empty() || !reads_rows {
         return false;
     }
     words.iter().any(|word| {
