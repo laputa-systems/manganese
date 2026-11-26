@@ -113,13 +113,16 @@ def harness(oracle, records):
             process.stdin.flush()
             outputs.append(process.stdout.read(struct.unpack('>I', process.stdout.read(4))[0]).decode())
         process.stdin.close()
-        code = process.wait(timeout=60)
+        code = process.wait()
     finally:
-        if not process.stdin.closed:
-            process.stdin.close()
         if process.poll() is None:
             process.kill()
         process.wait()
+        if not process.stdin.closed:
+            try:
+                process.stdin.close()
+            except OSError:
+                pass
     if code:
         raise RuntimeError('harness failed')
     return outputs
