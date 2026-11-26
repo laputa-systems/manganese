@@ -39,6 +39,7 @@ def main() -> int:
     archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
     session = None
     browser: subprocess.Popen[bytes] | None = None
+    cleanup_failure: Exception | None = None
     try:
         if mode != 'write':
             copy_profile(profile, run_dir / 'profile')
@@ -52,17 +53,27 @@ def main() -> int:
             raise RuntimeError('browser shutdown failed')
         result = json.loads(output)
     finally:
-        if browser is not None and browser.poll() is None:
+        primary = sys.exc_info()[0]
+        if browser is not None:
             try:
-                browser.kill()
-                browser.wait()
-            except OSError as error:
-                print(f'browser cleanup: {error}', file=sys.stderr)
+                if browser.poll() is None:
+                    browser.kill()
+                    browser.wait()
+            except Exception as error:
+                if primary is None:
+                    cleanup_failure = error
+                else:
+                    print(f'browser cleanup: {type(error).__name__}: {error}', file=sys.stderr)
         if session is not None:
             try:
                 session.close()
             except Exception as error:
-                print(f'session cleanup: {type(error).__name__}: {error}', file=sys.stderr)
+                if primary is None:
+                    cleanup_failure = error
+                else:
+                    print(f'session cleanup: {type(error).__name__}: {error}', file=sys.stderr)
+    if cleanup_failure is not None:
+        raise cleanup_failure
     if mode == 'write' and session is not None:
         copy_profile(session.profile, profile)
     print(json.dumps(result))
