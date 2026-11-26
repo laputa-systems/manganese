@@ -5,10 +5,11 @@ use std::net::{SocketAddr, TcpListener as StdTcpListener, TcpStream as StdTcpStr
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::mpsc::{self as sync_channel, Receiver as SyncReceiver, RecvTimeoutError, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use devtools_endpoint::endpoint::Endpoint;
 use devtools_endpoint::handler::ProtocolSource;
@@ -20,7 +21,8 @@ use http1::request::{CacheLoad, RequestInfo, UploadBody};
 use http1::request_url::RequestUrl;
 use http1::response_reader::ConnectionVerdict;
 use http1::stream_parser::SocketLiveness;
-use runtime::{Deadline, DeadlineTrigger};
+use runtime::Deadline;
+use smol::channel::{self, Sender as AsyncSender};
 use smol::net::TcpStream as AsyncTcpStream;
 use smol::Task;
 
@@ -28,8 +30,12 @@ const TARGET_HOST: &str = "manganese.invalid";
 const TARGET_PORT: u16 = 8123;
 const FULL_BODY_LEN: usize = 64;
 const PARTIAL_BODY: &[u8] = b"partial-body";
+const MAX_RETAINED_CONNECTIONS: usize = 8;
+const RELAY_POLL_INTERVAL: Duration = Duration::from_millis(50);
+const OBSERVATION_TIMEOUT: Duration = Duration::from_millis(2000);
+const TRIGGER_ELAPSED: Duration = Duration::from_millis(9);
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ConnectionCounter {
     active: AtomicUsize,
 }
@@ -55,12 +61,16 @@ impl Drop for ConnectionGuard {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RetainedConnections(Rc<RefCell<Vec<StdTcpStream>>>);
 
 impl RetainedConnections {
     fn retain(&self, stream: &StdTcpStream) {
-        self.0.borrow_mut().push(stream.try_clone().expect("a retained connection handle"));
+        let mut held = self.0.borrow_mut();
+        if held.len() >= MAX_RETAINED_CONNECTIONS {
+            held.remove(0);
+        }
+        held.push(stream.try_clone().expect("a retained connection handle"));
     }
 
     fn release(&self) {
@@ -109,7 +119,7 @@ impl SocketLiveness for TestLiveness {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RelayObservations {
     pub handshake: AtomicBool,
     pub request_seen: AtomicBool,
@@ -120,17 +130,21 @@ pub struct RelayObservations {
     pub request: Mutex<String>,
 }
 
+#[derive(Debug)]
 pub enum RelayMode {
     Complete(Vec<u8>),
     Stall {
-        trigger: Arc<Mutex<Option<DeadlineTrigger>>>,
-        progress: Arc<AtomicUsize>,
+        request_seen: AsyncSender<()>,
+        release: SyncReceiver<()>,
+        observed: AsyncSender<()>,
     },
 }
 
+#[derive(Debug)]
 pub struct Relay {
     address: SocketAddr,
     stop: Arc<AtomicBool>,
+    stop_signal: SyncSender<()>,
     thread: Option<JoinHandle<()>>,
     observations: Arc<RelayObservations>,
     counter: Arc<ConnectionCounter>,
@@ -155,9 +169,16 @@ impl Relay {
 
     pub fn stop_and_join(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
+        let _ = self.stop_signal.try_send(());
         if let Some(thread) = self.thread.take() {
             thread.join().expect("the relay stub exits without panic");
         }
+    }
+}
+
+impl Drop for Relay {
+    fn drop(&mut self) {
+        self.stop_and_join();
     }
 }
 
@@ -165,29 +186,41 @@ pub fn spawn_relay(mode: RelayMode) -> Relay {
     let listener = StdTcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0))).expect("the relay binds loopback");
     let address = listener.local_addr().expect("the relay has an address");
     let stop = Arc::new(AtomicBool::new(false));
+    let (stop_signal, stop_rx) = sync_channel::sync_channel(1);
     let observations = Arc::new(RelayObservations::default());
     let counter = Arc::new(ConnectionCounter::default());
     let thread_stop = stop.clone();
     let thread_observations = observations.clone();
     let thread = std::thread::Builder::new()
         .name("socks5-relay-stub".into())
-        .spawn(move || relay_loop(listener, thread_stop, mode, thread_observations))
+        .spawn(move || relay_loop(listener, thread_stop, stop_rx, mode, thread_observations))
         .expect("the relay thread starts");
-    Relay { address, stop, thread: Some(thread), observations, counter }
+    Relay { address, stop, stop_signal, thread: Some(thread), observations, counter }
 }
 
-fn relay_loop(listener: StdTcpListener, stop: Arc<AtomicBool>, mode: RelayMode, observations: Arc<RelayObservations>) {
+fn relay_loop(
+    listener: StdTcpListener,
+    stop: Arc<AtomicBool>,
+    stop_rx: SyncReceiver<()>,
+    mode: RelayMode,
+    observations: Arc<RelayObservations>,
+) {
     listener.set_nonblocking(true).expect("the relay accept loop is nonblocking");
     while !stop.load(Ordering::SeqCst) {
         match listener.accept() {
-            Ok((mut stream, _)) => handle_connection(&mut stream, &mode, &observations),
-            Err(error) if error.kind() == io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(5)),
+            Ok((mut stream, _)) => handle_connection(&mut stream, &mode, &observations, &stop),
+            Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
+                match stop_rx.recv_timeout(RELAY_POLL_INTERVAL) {
+                    Ok(()) | Err(RecvTimeoutError::Disconnected) => break,
+                    Err(RecvTimeoutError::Timeout) => {}
+                }
+            }
             Err(error) => panic!("relay accept failed: {error}"),
         }
     }
 }
 
-fn handle_connection(stream: &mut StdTcpStream, mode: &RelayMode, observations: &RelayObservations) {
+fn handle_connection(stream: &mut StdTcpStream, mode: &RelayMode, observations: &RelayObservations, stop: &AtomicBool) {
     stream.set_read_timeout(Some(Duration::from_millis(1000))).expect("a bounded relay read");
     let mut greeting = [0u8; 2];
     stream.read_exact(&mut greeting).expect("a SOCKS greeting");
@@ -232,22 +265,18 @@ fn handle_connection(stream: &mut StdTcpStream, mode: &RelayMode, observations: 
             stream.flush().expect("a flushed response");
             observations.server_closed.store(true, Ordering::SeqCst);
         }
-        RelayMode::Stall { trigger, progress } => {
+        RelayMode::Stall { request_seen, release, observed } => {
             let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {FULL_BODY_LEN}\r\nConnection: close\r\n\r\n");
             stream.write_all(head.as_bytes()).expect("response headers");
             stream.write_all(PARTIAL_BODY).expect("a partial response body");
             stream.flush().expect("a flushed partial response");
-            let started = Instant::now();
-            while progress.load(Ordering::SeqCst) == 0 && started.elapsed() < Duration::from_millis(800) {
-                std::thread::sleep(Duration::from_millis(2));
+            let _ = request_seen.try_send(());
+            while !stop.load(Ordering::SeqCst) {
+                match release.recv_timeout(RELAY_POLL_INTERVAL) {
+                    Ok(()) | Err(RecvTimeoutError::Disconnected) => break,
+                    Err(RecvTimeoutError::Timeout) => {}
+                }
             }
-            trigger
-                .lock()
-                .expect("trigger lock")
-                .take()
-                .expect("a single in-flight trigger")
-                .fire(Duration::from_millis(9))
-                .expect("the controlled deadline is still live");
             let mut byte = [0u8; 1];
             match stream.read(&mut byte) {
                 Ok(_) => observations.peer_closed.store(true, Ordering::SeqCst),
@@ -256,6 +285,7 @@ fn handle_connection(stream: &mut StdTcpStream, mode: &RelayMode, observations: 
                 }
                 Err(_) => observations.peer_closed.store(true, Ordering::SeqCst),
             }
+            let _ = observed.try_send(());
         }
     }
 }
@@ -343,11 +373,13 @@ pub fn endpoint() -> Endpoint {
     .expect("the DevTools endpoint starts")
 }
 
+#[derive(Debug)]
 pub struct CancellationWiring {
     pub propagate: bool,
     pub cleanup: bool,
 }
 
+#[derive(Debug)]
 pub struct CancellationObservation {
     pub outcome: &'static str,
     pub body_len: usize,
@@ -360,10 +392,16 @@ pub struct CancellationObservation {
 
 pub fn run_cancellation(wiring: CancellationWiring) -> CancellationObservation {
     let progress = Arc::new(AtomicUsize::new(0));
-    let (trigger, deadline) = Deadline::controlled();
+    let (request_seen_tx, request_seen_rx) = channel::bounded(1);
+    let (release_tx, release_rx) = sync_channel::sync_channel(1);
+    let (observed_tx, observed_rx) = channel::bounded(1);
+    let (first_chunk_tx, first_chunk_rx) = channel::bounded(1);
+    let (cancel_trigger, deadline) = Deadline::controlled();
+    let (watchdog_trigger, watchdog_deadline) = Deadline::controlled();
     let mut relay = spawn_relay(RelayMode::Stall {
-        trigger: Arc::new(Mutex::new(Some(trigger))),
-        progress: progress.clone(),
+        request_seen: request_seen_tx,
+        release: release_rx,
+        observed: observed_tx,
     });
     let address = relay.address();
     let counter = relay.counter().clone();
@@ -383,15 +421,21 @@ pub fn run_cancellation(wiring: CancellationWiring) -> CancellationObservation {
             Connected { stream, liveness: Arc::new(TestLiveness), verdict: Arc::new(ConnectionVerdict::default()) }
         };
         let observed_progress = progress.clone();
+        let chunk_signal = first_chunk_tx.clone();
         let fetch = async {
             let mut response = match client::send(&request, &mut dial, &spawn).await {
                 Ok(response) => response,
                 Err(_) => return "failed",
             };
+            let mut first = true;
             while let Some(chunk) = response.next_chunk().await {
                 match chunk {
                     Ok(chunk) => {
                         observed_progress.fetch_add(chunk.len(), Ordering::SeqCst);
+                        if first {
+                            first = false;
+                            let _ = chunk_signal.try_send(());
+                        }
                     }
                     Err(_) => return "failed",
                 }
@@ -399,15 +443,32 @@ pub fn run_cancellation(wiring: CancellationWiring) -> CancellationObservation {
             "complete"
         };
         let cancel = async {
-            if wiring.propagate {
-                let _ = deadline.wait().await;
-                "canceled"
-            } else {
-                smol::Timer::after(Duration::from_millis(800)).await;
-                "watchdog"
-            }
+            smol::future::or(
+                async {
+                    let _ = deadline.wait().await;
+                    "canceled"
+                },
+                async {
+                    let _ = watchdog_deadline.wait().await;
+                    "watchdog"
+                },
+            )
+            .await
         };
-        let outcome = smol::future::or(fetch, cancel).await;
+        let mut cancel_trigger = Some(cancel_trigger);
+        let mut watchdog_trigger = Some(watchdog_trigger);
+        let arm = async {
+            let _ = request_seen_rx.recv().await;
+            let _ = first_chunk_rx.recv().await;
+            let fired = if wiring.propagate {
+                cancel_trigger.take().expect("a live cancellation trigger").fire(TRIGGER_ELAPSED)
+            } else {
+                watchdog_trigger.take().expect("a live watchdog trigger").fire(TRIGGER_ELAPSED)
+            };
+            fired.expect("the controlled trigger is live");
+            release_tx.try_send(()).expect("the relay release signal is delivered");
+        };
+        let (outcome, ()) = smol::future::zip(smol::future::or(fetch, cancel), arm).await;
         if outcome == "canceled" {
             if wiring.cleanup {
                 retained.release();
@@ -418,8 +479,15 @@ pub fn run_cancellation(wiring: CancellationWiring) -> CancellationObservation {
                 }
             }
         }
-        let settle = if wiring.cleanup { Duration::from_millis(250) } else { Duration::from_millis(150) };
-        smol::Timer::after(settle).await;
+        let observed = smol::future::or(
+            async { observed_rx.recv().await.is_ok() },
+            async {
+                smol::Timer::after(OBSERVATION_TIMEOUT).await;
+                false
+            },
+        )
+        .await;
+        assert!(observed, "the relay completed its final read within the bound");
         (outcome, counter.active(), observed_progress.load(Ordering::SeqCst), retained.len())
     }));
     let request_seen = relay.observations().request_seen.load(Ordering::SeqCst);
