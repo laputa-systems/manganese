@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::num::NonZero;
 use std::sync::Arc;
 
@@ -28,6 +29,7 @@ pub struct Engine {
     _database: Arc<Database>,
     connection: Arc<Connection>,
     views_enabled: bool,
+    mmap_size: Cell<i64>,
 }
 
 pub struct EngineStatement {
@@ -53,7 +55,7 @@ impl Engine {
             .map_err(|error| error_code(&error))?;
         connection.set_dqs_dml(false);
         connection.set_triggers_enabled(triggers_enabled);
-        Ok(Self { io, _database: database, connection, views_enabled })
+        Ok(Self { io, _database: database, connection, views_enabled, mmap_size: Cell::new(0) })
     }
 
     fn view_names(&self) -> Vec<Vec<u8>> {
@@ -80,6 +82,18 @@ impl Engine {
         }
         if chromium_config::is_omitted_pragma(&first.words) {
             let statement = self.connection.prepare("SELECT 1 WHERE 0").map_err(|error| error_code(&error))?;
+            return Ok((EngineStatement { statement, row: Vec::new() }, first.end));
+        }
+        if let Some(pragma) = chromium_config::config_pragma(&first.words) {
+            let value = match pragma {
+                chromium_config::ConfigPragma::Constant(value) => value,
+                chromium_config::ConfigPragma::MmapSize(Some(size)) => {
+                    self.mmap_size.set(size);
+                    size
+                }
+                chromium_config::ConfigPragma::MmapSize(None) => self.mmap_size.get(),
+            };
+            let statement = self.connection.prepare(format!("SELECT {value}")).map_err(|error| error_code(&error))?;
             return Ok((EngineStatement { statement, row: Vec::new() }, first.end));
         }
         let statement = self.connection.prepare(sql).map_err(|error| error_code(&error))?;

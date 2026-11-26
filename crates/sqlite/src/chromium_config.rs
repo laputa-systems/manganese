@@ -77,3 +77,36 @@ pub fn names_view(words: &[Word<'_>], views: &[Vec<u8>]) -> bool {
         is_identifier(word.kind) && views.iter().any(|view| view.eq_ignore_ascii_case(text))
     })
 }
+
+pub enum ConfigPragma {
+    Constant(i64),
+    MmapSize(Option<i64>),
+}
+
+const MAX_MMAP_SIZE: i64 = 268435456;
+
+pub fn config_pragma(words: &[Word<'_>]) -> Option<ConfigPragma> {
+    let rest = match words {
+        [pragma, schema, dot, rest @ ..] if pragma.kind == TokenType::TK_PRAGMA && dot.kind == TokenType::TK_DOT && schema.text.eq_ignore_ascii_case(b"main") => rest,
+        [pragma, rest @ ..] if pragma.kind == TokenType::TK_PRAGMA => rest,
+        _ => return None,
+    };
+    let (name, argument) = match rest {
+        [name] => (name, None),
+        [name, equals, value] if equals.kind == TokenType::TK_EQ => (name, Some(value)),
+        [name, open, value, close] if open.kind == TokenType::TK_LP && close.kind == TokenType::TK_RP => (name, Some(value)),
+        _ => return None,
+    };
+    let lower = name.text.to_ascii_lowercase();
+    match (lower.as_slice(), argument) {
+        (b"secure_delete", None) => Some(ConfigPragma::Constant(1)),
+        (b"recursive_triggers", None) => Some(ConfigPragma::Constant(0)),
+        (b"mmap_size", None) => Some(ConfigPragma::MmapSize(None)),
+        (b"mmap_size", Some(value)) => {
+            let text = std::str::from_utf8(value.text).ok()?;
+            let size: i64 = text.parse().ok()?;
+            Some(ConfigPragma::MmapSize(Some(size.clamp(0, MAX_MMAP_SIZE))))
+        }
+        _ => None,
+    }
+}
