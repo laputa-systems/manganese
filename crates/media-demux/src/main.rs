@@ -1,7 +1,13 @@
 mod avio;
+mod bits;
 mod codec;
 mod demuxer;
+mod flac;
+mod flac_decoder;
+mod flac_demux;
+mod flac_parser;
 mod format;
+mod parser;
 mod probe;
 mod rational;
 mod wav;

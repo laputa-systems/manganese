@@ -22,23 +22,28 @@ try:
         const outcome = await new Promise(resolve => {
             media.onloadedmetadata = () => resolve('metadata');
             media.onerror = () => resolve('error');
-            media.src = 'data:audio/wav;base64,' + INPUT;
+            media.src = 'data:' + MIME + ';base64,' + INPUT;
         });
         const number = value => value === Infinity ? 'inf' : value;
         if (outcome === 'error') return {code: media.error.code, message: media.error.message};
         const duration = number(media.duration);
         media.playbackRate = 16;
+        let ended_message = null;
         const ended = await new Promise(resolve => {
             media.onended = () => resolve(null);
-            media.onerror = () => resolve(media.error.code);
+            media.onerror = () => {
+                ended_message = media.error.message;
+                resolve(media.error.code);
+            };
             setTimeout(() => resolve('timeout'), 60000);
             media.play().catch(error => resolve('play ' + error.name));
         });
-        return {duration, final: number(media.duration), ended_code: ended};
+        return {duration, final: number(media.duration), ended_code: ended, ended_message};
     })()'''
     observed = {}
-    for name, data in cases.items():
-        result = client.send('Runtime.evaluate', {'expression': source.replace('INPUT', json.dumps(data)), 'awaitPromise': True,
+    for name, case in cases.items():
+        expression = source.replace('MIME', json.dumps(case['mime'])).replace('INPUT', json.dumps(case['data']))
+        result = client.send('Runtime.evaluate', {'expression': expression, 'awaitPromise': True,
                                                   'returnByValue': True, 'userGesture': True}, session=page, timeout=90)
         if 'exceptionDetails' in result:
             raise RuntimeError(json.dumps(result['exceptionDetails'])[:2000])

@@ -14,8 +14,14 @@ use crate::rational::NOPTS;
 use crate::rational::Rational;
 use crate::rational::Rounding;
 use crate::rational::TIME_BASE;
+use crate::flac_decoder::Decoded;
+use crate::flac_decoder::FlacDecoder;
+use crate::flac_demux;
+use crate::parser;
+use crate::parser::Parser;
 use crate::wav;
 use crate::wav::WavState;
+use crate::avio::AVERROR_INVALIDDATA;
 
 pub const RELATIVE_TS_BASE: i64 = i64::MAX - (1 << 48);
 pub const PKT_FLAG_KEY: u32 = 1;
@@ -88,6 +94,7 @@ pub struct CodecParams {
     pub initial_padding: i32,
     pub seek_preroll: i32,
     pub width: i32,
+    pub height: i32,
 }
 
 impl CodecParams {
@@ -108,21 +115,30 @@ impl CodecParams {
             initial_padding: 0,
             seek_preroll: 0,
             width: 0,
+            height: 0,
         }
     }
 }
 
-#[derive(Clone, Debug)]
+pub struct OpenDecoder {
+    pub channel_conf: bool,
+    pub state: DecoderState,
+}
+
+pub enum DecoderState {
+    Pcm,
+    Flac(Box<FlacDecoder>),
+}
+
 pub struct CodecContext {
     pub params: CodecParams,
     pub delay: i32,
-    pub decoder: Option<&'static str>,
-    pub channel_conf: bool,
+    pub decoder: Option<OpenDecoder>,
 }
 
 impl CodecContext {
     fn new() -> Self {
-        CodecContext { params: CodecParams::new(), delay: 0, decoder: None, channel_conf: false }
+        CodecContext { params: CodecParams::new(), delay: 0, decoder: None }
     }
 
     fn set_parameters(&mut self, params: &CodecParams) {
@@ -152,6 +168,12 @@ impl FoundDecoder {
 pub enum Parsing {
     None,
     FullRaw,
+}
+
+impl Parsing {
+    fn is_some(self) -> bool {
+        self != Parsing::None
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -188,6 +210,8 @@ pub struct Stream {
     probe_packets: i32,
     probe_data: Vec<u8>,
     pub need_parsing: Parsing,
+    parser: Option<Parser>,
+    pub attached_pic: Option<Vec<u8>>,
     pub need_context_update: bool,
     avctx_inited: bool,
     pub skip_samples: i64,
@@ -223,6 +247,8 @@ impl Stream {
             probe_packets: 2500,
             probe_data: Vec::new(),
             need_parsing: Parsing::None,
+            parser: None,
+            attached_pic: None,
             need_context_update: true,
             avctx_inited: false,
             skip_samples: 0,
@@ -275,7 +301,7 @@ impl Stream {
                 }
                 true
             }
-            MediaType::Video => avctx.width != 0,
+            MediaType::Video => avctx.width != 0 && !self.found_decoder.non_negative(),
             MediaType::Unknown => true,
         }
     }
@@ -297,6 +323,7 @@ pub struct FormatContext<'a> {
     max_analyze_duration: i64,
     max_ts_probe: i32,
     pub wav: WavState,
+    pub channel_mask: Option<Vec<u8>>,
 }
 
 pub enum Opened<'a> {
@@ -325,13 +352,20 @@ fn open_decoder(avctx: &mut CodecContext, decoder: &codec::Decoder) -> Step<i32>
     if params.ch_layout.nb_channels > 512 {
         return Ok(EINVAL);
     }
-    if !decoder.name.starts_with("pcm_") {
+    let state = if decoder.name.starts_with("pcm_") {
+        params.format = decoder.sample_fmt;
+        if decoder.raw_bits != 0 {
+            params.bits_per_raw_sample = decoder.raw_bits;
+        }
+        DecoderState::Pcm
+    } else if decoder.name == "flac" {
+        match FlacDecoder::init(params) {
+            Some(flac) => DecoderState::Flac(Box::new(flac)),
+            None => return Ok(AVERROR_INVALIDDATA),
+        }
+    } else {
         return Err(Unemulated("decoder initialization"));
-    }
-    params.format = decoder.sample_fmt;
-    if decoder.raw_bits != 0 {
-        params.bits_per_raw_sample = decoder.raw_bits;
-    }
+    };
     if params.bit_rate == 0 {
         let bits = codec::exact_bits_per_sample(params.codec_id) as i64;
         if bits != 0 {
@@ -342,8 +376,7 @@ fn open_decoder(avctx: &mut CodecContext, decoder: &codec::Decoder) -> Step<i32>
     if params.bits_per_coded_sample < 0 {
         return Ok(EINVAL);
     }
-    avctx.decoder = Some(decoder.name);
-    avctx.channel_conf = decoder.channel_conf;
+    avctx.decoder = Some(OpenDecoder { channel_conf: decoder.channel_conf, state });
     Ok(0)
 }
 
@@ -352,6 +385,21 @@ fn frame_duration(params: &CodecParams, frame_bytes: usize) -> i32 {
     let ch = params.ch_layout.nb_channels as i64;
     if bps > 0 && ch > 0 && frame_bytes > 0 && ch < 32768 && bps < 32768 {
         return ((frame_bytes as i64 * 8) / (bps * ch)).max(0) as i32;
+    }
+    match params.codec_id.0 {
+        "amr_nb" | "gsm" => return 160,
+        "amr_wb" | "gsm_ms" => return 320,
+        "mp1" => return 384,
+        "mp2" => return 1152,
+        "ac3" => return 1536,
+        "ftr" => return 1024,
+        _ => {}
+    }
+    if params.sample_rate > 0 && params.codec_id == Codec("mp3") {
+        return if params.sample_rate <= 24000 { 576 } else { 1152 };
+    }
+    if params.frame_size > 1 && frame_bytes != 0 {
+        return params.frame_size;
     }
     0
 }
@@ -380,16 +428,25 @@ impl<'a> FormatContext<'a> {
             max_analyze_duration: 60 * 1_000_000,
             max_ts_probe: 50,
             wav: WavState::default(),
+            channel_mask: None,
         };
         if matches!(iformat, Format::Aac | Format::Flac | Format::Mp3 | Format::Wav) {
             ctx.id3v2_skip();
         }
         let ret = match iformat {
             Format::Wav => wav::read_header(&mut ctx)?,
+            Format::Flac => flac_demux::read_header(&mut ctx)?,
             _ => return Err(Unemulated("demuxer outside the box scope")),
         };
         if ret < 0 {
             return Ok(Opened::Failed(ret));
+        }
+        for index in 0..ctx.streams.len() {
+            if let Some(picture) = &ctx.streams[index].attached_pic {
+                let mut packet = Packet::new(picture.clone(), -1, index);
+                packet.flags |= PKT_FLAG_KEY;
+                ctx.raw_packet_buffer.push_back(packet);
+            }
         }
         if ctx.data_offset == 0 {
             ctx.data_offset = ctx.pb.tell();
@@ -461,6 +518,7 @@ impl<'a> FormatContext<'a> {
     fn demux_packet(&mut self) -> Step<Result<Packet, i32>> {
         match self.iformat {
             Format::Wav => wav::read_packet(self),
+            Format::Flac => flac_demux::read_packet(self),
             _ => Err(Unemulated("demuxer outside the box scope")),
         }
     }
@@ -688,7 +746,17 @@ impl<'a> FormatContext<'a> {
         if packet.duration <= 0 {
             let st = &self.streams[index];
             let params = if st.avctx_inited { &st.avctx.params } else { &st.codecpar };
-            if params.codec_type == MediaType::Audio {
+            if st.codecpar.codec_type == MediaType::Video && time_base.num as i64 * 1000 > time_base.den as i64 {
+                duration = time_base;
+                packet.duration = rational::rescale_rnd(
+                    1,
+                    time_base.num as i64 * time_base.den as i64,
+                    time_base.den as i64 * time_base.num as i64,
+                    Rounding::Down,
+                    false,
+                );
+            }
+            if st.codecpar.codec_type == MediaType::Audio {
                 let frame_size = frame_duration(params, packet.data.len());
                 let sample_rate = params.sample_rate;
                 if frame_size > 0 && sample_rate > 0 {
@@ -758,6 +826,58 @@ impl<'a> FormatContext<'a> {
         }
     }
 
+    fn parse_packet(&mut self, index: usize, packet: Option<Packet>) -> Step<()> {
+        let flush = packet.is_none();
+        let mut parser = self.streams[index].parser.take().expect("a parsing stream has a parser");
+        let (data, mut pts, mut dts, mut pos, raw_flags, raw_duration) = match &packet {
+            Some(packet) => (&packet.data[..], packet.pts, packet.dts, packet.pos, packet.flags, packet.duration),
+            None => (&[][..], NOPTS, NOPTS, -1, 0, 0),
+        };
+        if data.is_empty() && !flush && parser.common.complete_frames {
+            return Err(Unemulated("empty packet for a complete-frame parser"));
+        }
+        let mut offset = 0usize;
+        let mut got_output = flush;
+        while offset < data.len() || (flush && got_output) {
+            let (len, frame) = parser.parse(&mut self.streams[index].avctx.params, &data[offset..], pts, dts, pos);
+            pts = NOPTS;
+            dts = NOPTS;
+            pos = -1;
+            offset += len;
+            got_output = frame.is_some();
+            let Some(frame) = frame else {
+                continue;
+            };
+            let st = &self.streams[index];
+            let mut out = Packet::new(frame, parser.common.pos, index);
+            out.duration = if parser.common.complete_frames { raw_duration } else { 0 };
+            let sample_rate = st.avctx.params.sample_rate;
+            if st.codecpar.codec_type == MediaType::Audio && sample_rate > 0 && out.duration == 0 && parser.common.duration > 0 {
+                out.duration = rational::rescale_q_rnd(parser.common.duration as i64, Rational::new(1, sample_rate), st.time_base, Rounding::Down, false);
+            }
+            out.pts = parser.common.pts;
+            out.dts = parser.common.dts;
+            out.flags |= raw_flags & (PKT_FLAG_DISCARD | PKT_FLAG_CORRUPT);
+            if st.need_parsing == Parsing::FullRaw {
+                out.pos = parser.common.frame_offset;
+            }
+            let key_frame = parser.common.key_frame;
+            let pict_type = parser.common.pict_type;
+            if key_frame == 1 || (key_frame == -1 && pict_type == crate::parser::PICTURE_TYPE_I) {
+                out.flags |= PKT_FLAG_KEY;
+            }
+            if key_frame == -1 && pict_type == crate::parser::PICTURE_TYPE_NONE && raw_flags & PKT_FLAG_KEY != 0 {
+                out.flags |= PKT_FLAG_KEY;
+            }
+            self.compute_pkt_fields(index, &mut out);
+            self.parse_queue.push_back(out);
+        }
+        if !flush {
+            self.streams[index].parser = Some(parser);
+        }
+        Ok(())
+    }
+
     fn read_frame_internal(&mut self) -> Step<Result<Packet, i32>> {
         let mut got: Option<Packet> = None;
         let mut ret = 0;
@@ -766,6 +886,11 @@ impl<'a> FormatContext<'a> {
                 Err(err) => {
                     if err == EAGAIN {
                         return Ok(Err(err));
+                    }
+                    for index in 0..self.streams.len() {
+                        if self.streams[index].parser.is_some() && self.streams[index].need_parsing.is_some() {
+                            self.parse_packet(index, None)?;
+                        }
                     }
                     ret = err;
                     break;
@@ -779,23 +904,41 @@ impl<'a> FormatContext<'a> {
                             st.avctx.decoder = None;
                             st.found_decoder = FoundDecoder::Unknown;
                         }
+                        if st.parser.is_some() && st.avctx.params.codec_id != st.codecpar.codec_id {
+                            st.parser = None;
+                        }
                         let params = st.codecpar.clone();
                         st.avctx.set_parameters(&params);
                         st.need_context_update = false;
                     }
-                    if self.streams[index].need_parsing != Parsing::None {
-                        if codec::has_parser(self.streams[index].codecpar.codec_id) {
-                            return Err(Unemulated("codec parser"));
-                        }
-                        self.streams[index].need_parsing = Parsing::None;
-                    }
-                    self.compute_pkt_fields(index, &mut packet);
                     let st = &mut self.streams[index];
-                    if packet.flags & PKT_FLAG_KEY != 0 {
+                    if st.need_parsing.is_some() && st.parser.is_none() {
+                        st.parser = parser::init(st.codecpar.codec_id);
+                        match &mut st.parser {
+                            Some(parser) => parser.common.use_codec_ts = st.need_parsing == Parsing::FullRaw,
+                            None if codec::has_parser(st.codecpar.codec_id) => return Err(Unemulated("codec parser")),
+                            None => st.need_parsing = Parsing::None,
+                        }
+                    }
+                    if !st.need_parsing.is_some() || st.parser.is_none() {
+                        self.compute_pkt_fields(index, &mut packet);
+                        got = Some(packet);
+                    } else {
+                        self.parse_packet(index, Some(packet))?;
+                        let st = &mut self.streams[index];
+                        st.codecpar.sample_rate = st.avctx.params.sample_rate;
+                        st.codecpar.bit_rate = st.avctx.params.bit_rate;
+                        st.codecpar.ch_layout = st.avctx.params.ch_layout;
+                        st.codecpar.codec_id = st.avctx.params.codec_id;
+                    }
+                    let st = &mut self.streams[index];
+                    if let Some(packet) = &got
+                        && packet.flags & PKT_FLAG_KEY != 0
+                    {
                         st.skip_to_keyframe = false;
                     }
-                    if !st.skip_to_keyframe {
-                        got = Some(packet);
+                    if st.skip_to_keyframe {
+                        got = None;
                     }
                 }
             }
@@ -844,7 +987,7 @@ impl<'a> FormatContext<'a> {
         Ok(Ok(packet))
     }
 
-    fn try_decode_frame(&mut self, index: usize) -> Step<i32> {
+    fn try_decode_frame(&mut self, index: usize, packet: Option<&[u8]>) -> Step<i32> {
         let st = &mut self.streams[index];
         if st.avctx.decoder.is_none()
             && !matches!(st.found_decoder, FoundDecoder::Found)
@@ -865,11 +1008,33 @@ impl<'a> FormatContext<'a> {
         if !st.found_decoder.non_negative() {
             return Ok(-1);
         }
-        let first_frame_conf = st.codec_info_nb_frames == 0 && st.avctx.channel_conf;
-        if !st.has_codec_parameters() || first_frame_conf {
-            return Err(Unemulated("decoding during stream analysis"));
+        let needs_decoding = |st: &Stream| {
+            let channel_conf = st.avctx.decoder.as_ref().is_some_and(|decoder| decoder.channel_conf);
+            !st.has_codec_parameters() || (st.codec_info_nb_frames == 0 && channel_conf)
+        };
+        if !needs_decoding(st) {
+            return Ok(0);
         }
-        Ok(0)
+        let Some(decoder) = st.avctx.decoder.as_mut() else {
+            return Err(Unemulated("decoding without an open decoder"));
+        };
+        let DecoderState::Flac(flac) = &mut decoder.state else {
+            return Err(Unemulated("decoding during stream analysis"));
+        };
+        if flac.reached_subframes {
+            return Err(Unemulated("FLAC decoding after a decoded frame"));
+        }
+        let Some(mut rest) = packet.filter(|data| !data.is_empty()) else {
+            return Ok(0);
+        };
+        loop {
+            match flac.decode(&mut st.avctx.params, rest) {
+                Decoded::Consumed(consumed) if consumed < rest.len() => rest = &rest[consumed..],
+                Decoded::Consumed(_) => return Ok(0),
+                Decoded::Failed => return Ok(AVERROR_INVALIDDATA),
+                Decoded::ReachedSubframes => return Ok(0),
+            }
+        }
     }
 
     pub fn find_stream_info(&mut self) -> Step<i32> {
@@ -880,8 +1045,15 @@ impl<'a> FormatContext<'a> {
         let mut eof_reached = false;
         for index in 0..self.streams.len() {
             let st = &mut self.streams[index];
-            if st.request_probe <= 0 && st.need_parsing != Parsing::None && codec::has_parser(st.codecpar.codec_id) {
-                return Err(Unemulated("codec parser"));
+            if st.parser.is_none() && st.request_probe <= 0 {
+                st.parser = parser::init(st.codecpar.codec_id);
+                match &mut st.parser {
+                    Some(parser) => parser.common.use_codec_ts = st.need_parsing == Parsing::FullRaw,
+                    None if st.need_parsing.is_some() && codec::has_parser(st.codecpar.codec_id) => {
+                        return Err(Unemulated("codec parser"));
+                    }
+                    None => {}
+                }
             }
             let params = st.codecpar.clone();
             st.avctx.set_parameters(&params);
@@ -916,8 +1088,12 @@ impl<'a> FormatContext<'a> {
                     stopped = true;
                     break;
                 }
+                if st.codecpar.codec_type == MediaType::Video && st.attached_pic.is_none() {
+                    return Err(Unemulated("video stream analysis"));
+                }
+                let ts_probe = if st.attached_pic.is_some() { 1 } else { self.max_ts_probe };
                 if st.first_dts == NOPTS
-                    && st.codec_info_nb_frames < self.max_ts_probe
+                    && st.codec_info_nb_frames < ts_probe
                     && matches!(st.codecpar.codec_type, MediaType::Audio | MediaType::Video)
                 {
                     stopped = true;
@@ -945,9 +1121,12 @@ impl<'a> FormatContext<'a> {
             let index = packet.stream_index;
             let size = packet.data.len() as i64;
             let (dts, packet_duration) = (packet.dts, packet.duration);
+            let data = packet.data.clone();
             self.packet_buffer.push_back(packet);
-            read_size += size;
             let st = &mut self.streams[index];
+            if st.attached_pic.is_none() {
+                read_size += size;
+            }
             if !st.avctx_inited {
                 let params = st.codecpar.clone();
                 st.avctx.set_parameters(&params);
@@ -990,7 +1169,7 @@ impl<'a> FormatContext<'a> {
                     st.codec_info_duration += packet_duration;
                 }
             }
-            self.try_decode_frame(index)?;
+            self.try_decode_frame(index, Some(&data))?;
             self.streams[index].codec_info_nb_frames += 1;
             count += 1;
         }
@@ -1007,7 +1186,7 @@ impl<'a> FormatContext<'a> {
         if flush_codecs {
             for index in 0..self.streams.len() {
                 if self.streams[index].found_decoder == FoundDecoder::Found {
-                    self.try_decode_frame(index)?;
+                    self.try_decode_frame(index, None)?;
                 }
             }
         }
@@ -1039,6 +1218,7 @@ impl<'a> FormatContext<'a> {
                 ret = 0;
             }
             st.avctx_inited = false;
+            st.avctx.decoder = None;
         }
         Ok(ret)
     }

@@ -143,6 +143,7 @@ pub fn has_parser(codec: Codec) -> bool {
 
 pub fn intra_only(codec: Codec) -> bool {
     codec.0.starts_with("pcm_")
+        || matches!(codec.0, "flac" | "mp1" | "mp2" | "mp3" | "vorbis" | "opus" | "mjpeg" | "bmp" | "tiff" | "webp" | "jpegxl")
 }
 
 pub struct Decoder {
@@ -164,7 +165,8 @@ pub fn find_decoder(codec: Codec) -> Option<Decoder> {
         "pcm_f32le" => pcm("pcm_f32le", sample_fmt::FLT, 0),
         "pcm_alaw" => pcm("pcm_alaw", sample_fmt::S16, 0),
         "pcm_mulaw" => pcm("pcm_mulaw", sample_fmt::S16, 0),
-        "aac" | "flac" | "mp3" | "vorbis" | "opus" | "h264" => Some(Decoder { name: codec.0, channel_conf: codec.0 == "aac", sample_fmt: sample_fmt::NONE, raw_bits: 0 }),
+        "aac" | "flac" | "mp3" | "vorbis" | "opus" => Some(Decoder { name: codec.0, channel_conf: true, sample_fmt: sample_fmt::NONE, raw_bits: 0 }),
+        "h264" => Some(Decoder { name: codec.0, channel_conf: false, sample_fmt: sample_fmt::NONE, raw_bits: 0 }),
         _ => None,
     }
 }

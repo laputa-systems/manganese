@@ -29,7 +29,7 @@ const DEMUXER_ERROR_COULD_NOT_PARSE: i32 = 13;
 const DEMUXER_ERROR_NO_SUPPORTED_STREAMS: i32 = 14;
 const DEMUXER_ERROR_DETECTED_HLS: i32 = 22;
 
-pub const SCOPED_FORMATS: &[Format] = &[Format::Wav];
+pub const SCOPED_FORMATS: &[Format] = &[Format::Flac, Format::Wav];
 
 fn time(value: i64) -> String {
     match value {
@@ -441,6 +441,7 @@ pub fn demux(data: &[u8]) -> Step<String> {
         }
         match st.codecpar.codec_type {
             MediaType::Audio => {}
+            MediaType::Video if matches!(st.codecpar.codec_id.0, "gif" | "mjpeg" | "jpegxl" | "png" | "tiff" | "bmp" | "webp") => continue,
             MediaType::Video => return Err(Unemulated("video stream")),
             MediaType::Unknown => continue,
         }

@@ -4,6 +4,8 @@ import random
 import struct
 import subprocess
 
+import flacgen
+
 root = pathlib.Path(__file__).resolve().parents[3]
 fixture_dir = root / '.work/tmp/media-demux/fixtures'
 
@@ -53,6 +55,13 @@ FIXTURES = [
     'components/neterror/resources/sounds/hit.mp3',
     'components/neterror/resources/sounds/button-press.mp3',
     'components/neterror/resources/sounds/score-reached.mp3',
+    'chromeos/ash/resources/public/sounds/focus_mode_ending_moment.flac',
+    'chromeos/ash/resources/public/sounds/power/charging_started_medium.flac',
+    'chromeos/ash/resources/public/sounds/power/charging_started_high.flac',
+    'chrome/browser/resources/intro/sounds/feature_showcase_progress.flac',
+    'chrome/browser/resources/intro/sounds/welcome_back.flac',
+    'chrome/browser/resources/intro/sounds/feature_showcase_ambient.flac',
+    'chrome/browser/resources/intro/sounds/ambient.flac',
 ]
 
 
@@ -385,8 +394,157 @@ def generated(lane):
     return items
 
 
+def flac_generated(lane):
+    seen = lane == 'seen'
+    rng = random.Random(7121 if seen else 3389)
+    items = []
+    g = flacgen
+
+    def add(name, data):
+        items.append((f'flac-{name}', data))
+
+    def simple(channels=2, bps=16, rate=44100, blocksize=4096, frames=12, metadata=(), info=None, **options):
+        out, total, blocks = g.stream(rng, channels, bps, rate, blocksize, frames, **options)
+        return g.flac_file(out, rate, channels, bps, total, blocks, metadata, info), out, total, blocks
+
+    grid = [(1, 8, 8000, 576, 4), (1, 16, 22050, 1152, 11), (2, 16, 44100, 4096, 12), (2, 24, 48000, 4608, 10), (6, 16, 48000, 1024, 15),
+            (8, 24, 96000, 2048, 9), (2, 16, 16000, 192, 40), (4, 16, 32000, 256, 20), (3, 12, 24000, 512, 13), (5, 20, 88200, 8192, 3),
+            (7, 16, 44100, 2304, 10), (2, 32, 192000, 4096, 10), (1, 24, 176400, 16384, 2), (2, 8, 11025, 100, 30), (2, 16, 50000, 1000, 25)] if seen else \
+           [(1, 16, 44100, 4096, 10), (2, 16, 48000, 1152, 14), (2, 24, 96000, 4096, 11), (6, 24, 48000, 4096, 10), (4, 8, 8000, 2304, 9),
+            (8, 16, 44100, 576, 12), (2, 20, 32000, 300, 33), (1, 12, 37800, 2000, 16), (3, 16, 22050, 8192, 5), (2, 16, 64000, 1500, 18)]
+    for channels, bps, rate, blocksize, frames in grid:
+        add(f'{channels}ch-{bps}-{rate}-{blocksize}-{frames}', simple(channels, bps, rate, blocksize, frames)[0])
+    for mode, name in ([(8, 'left-side'), (9, 'right-side'), (10, 'mid-side')] if seen else [(10, 'mid-side'), (8, 'left-side')]):
+        add(f'stereo-{name}', simple(2, 16, 44100, 4096, 12, mode=mode)[0])
+    for kind in (['verbatim', 'constant', 'fixed2'] if seen else ['verbatim', 'fixed2']):
+        add(f'subframe-{kind}', simple(2, 16, 44100, 1152, 12, kind=kind)[0])
+    add('noise', simple(2, 16, 44100, 4096, 11, shape='noise', kind='verbatim')[0])
+    add('silence', simple(1 if seen else 2, 16, 8000, 4096, 12 if seen else 13, shape='silence')[0])
+    add('variable', simple(2, 16, 44100, 0, 0, variable=True, sizes=[4096, 1024, 2048, 4096, 576, 4608, 4096, 192, 4096, 1152, 4096, 4096, 300])[0])
+    add('variable-short', simple(1, 16, 22050, 0, 0, variable=True, sizes=[1024, 2048, 4096])[0])
+    add('blocksize-change', simple(2, 16, 44100, 0, 0, sizes=[4096] * 11 + [1024])[0])
+    for frames in ([1, 2, 5, 9, 10, 11] if seen else [3, 8, 12]):
+        add(f'frames-{frames}', simple(2, 16, 44100, 4096, frames)[0])
+    for name, options in ([('rate-code-12', dict(rate=32000, rate_code=12)), ('rate-code-13', dict(rate=11025, rate_code=13)),
+                           ('rate-code-14', dict(rate=50000, rate_code=14)), ('bps-code-0', dict(bps_code=0))] if seen else
+                          [('rate-code-13', dict(rate=44100, rate_code=13)), ('rate-code-12', dict(rate=48000, rate_code=12)), ('bps-code-0', dict(bps_code=0))]):
+        rate = options.pop('rate', 44100)
+        add(name, simple(2, 16, rate, 4096, 12, **options)[0])
+    add('rate-code-0-single', simple(1, 16, 44100, 4096, 1, rate_code=0)[0])
+    add('rate-code-0-first', simple(1, 16, 44100, 4096, 12, rate_code=None)[0])
+    base, frames, total, blocks = simple(2, 16, 44100, 4096, 12)
+    sizes = [len(f) for f in frames]
+    info = lambda **change: g.streaminfo(change.get('min_block', 4096), change.get('max_block', 4096), min(sizes), max(sizes), change.get('rate', 44100),
+                                         change.get('channels', 2), change.get('bps', 16), change.get('samples', total))
+    infos = {
+        'samples-zero': info(samples=0), 'samples-large': info(samples=total * 3), 'samples-small': info(samples=total // 4),
+        'rate-zero': info(rate=0), 'rate-mismatch': info(rate=22050), 'rate-huge': info(rate=1000000), 'rate-low': info(rate=2000),
+        'channels-mismatch': info(channels=6), 'channels-fewer': info(channels=1), 'bps-mismatch': info(bps=24), 'bps-invalid': info(bps=3),
+        'bps-eight': info(bps=8), 'max-block-small': info(max_block=8, min_block=8), 'max-block-under-frame': info(max_block=1024, min_block=1024),
+        'min-block-small': info(min_block=8), 'min-over-max': info(min_block=8192),
+    }
+    for name in sorted(infos) if seen else sorted(infos)[::3]:
+        add(f'info-{name}', g.flac_file(frames, 44100, 2, 16, total, blocks, info=infos[name]))
+    comment = lambda *pairs: (4, g.vorbis_comment([p for p in pairs]))
+    metadata = {
+        'padding': [(1, bytes(1024))],
+        'application': [(2, b'test' + bytes(20))],
+        'seektable': [(3, g.seektable([(0, 0, 4096), (40960, sum(sizes[:10]), 4096)]))],
+        'seektable-odd': [(3, g.seektable([(0, 0, 4096)]) + b'abc')],
+        'comment': [comment(b'TITLE=Corpus', b'ARTIST=Manganese')],
+        'mask-stereo': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x3')],
+        'mask-decimal': [comment(b'waveformatextensible_channel_mask=3')],
+        'mask-wide': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x603')],
+        'mask-side': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x600')],
+        'mask-zero': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0')],
+        'mask-high': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x40000')],
+        'mask-negative': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=-3')],
+        'mask-octal': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=03')],
+        'mask-text': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=front')],
+        'mask-twice': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x3', b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x4')],
+        'mask-blocks': [comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=x'), comment(b'WAVEFORMATEXTENSIBLE_CHANNEL_MASK=0x3')],
+        'comment-short': [(4, b'\x05\0\0\0ab')],
+        'comment-truncated': [(4, g.vorbis_comment([b'TITLE=x'])[:-3])],
+        'cuesheet': [(5, g.cuesheet())],
+        'cuesheet-short': [(5, g.cuesheet()[:400])],
+        'cuesheet-no-index': [(5, g.cuesheet(index_points=0))],
+        'cuesheet-no-tracks': [(5, g.cuesheet(tracks=0) + bytes(40))],
+        'picture-png': [(6, g.picture())],
+        'picture-jpeg': [(6, g.picture(b'image/jpeg', b'\xff\xd8\xff\xe0' + bytes(60)))],
+        'picture-png-sig-jpeg-mime': [(6, g.picture(b'image/jpeg'))],
+        'picture-unknown-mime': [(6, g.picture(b'image/x-unknown'))],
+        'picture-type-invalid': [(6, g.picture(kind=30))],
+        'picture-width-zero': [(6, g.picture(width=0))],
+        'picture-short': [(6, g.picture()[:30])],
+        'picture-mime-long': [(6, g.picture(b'image/' + b'x' * 70))],
+        'picture-length-large': [(6, g.picture(length=1000))],
+        'picture-two': [(6, g.picture()), (6, g.picture(b'image/gif', b'GIF89a' + bytes(30), kind=4))],
+        'block-reserved': [(9, bytes(12))],
+        'block-invalid': [(127, bytes(4))],
+    }
+    for name in sorted(metadata) if seen else sorted(metadata)[1::3]:
+        add(f'meta-{name}', g.flac_file(frames, 44100, 2, 16, total, blocks, metadata[name]))
+    add('meta-picture-truncated', g.flac_file(frames, 44100, 2, 16, total, blocks, [(6, g.picture(data=b'\x89PNG\r\n\x1a\n' + bytes(56), length=(1 << 24) + 64))]))
+    head = b'fLaC' + g.block(0, info())
+    joined = b''.join(frames)
+    layouts = {
+        'no-marker': joined,
+        'no-marker-at-3': joined[sum(sizes[:3]):],
+        'marker-only': b'fLaC' if seen else b'fLaC\x80\0',
+        'info-only': head,
+        'no-last-flag': b'fLaC' + bytes([0]) + (34).to_bytes(3, 'big') + info() + joined,
+        'comment-first': b'fLaC' + g.block(4, g.vorbis_comment([b'A=b'])) + g.block(0, info(), True) + joined,
+        'padding-first': b'fLaC' + g.block(1, bytes(10)) + g.block(0, info(), True) + joined,
+        'seektable-first': b'fLaC' + g.block(3, g.seektable([(0, 0, 4096)]), True) + joined,
+        'two-streaminfo': b'fLaC' + g.block(0, info()) + g.block(0, info(), True) + joined,
+        'streaminfo-size': b'fLaC' + g.block(0, info() + bytes(2), True) + joined,
+        'block-beyond-end': b'fLaC' + g.block(0, info()) + bytes([0x81]) + (100000).to_bytes(3, 'big') + bytes(10),
+        'junk-before-frames': base[:len(head)] + bytes(range(256)) * 3 + joined,
+        'zeros-before-frames': base[:len(head)] + bytes(5000) + joined,
+        'junk-between': base[:len(head)] + b''.join(f + (bytes(range(7, 250)) if i == 4 else b'') for i, f in enumerate(frames)),
+        'frame-crc-bad': simple(2, 16, 44100, 4096, 12, corrupt=(3,))[0],
+        'frame-crc-bad-first': simple(2, 16, 44100, 4096, 12, corrupt=(0,))[0],
+        'frame-crc-bad-many': simple(2, 16, 44100, 4096, 14, corrupt=(1, 2, 5, 6, 7))[0],
+        'frame-numbers-gap': simple(2, 16, 44100, 4096, 12, numbers=[0, 1, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17])[0],
+        'frame-numbers-start': simple(2, 16, 44100, 4096, 12, numbers=list(range(100, 112)))[0],
+        'frame-numbers-repeat': simple(2, 16, 44100, 4096, 12, numbers=[0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10])[0],
+        'frames-reordered': base[:len(head)] + b''.join(frames[i] for i in [0, 1, 3, 2, 4, 5, 7, 6, 8, 9, 10, 11]),
+        'frames-duplicated': base[:len(head)] + b''.join(frames[:6] + frames[3:]),
+        'trailing-junk': base + bytes(range(256)) * 4,
+        'trailing-id3v1': base + b'TAG' + bytes(125),
+        'id3-prefix': id3(frames=text_frame(b'TIT2', b'flac')) + base,
+        'id3-prefix-twice': id3() + id3(size=11) + base,
+        'mixed-rate-frames': base[:len(head)] + b''.join(frames[:6]) + b''.join(g.stream(rng, 2, 16, 22050, 4096, 6)[0]),
+        'mixed-channels-frames': base[:len(head)] + b''.join(frames[:6]) + b''.join(g.stream(rng, 1, 16, 44100, 4096, 6)[0]),
+        'mixed-bps-frames': base[:len(head)] + b''.join(frames[:6]) + b''.join(g.stream(rng, 2, 24, 44100, 4096, 6)[0]),
+        'long-low-rate': simple(1, 8, 8000, 4096, 150, shape='silence')[0],
+    }
+    for name in sorted(layouts) if seen else sorted(layouts)[::2]:
+        data = layouts[name]
+        if not seen and name.startswith(('junk', 'frames', 'trailing')):
+            data = mutate(data, rng, 1)
+        add(f'layout-{name}', data)
+    full = simple(2, 16, 44100, 1152, 14)[0]
+    cuts = [3, 4, 5, 8, 20, 41, 42, 43, 50, 60, 100, 1000, len(full) // 3, len(full) // 2, len(full) - 2] if seen else \
+        [6, 30, 44, 47, 500, len(full) // 4, len(full) - 7]
+    for cut in cuts:
+        add(f'truncated-{cut}', full[:cut])
+    bases = [simple(2, 16, 44100, 1152, 12)[0], simple(1, 8, 8000, 576, 14)[0], simple(6, 24, 48000, 1024, 11)[0],
+             simple(2, 16, 44100, 4096, 10, metadata=[(4, g.vorbis_comment([b'TITLE=m'])), (6, g.picture())])[0],
+             b''.join(g.stream(rng, 2, 16, 44100, 2048, 12)[0]), simple(2, 16, 44100, 0, 0, variable=True, sizes=[1024, 2048] * 6)[0]]
+    for count in range(50 if seen else 30):
+        add(f'mutated-{count}', mutate(rng.choice(bases), rng))
+    if seen:
+        long_frames, long_total, long_blocks = g.stream(rng, 1, 8, 8000, 4096, 150, shape='silence')
+        long_sizes = [len(f) for f in long_frames]
+        long_info = lambda samples: g.streaminfo(4096, 4096, min(long_sizes), max(long_sizes), 8000, 1, 8, samples)
+        add('layout-long-unknown-duration', g.flac_file(long_frames, 8000, 1, 8, long_total, long_blocks, info=long_info(0)))
+        add('layout-long-duration-grows', g.flac_file(long_frames, 8000, 1, 8, long_total, long_blocks, info=long_info(8000 * 20)))
+    return items
+
+
 def lane_items(lane):
-    items = generated(lane)
+    items = generated(lane) + flac_generated(lane)
     for index, (path, data) in enumerate(fixtures()):
         if (index % 3 == 2) == (lane == 'holdout'):
             items.append(('fixture-' + pathlib.Path(path).name.lower().replace('.', '-'), data))

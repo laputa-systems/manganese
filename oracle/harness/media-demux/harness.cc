@@ -34,7 +34,7 @@
 
 namespace {
 
-const std::set<std::string_view> kScopedDemuxers = {"wav"};
+const std::set<std::string_view> kScopedDemuxers = {"flac", "wav"};
 
 std::string Time(base::TimeDelta value) {
   if (value == media::kNoTimestamp) return "none";
