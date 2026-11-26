@@ -16,6 +16,8 @@ fn main() {
         wire::fail("GOLDENS_SCRATCH is not set");
     };
     let scratch = PathBuf::from(scratch);
+    // SAFETY: main runs before any other thread exists, so no thread reads the environment concurrently.
+    unsafe { std::env::set_var("TURSO_TMPDIR", &scratch) };
     let mut input = std::io::stdin().lock();
     let mut output = std::io::stdout().lock();
     let mut magic = [0u8; 4];
