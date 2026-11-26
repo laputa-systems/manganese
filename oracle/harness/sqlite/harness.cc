@@ -1,6 +1,9 @@
+#include <errno.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <map>
@@ -143,19 +146,29 @@ class Writer {
   std::string out_;
 };
 
-std::string ReadFrame() {
-  unsigned char header[4];
-  size_t got = fread(header, 1, 4, stdin);
-  if (got == 0 && feof(stdin)) {
-    return std::string();
+size_t ReadInput(char* data, size_t length) {
+  size_t got = 0;
+  while (got < length) {
+    ssize_t count = read(STDIN_FILENO, data + got, length - got);
+    if (count < 0 && errno == EINTR) {
+      continue;
+    }
+    if (count < 0) {
+      Fail("cannot read request");
+    }
+    if (count == 0) {
+      break;
+    }
+    got += static_cast<size_t>(count);
   }
-  if (got != 4) {
-    Fail("truncated frame header");
-  }
+  return got;
+}
+
+std::string ReadBody(const unsigned char* header) {
   uint32_t length = uint32_t{header[0]} << 24 | uint32_t{header[1]} << 16 |
                     uint32_t{header[2]} << 8 | header[3];
   std::string body(length, '\0');
-  if (length && fread(body.data(), 1, length, stdin) != length) {
+  if (length && ReadInput(body.data(), length) != length) {
     Fail("truncated frame body");
   }
   return body;
@@ -718,6 +731,18 @@ class Session {
   std::unique_ptr<sql::MetaTable> meta_;
 };
 
+[[noreturn]] void ServeRequest(const char* scratch,
+                               const unsigned char* header) {
+  std::string request = ReadBody(header);
+  std::string response;
+  {
+    Session session(base::FilePath(scratch).AppendASCII("r0"));
+    response = session.Run(request);
+  }
+  WriteFrame(response);
+  _exit(0);
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -728,24 +753,47 @@ int main(int argc, char** argv) {
     Fail("GOLDENS_SCRATCH is not set");
   }
   char magic[4];
-  if (fread(magic, 1, 4, stdin) != 4 || memcmp(magic, "MGB1", 4) != 0) {
+  if (ReadInput(magic, 4) != 4 || memcmp(magic, "MGB1", 4) != 0) {
     Fail("missing MGB1 header");
   }
   if (fwrite("MGB1", 1, 4, stdout) != 4 || fflush(stdout) != 0) {
     Fail("cannot write header");
   }
-  uint64_t counter = 0;
+  // Chromium's sql::Statement::Bind* releases a bound blob before
+  // sqlite3_bind_* refuses a statement that was stepped and not reset, so a
+  // later step reads the freed memory SQLite still holds as SQLITE_STATIC.
+  // Each request therefore runs in a child forked from this process, which
+  // allocates nothing after the handshake, so that memory depends only on the
+  // request.
   for (;;) {
-    std::string request = ReadFrame();
-    if (request.empty() && feof(stdin)) {
+    unsigned char header[4];
+    size_t got = ReadInput(reinterpret_cast<char*>(header), 4);
+    if (got == 0) {
       return 0;
     }
-    std::string response;
-    {
-      Session session(base::FilePath(scratch).AppendASCII(
-          "r" + std::to_string(counter++)));
-      response = session.Run(request);
+    if (got != 4) {
+      Fail("truncated frame header");
     }
-    WriteFrame(response);
+    pid_t child = fork();
+    if (child < 0) {
+      Fail("cannot start a request process");
+    }
+    if (child == 0) {
+      ServeRequest(scratch, header);
+    }
+    int status = 0;
+    while (waitpid(child, &status, 0) < 0) {
+      if (errno != EINTR) {
+        Fail("cannot wait for a request process");
+      }
+    }
+    if (WIFSIGNALED(status)) {
+      fprintf(stderr, "sqlite oracle: request process killed by signal %d\n",
+              WTERMSIG(status));
+      exit(2);
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+      exit(WIFEXITED(status) ? WEXITSTATUS(status) : 2);
+    }
   }
 }
