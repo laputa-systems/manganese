@@ -121,11 +121,6 @@ def page_at(data, index):
     return pos, end
 
 
-def replace_page(data, index, replacement):
-    start, end = page_at(data, index)
-    return data[:start] + replacement + data[end:]
-
-
 def set_granule(data, index, granule):
     start, end = page_at(data, index)
     page = bytearray(data[start:end])
