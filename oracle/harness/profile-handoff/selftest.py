@@ -8,6 +8,9 @@ class Client:
         self.primary = primary
         self.disable_failure = disable_failure
 
+    def page(self):
+        return 'page'
+
     def send(self, method, *args, session=None):
         if method == 'Fetch.disable' and self.disable_failure is not None:
             raise self.disable_failure
