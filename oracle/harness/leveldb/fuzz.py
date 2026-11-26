@@ -58,7 +58,7 @@ def generate(_oracle):
             ops.extend((CLOSE, DESTROY, OPEN))
             snapshots.clear()
     ops.extend((iterate(), CLOSE))
-    return request(flags, [], ops)
+    return request(flags, ops)
 
 
 fuzzdriver.run('leveldb', seed, cases, generate)
