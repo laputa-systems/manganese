@@ -281,6 +281,16 @@ impl Opus {
     fn new() -> Self {
         Opus { pre_skip: 0, need_comments: false, cur_dts: 0, trim_pending: false }
     }
+
+    fn rearm(&mut self, packet: &[u8]) -> Result<(), i32> {
+        if packet.len() < OPUS_HEAD_SIZE || packet[8] & 0xf0 != 0 {
+            return Err(AVERROR_INVALIDDATA);
+        }
+        self.pre_skip = u16::from_le_bytes(packet[10..12].try_into().unwrap()) as i64;
+        self.need_comments = true;
+        self.trim_pending = true;
+        Ok(())
+    }
 }
 
 struct Stream {
@@ -515,6 +525,13 @@ fn deliver(
     page: &Page,
     packet_at: usize,
 ) -> Step<Result<Delivery, i32>> {
+    if streams[index].codec == Kind::Opus && packet.starts_with(b"OpusHead") {
+        let CodecData::Opus(private) = &mut streams[index].codec_data else { unreachable!() };
+        if let Err(err) = private.rearm(packet) {
+            return Ok(Err(err));
+        }
+        return Ok(Ok(Delivery { packet: Packet::new(Vec::new(), pos, index) }));
+    }
     let stream = &mut streams[index];
     if packet.is_empty() {
         return Ok(Err(AVERROR_INVALIDDATA));
