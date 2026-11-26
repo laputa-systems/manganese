@@ -1,0 +1,18 @@
+version 1
+box http1
+revision 7e8b4eb95238059247ebfd735a29c82833b480ee
+arch x86_64
+spec sha256:b52e1897eda432eb5e10ea4a03e08845339377361b755d2a820b55e8723ffbf3
+corpus sha256:4bdd84e6c237fbaeffa23f2cd38b7ae94363da76fa5b5cebdffb3b7d3b77911a seen 631 holdout 320
+oracle .work/tmp/http1/oracle sha256:c4ed31849c7c2cd8470042c8f4f245e53cda94ab9ee5ac391c43d86a59f48dc6
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/http1 sha256:6c772f284ec0faad6b317d1b3aba109191036f80de12c6064ad8b2cf7c724c46
+dependencies cargo-lock sha256:25d46449e17c754f1238d6f0371c77c9fa280b57a3594339febc0acede8039f3 tree sha256:b5695d2864c5ee15fb7b64eafff6cdd0b230ad0dd20055e1a704a1600e782df1
+snapshot vendor/smolith tree b39d9c755f401cc55043f001fcace6f71405a393
+run seen exit 0 items 631 631
+run holdout exit 0 items 320 320
+run fuzz exit 0 seed 1795668973936147081 requested 20000 completed 20000
+run anchor make http1-anchor exit 0
+level source-harness met
+level frozen-browser met: make http1-anchor
+level integration pending: arm64 evidence (public_api: CDP Network views and SOCKS5 egress captures of the frozen arm64 browser) and make closure have not run
