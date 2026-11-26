@@ -47,14 +47,14 @@ def frame(opcode: int, payload: bytes, fin: bool = True, compressed: bool = Fals
     return head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
 
 
-def deflate_payload(payload: bytes, compressor) -> bytes:
+def deflate_payload(payload: bytes, compressor: zlib.Compress) -> bytes:
     data = compressor.compress(payload) + compressor.flush(zlib.Z_SYNC_FLUSH)
     if not data.endswith(b"\x00\x00\xff\xff"):
         raise ValueError("sync flush did not end with the deflate tail")
     return data[:-4]
 
 
-def compressed_frame(payload: bytes, compressor) -> bytes:
+def compressed_frame(payload: bytes, compressor: zlib.Compress) -> bytes:
     return frame(1, deflate_payload(payload, compressor), compressed=True)
 
 
