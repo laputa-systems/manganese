@@ -1,3 +1,5 @@
+use crate::compression::Deflater;
+use crate::compression::Inflater;
 use crate::handler::Handler;
 use crate::handler::Route;
 use crate::handler::Session;
@@ -10,6 +12,7 @@ use crate::websocket::Decoded;
 use crate::websocket::Negotiation;
 use crate::websocket::accept_key;
 use crate::websocket::close_frame;
+use crate::websocket::compressed_text_frame;
 use crate::websocket::decode_frame;
 use crate::websocket::handshake_response;
 use crate::websocket::negotiate_extensions;
@@ -42,6 +45,9 @@ struct WebSocket {
     session: Option<Session>,
     message: Vec<u8>,
     message_compressed: bool,
+    message_started: bool,
+    inflater: Option<Inflater>,
+    deflater: Option<Deflater>,
 }
 
 enum Phase {
@@ -178,15 +184,25 @@ impl Connection {
                 let Phase::WebSocket(websocket) = &mut self.phase else {
                     return false;
                 };
-                if websocket.message.is_empty() {
+                if !websocket.message_started {
+                    websocket.message.clear();
                     websocket.message_compressed = compressed;
+                    websocket.message_started = true;
                 }
                 websocket.message.extend_from_slice(&payload);
                 if fin {
-                    let message = std::mem::take(&mut websocket.message);
+                    websocket.message_started = false;
+                    let mut message = std::mem::take(&mut websocket.message);
                     if std::mem::take(&mut websocket.message_compressed) {
-                        self.close();
-                        return false;
+                        let Some(inflater) = websocket.inflater.as_mut() else {
+                            self.close();
+                            return false;
+                        };
+                        let Some(inflated) = inflater.inflate(&message) else {
+                            self.close();
+                            return false;
+                        };
+                        message = inflated;
                     }
                     self.tasks.push(Task::WebSocketMessage(message));
                 }
@@ -210,7 +226,7 @@ impl Connection {
                 }
             }
             Task::WebSocketMessage(message) => {
-                let Phase::WebSocket(websocket) = &self.phase else {
+                let Phase::WebSocket(websocket) = &mut self.phase else {
                     return;
                 };
                 if websocket.closed {
@@ -219,7 +235,11 @@ impl Connection {
                 if let Some(session) = &websocket.session {
                     let reply = handler.handle_message(session, &message);
                     if !reply.is_empty() {
-                        self.out.extend_from_slice(&text_frame(&reply));
+                        let frame = match websocket.deflater.as_mut().and_then(|deflater| deflater.compress(&reply)) {
+                            Some(payload) => compressed_text_frame(&payload),
+                            None => text_frame(&reply),
+                        };
+                        self.out.extend_from_slice(&frame);
                     }
                 }
             }
@@ -254,7 +274,11 @@ impl Connection {
                     return;
                 }
                 Negotiation::Declined => {}
-                Negotiation::Deflate(response) => extension = Some(response),
+                Negotiation::Deflate(agreement) => {
+                    websocket.deflater = Some(Deflater::new(agreement.server_max_window_bits, !agreement.server_no_context_takeover));
+                    websocket.inflater = Some(Inflater::new(agreement.client_max_window_bits));
+                    extension = Some(agreement.response);
+                }
             }
         }
         websocket.accepted = true;

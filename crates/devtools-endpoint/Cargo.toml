@@ -18,3 +18,4 @@ fastwebsockets = { package = "laputa-fastwebsockets-futures-lite", path = "../..
 sha1 = "0.11"
 base64 = "0.23"
 getrandom = { version = "0.4", features = ["std"] }
+zlib-rs = { path = "../../vendor/zlib-rs", features = ["chromium-compat"] }

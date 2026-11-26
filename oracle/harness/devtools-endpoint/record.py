@@ -13,6 +13,7 @@ import os
 import pathlib
 import struct
 import subprocess
+import zlib
 
 root = pathlib.Path(__file__).resolve().parents[3]
 ADAPTER = root / ".work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint-oracle"
@@ -34,9 +35,9 @@ def get(path: str, host: str | None = "127.0.0.1:9221", method: str = "GET", ver
     return f"{method} {path} {version}\r\n{host_line}{extra}\r\n".encode()
 
 
-def frame(opcode: int, payload: bytes, fin: bool = True) -> bytes:
+def frame(opcode: int, payload: bytes, fin: bool = True, compressed: bool = False) -> bytes:
     mask = b"\x11\x22\x33\x44"
-    head = bytes([(0x80 if fin else 0) | opcode])
+    head = bytes([(0x80 if fin else 0) | (0x40 if compressed else 0) | opcode])
     if len(payload) < 126:
         head += bytes([0x80 | len(payload)])
     elif len(payload) < 65536:
@@ -44,6 +45,17 @@ def frame(opcode: int, payload: bytes, fin: bool = True) -> bytes:
     else:
         head += bytes([0x80 | 127]) + struct.pack(">Q", len(payload))
     return head + mask + bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+
+
+def deflate_payload(payload: bytes, compressor) -> bytes:
+    data = compressor.compress(payload) + compressor.flush(zlib.Z_SYNC_FLUSH)
+    if not data.endswith(b"\x00\x00\xff\xff"):
+        raise ValueError("sync flush did not end with the deflate tail")
+    return data[:-4]
+
+
+def compressed_frame(payload: bytes, compressor) -> bytes:
+    return frame(1, deflate_payload(payload, compressor), compressed=True)
 
 
 def upgrade(path: str, host: str = "127.0.0.1:9221", key: str = KEY, extra: str = "") -> bytes:
@@ -135,6 +147,18 @@ def corpus() -> list[tuple[str, str, bytes]]:
     add("holdout", "ws-version-8", [(get(browser, extra=f"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {KEY}\r\nSec-WebSocket-Version: 8\r\n"), 0)], 1000)
     add("holdout", "ws-protocol-header", [(upgrade(browser, extra="Sec-WebSocket-Protocol: cdp\r\n"), 0)], 1000)
     add("seen", "ws-extensions-header", [(upgrade(browser, extra="Sec-WebSocket-Extensions: permessage-deflate\r\n"), 0)], 1000)
+    deflate_upgrade = upgrade(browser, extra="Sec-WebSocket-Extensions: permessage-deflate\r\n")
+    reset_upgrade = upgrade(browser, extra="Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover; client_no_context_takeover\r\n")
+    get_version = json.dumps({"id": 1, "method": "Browser.getVersion"}, separators=(",", ":")).encode()
+    get_version_again = json.dumps({"id": 2, "method": "Browser.getVersion"}, separators=(",", ":")).encode()
+    add("seen", "ws-browser-deflate-get-version", [(deflate_upgrade, 300), (compressed_frame(get_version, zlib.compressobj(wbits=-15)), 100)], 1500)
+    retained = zlib.compressobj(wbits=-15)
+    add("holdout", "ws-browser-deflate-two-messages", [(deflate_upgrade, 300), (compressed_frame(get_version, retained), 100), (compressed_frame(get_version_again, retained), 100)], 1500)
+    pieces = deflate_payload(get_version, zlib.compressobj(wbits=-15))
+    cut = len(pieces) // 2
+    add("seen", "ws-browser-deflate-fragmented", [(deflate_upgrade, 300), (frame(1, pieces[:cut], fin=False, compressed=True), 100), (frame(0, pieces[cut:]), 100)], 1500)
+    add("holdout", "ws-browser-deflate-no-context-takeover", [(reset_upgrade, 300), (compressed_frame(get_version, zlib.compressobj(wbits=-15)), 100), (compressed_frame(get_version_again, zlib.compressobj(wbits=-15)), 100)], 1500)
+    add("holdout", "ws-browser-compressed-without-offer", [(upgrade(browser), 300), (compressed_frame(get_version, zlib.compressobj(wbits=-15)), 100)], 1500)
     messages = {
         "get-version": [cdp({"id": 1, "method": "Browser.getVersion"})],
         "unknown-method": [cdp({"id": 2, "method": "Nope.nothing"})],

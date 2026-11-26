@@ -3,6 +3,7 @@
 pub mod canonical;
 pub mod cbor;
 pub mod cdp;
+pub mod compression;
 pub mod connection;
 pub mod dispatchable;
 pub mod endpoint;

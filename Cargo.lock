@@ -251,6 +251,7 @@ dependencies = [
  "laputa-fastwebsockets-futures-lite",
  "laputa-smol",
  "sha1",
+ "zlib-rs 0.6.8",
 ]
 
 [[package]]
