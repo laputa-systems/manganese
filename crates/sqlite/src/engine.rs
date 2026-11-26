@@ -5,6 +5,7 @@ use turso_core::Connection;
 use turso_core::ConnectOpts;
 use turso_core::Database;
 use turso_core::DatabaseOpts;
+use turso_core::Dialect;
 use turso_core::LimboError;
 use turso_core::OpenFlags;
 use turso_core::OpenOptions;
@@ -42,7 +43,8 @@ impl Engine {
     pub fn open(path: &str, read_only: bool, triggers_enabled: bool, views_enabled: bool) -> Result<Self, i32> {
         let io: Arc<dyn IO> = Arc::new(PlatformIO::new().map_err(|error| error_code(&error))?);
         let flags = if read_only { OpenFlags::ReadOnly } else { OpenFlags::Create };
-        let options = OpenOptions::new(Arc::new(SqliteDialect))
+        let dialect: Arc<dyn Dialect> = Arc::new(SqliteDialect);
+        let options = OpenOptions::new(dialect.with_icu_functions())
             .flags(flags)
             .db_opts(DatabaseOpts::new().with_views(true).with_vacuum(true).with_without_rowid(true).with_attach(true).with_rollback_journal(true));
         let database = Database::open(io.clone(), path, options).map_err(|error| error_code(&error))?;
