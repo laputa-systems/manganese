@@ -224,3 +224,16 @@ https-fixture-inspect:
 .PHONY: https-fixture-witness
 https-fixture-witness:
 	python3 -B oracle/harness/https/witness.py
+
+.PHONY: jpeg-decode-harness
+jpeg-decode-harness:
+	mkdir -p .work/tmp/jpeg-decode
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/jpeg-decode "$$tag" python3 -B /lane/oracle/harness/jpeg-decode/build.py
+
+.PHONY: jpeg-decode-anchor
+jpeg-decode-anchor:
+	PYTHONPATH=oracle/harness/jpeg-decode python3 -B oracle/harness/jpeg-decode/anchor.py
+
+.PHONY: jpeg-decode-record
+jpeg-decode-record:
+	PYTHONPATH=oracle/harness/jpeg-decode python3 -B oracle/harness/jpeg-decode/record.py
