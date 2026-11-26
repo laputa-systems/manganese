@@ -68,12 +68,16 @@ impl Engine {
     }
 
     pub fn prepare(&self, sql: &str) -> Result<(EngineStatement, usize), i32> {
-        let words = chromium_config::first_statement(sql);
-        if chromium_config::omits(&words) {
+        let first = chromium_config::first_statement(sql);
+        if chromium_config::omits(&first.words) {
             return Err(SQLITE_ERROR);
         }
-        if !self.views_enabled && chromium_config::names_view(&words, &self.view_names()) {
+        if !self.views_enabled && chromium_config::names_view(&first.words, &self.view_names()) {
             return Err(SQLITE_ERROR);
+        }
+        if chromium_config::is_omitted_pragma(&first.words) {
+            let statement = self.connection.prepare("SELECT 1 WHERE 0").map_err(|error| error_code(&error))?;
+            return Ok((EngineStatement { statement, row: Vec::new() }, first.end));
         }
         let statement = self.connection.prepare(sql).map_err(|error| error_code(&error))?;
         let tail = statement.tail_offset();

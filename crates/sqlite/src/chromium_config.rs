@@ -6,17 +6,38 @@ pub struct Word<'a> {
     pub text: &'a [u8],
 }
 
-pub fn first_statement(sql: &str) -> Vec<Word<'_>> {
+pub struct Statement<'a> {
+    pub words: Vec<Word<'a>>,
+    pub end: usize,
+}
+
+pub fn first_statement(sql: &str) -> Statement<'_> {
+    let base = sql.as_ptr() as usize;
     let mut words = Vec::new();
+    let mut end = sql.len();
     for token in Lexer::new(sql.as_bytes()) {
         let Ok(token) = token else { break };
         match token.token_type {
             TokenType::TK_NONE => {}
-            TokenType::TK_SEMI => break,
+            TokenType::TK_SEMI => {
+                end = (token.value.as_ptr() as usize).saturating_sub(base) + token.value.len();
+                break;
+            }
             kind => words.push(Word { kind, text: token.value }),
         }
     }
-    words
+    Statement { words, end: end.min(sql.len()) }
+}
+
+pub fn is_omitted_pragma(words: &[Word<'_>]) -> bool {
+    let name = match words {
+        [pragma, name, ..] if pragma.kind == TokenType::TK_PRAGMA && words.get(2).is_none_or(|word| word.kind != TokenType::TK_DOT) => name,
+        [pragma, _, dot, name, ..] if pragma.kind == TokenType::TK_PRAGMA && dot.kind == TokenType::TK_DOT => name,
+        _ => return false,
+    };
+    ["function_list", "module_list", "pragma_list", "compile_options"]
+        .iter()
+        .any(|omitted| name.text.eq_ignore_ascii_case(omitted.as_bytes()))
 }
 
 fn is_identifier(kind: TokenType) -> bool {
