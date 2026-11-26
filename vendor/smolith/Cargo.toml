@@ -28,3 +28,8 @@ piper = { package = "laputa-piper", version = "0.3.0", path = "crates/piper" }
 polling = { package = "laputa-polling", version = "0.3.0", path = "crates/polling" }
 smol = { package = "laputa-smol", version = "0.3.0", path = "crates/smol" }
 
+futures-io = { version = "0.3.34", default-features = false }
+h12tiny-core = { version = "0.9.0", path = "crates/h12tiny-core", default-features = false }
+h2 = { package = "laputa-h2-futures-lite", version = "=0.4.20-beta.2", path = "crates/laputa-h2-futures-lite", default-features = false }
+hyper = { package = "laputa-hyper-futures-lite", version = "=1.12.0-beta.1", path = "crates/laputa-hyper-futures-lite", default-features = false }
+fastwebsockets = { package = "laputa-fastwebsockets-futures-lite", version = "0.10.2", path = "crates/laputa-fastwebsockets-futures-lite" }
