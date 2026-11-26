@@ -74,16 +74,12 @@ fn read_page(data: &[u8], cursor: &mut usize) -> Option<Page> {
         }
     }
     let start = *cursor;
-    if start + 27 > data.len() || data[start + 4] != 0 {
+    if start + 27 > data.len() {
         *cursor = start + 4;
         return None;
     }
     let flags = data[start + 5];
     let granule = u64::from_le_bytes(data[start + 6..start + 14].try_into().ok()?);
-    if granule > i64::MAX as u64 {
-        *cursor = start + 4;
-        return None;
-    }
     let serial = u32::from_le_bytes(data[start + 14..start + 18].try_into().ok()?);
     let stored = u32::from_be_bytes(data[start + 22..start + 26].try_into().ok()?);
     let segments_len = data[start + 26] as usize;
@@ -105,6 +101,14 @@ fn read_page(data: &[u8], cursor: &mut usize) -> Option<Page> {
     check.extend_from_slice(&data[start + 26..body_end]);
     if page_crc(&check) != stored {
         *cursor = start + 1;
+        return None;
+    }
+    if data[start + 4] != 0 {
+        *cursor = start + 4;
+        return None;
+    }
+    if granule > i64::MAX as u64 {
+        *cursor = data.len();
         return None;
     }
     let mut packets = Vec::new();
@@ -673,6 +677,7 @@ pub fn read_header(ctx: &mut FormatContext<'_>) -> Step<i32> {
     let mut packets = VecDeque::new();
     let mut headers = false;
     let mut last_granules: Vec<u64> = Vec::new();
+    let mut duration_scan_done = false;
     loop {
         let Some(page) = read_page(data, &mut cursor) else {
             if cursor >= data.len().saturating_sub(3) {
@@ -699,6 +704,7 @@ pub fn read_header(ctx: &mut FormatContext<'_>) -> Step<i32> {
             }
             None => {
                 let index = streams.len();
+                duration_scan_done |= index > 0;
                 let _ = ctx.new_stream();
                 ctx.streams[index].set_pts_info(64, 1, 1_000_000);
                 streams.push(Stream {
@@ -718,7 +724,7 @@ pub fn read_header(ctx: &mut FormatContext<'_>) -> Step<i32> {
         };
         let stream = &mut streams[index];
         stream.granule = page.granule;
-        stream.got_data |= page.flags & OGG_FLAG_BOS == 0;
+        stream.got_data = page.flags & OGG_FLAG_BOS == 0;
         if stream.header < 0 {
             let first = page.packets.first().map(Vec::as_slice).unwrap_or_default();
             let codec = find_codec(first);
@@ -744,6 +750,9 @@ pub fn read_header(ctx: &mut FormatContext<'_>) -> Step<i32> {
                     continue;
                 }
             }
+            if streams[index].codec == Kind::Unknown {
+                continue;
+            }
             let result = deliver(ctx, &mut streams, index, packet, page.positions[at] as i64, &page, at)?;
             if let Ok(delivery) = result {
                 if delivery.packet.data.is_empty() {
@@ -754,7 +763,7 @@ pub fn read_header(ctx: &mut FormatContext<'_>) -> Step<i32> {
                 }
             }
         }
-        if page.granule != NOGRANULE && page.granule != 0 {
+        if !duration_scan_done && page.granule != NOGRANULE && page.granule != 0 {
             last_granules.resize(streams.len(), NOGRANULE);
             last_granules[index] = page.granule;
         }
