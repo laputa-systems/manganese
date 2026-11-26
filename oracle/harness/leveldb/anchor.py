@@ -1,4 +1,5 @@
 import hashlib
+import itertools
 import json
 import os
 import pathlib
@@ -46,13 +47,48 @@ shutil.copyfile(fixture, store / digest)
 
 oracle = root / '.work/tmp/leveldb/oracle'
 candidate = root / '.work/tmp/target/x86_64-unknown-linux-musl/debug/leveldb'
-for index, database in enumerate(sorted(databases)):
-    copies = [run_dir / f'copy-{index}-{role}' for role in ('oracle', 'candidate')]
+
+
+copy_numbers = itertools.count()
+
+
+def agree(command: str, path: pathlib.Path, label: str) -> list[str]:
+    number = next(copy_numbers)
+    copies = [run_dir / f'copy-{number}-{role}' for role in ('oracle', 'candidate')]
     for copy in copies:
-        shutil.copytree(database, copy)
-    reference = subprocess.run([str(oracle), 'read', str(copies[0])], capture_output=True, check=True, timeout=120).stdout
-    actual = subprocess.run([str(candidate), 'read', str(copies[1])], capture_output=True, check=True, timeout=120).stdout
+        if path.is_dir():
+            shutil.copytree(path, copy)
+        else:
+            shutil.copyfile(path, copy)
+    reference = subprocess.run([str(oracle), command, str(copies[0])], capture_output=True, check=True, timeout=120).stdout
+    actual = subprocess.run([str(candidate), command, str(copies[1])], capture_output=True, check=True, timeout=120).stdout
     if not reference or reference != actual:
-        raise RuntimeError(f'profile database mismatch: {database.relative_to(session.profile)}')
-    print(f'anchor {database.relative_to(session.profile)}: {len(reference.splitlines())} entries agree')
+        raise RuntimeError(f'{label} mismatch: {path.relative_to(session.profile)}')
+    return reference.decode().splitlines()
+
+
+entries = {'Local Storage': 0, 'IndexedDB': 0}
+for database in sorted(databases):
+    kind = 'Local Storage' if 'Local Storage' in database.parts else 'IndexedDB'
+    if kind == 'Local Storage':
+        lines = agree('read', database, 'database')
+        if not lines or lines[-1] != 'status 0' or len(lines) < 2:
+            raise RuntimeError(f'Local Storage database did not read back: {lines[-1:]}')
+        print(f'anchor {database.relative_to(session.profile)}: {len(lines) - 1} entries agree')
+    for file in sorted(database.iterdir()):
+        if file.suffix in ('.ldb', '.sst'):
+            lines = agree('read-table', file, 'table')
+            count = sum(1 for line in lines if not line.startswith(('status ', 'open ')))
+        elif file.suffix == '.log':
+            lines = agree('read-log', file, 'log')
+            count = sum(1 for line in lines if line.startswith(('put ', 'delete ')))
+        else:
+            continue
+        if lines[-1] != 'status 0':
+            raise RuntimeError(f'{file.relative_to(session.profile)} did not read cleanly: {lines[-1]}')
+        entries[kind] += count
+        print(f'anchor {file.relative_to(session.profile)}: {count} records agree')
+for kind, count in entries.items():
+    if count == 0:
+        raise RuntimeError(f'no {kind} records were read from table or log files')
 print(f'profile workload {result}; database archive sha256:{digest}')

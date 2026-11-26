@@ -16,9 +16,13 @@
 #include "base/at_exit.h"
 #include "base/command_line.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
+#include "db/log_reader.h"
+#include "db/write_batch_internal.h"
 #include "leveldb/db.h"
+#include "leveldb/env.h"
 #include "leveldb/filter_policy.h"
 #include "leveldb/iterator.h"
+#include "leveldb/table.h"
 #include "leveldb/write_batch.h"
 #include "third_party/leveldatabase/env_chromium.h"
 
@@ -407,6 +411,86 @@ int ReadDatabase(const char* path) {
   return 0;
 }
 
+int ReadTable(const char* path) {
+  leveldb_env::Options options;
+  uint64_t size = 0;
+  auto status = options.env->GetFileSize(path, &size);
+  leveldb::RandomAccessFile* file = nullptr;
+  if (status.ok()) status = options.env->NewRandomAccessFile(path, &file);
+  std::unique_ptr<leveldb::RandomAccessFile> owned(file);
+  leveldb::Table* table = nullptr;
+  if (status.ok()) status = leveldb::Table::Open(options, file, size, &table);
+  std::unique_ptr<leveldb::Table> owned_table(table);
+  if (!status.ok()) {
+    std::printf("open %d\n", Code(status));
+    return 0;
+  }
+  leveldb::ReadOptions read;
+  read.verify_checksums = true;
+  std::unique_ptr<leveldb::Iterator> it(table->NewIterator(read));
+  for (it->SeekToFirst(); it->Valid(); it->Next()) {
+    Hex(std::string_view(it->key().data(), it->key().size()));
+    std::printf(" ");
+    Hex(std::string_view(it->value().data(), it->value().size()));
+    std::printf("\n");
+  }
+  std::printf("status %d\n", Code(it->status()));
+  return 0;
+}
+
+class FirstCorruption : public leveldb::log::Reader::Reporter {
+ public:
+  void Corruption(size_t, const leveldb::Status& status) override {
+    if (status_.ok()) status_ = status;
+  }
+  leveldb::Status status_;
+};
+
+class BatchPrinter : public leveldb::WriteBatch::Handler {
+ public:
+  void Put(const leveldb::Slice& key, const leveldb::Slice& value) override {
+    std::printf("put ");
+    Hex(std::string_view(key.data(), key.size()));
+    std::printf(" ");
+    Hex(std::string_view(value.data(), value.size()));
+    std::printf("\n");
+  }
+  void Delete(const leveldb::Slice& key) override {
+    std::printf("delete ");
+    Hex(std::string_view(key.data(), key.size()));
+    std::printf("\n");
+  }
+};
+
+int ReadLog(const char* path) {
+  leveldb_env::Options options;
+  leveldb::SequentialFile* file = nullptr;
+  auto status = options.env->NewSequentialFile(path, &file);
+  std::unique_ptr<leveldb::SequentialFile> owned(file);
+  if (!status.ok()) {
+    std::printf("open %d\n", Code(status));
+    return 0;
+  }
+  FirstCorruption reporter;
+  leveldb::log::Reader reader(file, &reporter, true, 0);
+  leveldb::Slice record;
+  std::string scratch;
+  while (reader.ReadRecord(&record, &scratch)) {
+    if (record.size() < 12) {
+      std::printf("short %zu\n", record.size());
+      continue;
+    }
+    leveldb::WriteBatch batch;
+    leveldb::WriteBatchInternal::SetContents(&batch, record);
+    std::printf("batch %llu %d\n", static_cast<unsigned long long>(leveldb::WriteBatchInternal::Sequence(&batch)),
+                leveldb::WriteBatchInternal::Count(&batch));
+    BatchPrinter printer;
+    std::printf("batch-status %d\n", Code(batch.Iterate(&printer)));
+  }
+  std::printf("status %d\n", Code(reporter.status_));
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -416,6 +500,8 @@ int main(int argc, char** argv) {
   int result = 2;
   if (argc == 1) result = Serve();
   else if (argc == 3 && std::string_view(argv[1]) == "read") result = ReadDatabase(argv[2]);
+  else if (argc == 3 && std::string_view(argv[1]) == "read-table") result = ReadTable(argv[2]);
+  else if (argc == 3 && std::string_view(argv[1]) == "read-log") result = ReadLog(argv[2]);
   base::ThreadPoolInstance::Get()->Shutdown();
   return result;
 }
