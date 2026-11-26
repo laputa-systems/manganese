@@ -153,3 +153,16 @@ zstd-anchor:
 protobuf-harness:
 	mkdir -p .work/tmp/protobuf
 	docker run --rm --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/protobuf $$(sh oracle/source-oracle image-tag) python3 -B /lane/oracle/harness/protobuf/build.py
+
+.PHONY: http1-harness
+http1-harness:
+	mkdir -p .work/tmp/http1
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/http1 "$$tag" python3 -B /lane/oracle/harness/http1/build.py
+
+.PHONY: http1-record
+http1-record:
+	python3 -B oracle/harness/http1/record.py
+
+.PHONY: http1-anchor
+http1-anchor:
+	PYTHONPATH=oracle/harness/http1 python3 -B oracle/harness/http1/anchor.py
