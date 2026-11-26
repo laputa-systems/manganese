@@ -30,7 +30,7 @@ const DEMUXER_ERROR_COULD_NOT_PARSE: i32 = 13;
 const DEMUXER_ERROR_NO_SUPPORTED_STREAMS: i32 = 14;
 const DEMUXER_ERROR_DETECTED_HLS: i32 = 22;
 
-pub const SCOPED_FORMATS: &[Format] = &[Format::Flac, Format::Mp3, Format::Wav];
+pub const SCOPED_FORMATS: &[Format] = &[Format::Flac, Format::Mp3, Format::Ogg, Format::Wav];
 
 fn time(value: i64) -> String {
     match value {
@@ -247,9 +247,6 @@ fn audio_config(par: &CodecParams) -> Step<Option<AudioConfig>> {
     if layout != LAYOUT_DISCRETE && LAYOUT_CHANNELS[layout as usize] != par.ch_layout.nb_channels {
         layout = guess_channel_layout(par.ch_layout.nb_channels);
     }
-    if par.seek_preroll > 0 {
-        return Err(Unemulated("seek preroll"));
-    }
     let extra_data = match &par.extradata {
         Some(data) if data.is_empty() => return Ok(None),
         Some(data) => data.clone(),
@@ -267,7 +264,7 @@ fn audio_config(par: &CodecParams) -> Step<Option<AudioConfig>> {
         channels,
         samples_per_second: par.sample_rate,
         extra_data,
-        seek_preroll: 0,
+        seek_preroll: rational::rescale(par.seek_preroll as i64, 1_000_000, par.sample_rate.max(1) as i64),
         codec_delay,
     };
     let bytes = bytes_per_channel(config.sample_format);
@@ -290,6 +287,8 @@ struct DemuxStream {
     last_packet_pos: i64,
     last_packet_dts: i64,
     last_packet_timestamp: i64,
+    last_packet_duration: i64,
+    fixup_chained_ogg: bool,
     initial_start_padding: Option<i64>,
     ranges: Ranges,
     output: String,
@@ -333,7 +332,7 @@ struct Host {
 }
 
 impl DemuxStream {
-    fn enqueue(&mut self, packet: &mut Packet, container: Format, host: &mut Host, buffered_changed: &mut bool) -> Step<()> {
+    fn enqueue(&mut self, packet: &mut Packet, container: Format, start: i64, host: &mut Host, buffered_changed: &mut bool) -> Step<()> {
         let packet_dts = if packet.dts == NOPTS { packet.pts } else { packet.dts };
         if self.last_packet_pos != NOPTS {
             if packet.pos == -1 {
@@ -358,15 +357,25 @@ impl DemuxStream {
         let payload = &packet.data[data_offset..];
         let d = convert(self.time_base, packet.duration);
         let duration = if d <= 1000 { NO_TIMESTAMP } else { d };
-        let timestamp = convert(self.time_base, packet.pts);
+        let mut timestamp = convert(self.time_base, packet.pts);
+        if self.config.codec_delay != 0 && start < 0 && timestamp != NO_TIMESTAMP {
+            timestamp -= start;
+        }
+        if self.fixup_chained_ogg
+            && (timestamp == NO_TIMESTAMP
+                || (self.last_packet_timestamp != NO_TIMESTAMP && timestamp < self.last_packet_timestamp))
+        {
+            timestamp = if self.last_packet_timestamp != NO_TIMESTAMP {
+                self.last_packet_timestamp + self.last_packet_duration.max(1)
+            } else {
+                0
+            };
+        }
         if timestamp == NO_TIMESTAMP || timestamp == INFINITE {
             host.errors.push(DEMUXER_ERROR_COULD_NOT_PARSE);
             return Ok(());
         }
         let padding = discard_padding(packet, self.config.samples_per_second);
-        if self.config.codec_delay != 0 {
-            return Err(Unemulated("codec delay"));
-        }
         if self.last_packet_timestamp != NO_TIMESTAMP && self.last_packet_timestamp < timestamp && timestamp >= 0 {
             self.ranges.add(self.last_packet_timestamp, timestamp);
             *buffered_changed = true;
@@ -377,6 +386,7 @@ impl DemuxStream {
             self.initial_start_padding = Some(start_padding);
         }
         self.last_packet_timestamp = timestamp;
+        self.last_packet_duration = duration;
         let is_padding = duration == add_time(start_padding, end_padding);
         let new_duration = timestamp - self.initial_start_padding.unwrap_or(0);
         if (!is_padding && new_duration > self.duration) || self.duration == NO_TIMESTAMP {
@@ -478,6 +488,8 @@ pub fn demux(data: &[u8]) -> Step<String> {
             last_packet_pos: NOPTS,
             last_packet_dts: NOPTS,
             last_packet_timestamp: NO_TIMESTAMP,
+            last_packet_duration: 0,
+            fixup_chained_ogg: ctx.iformat == Format::Ogg,
             initial_start_padding: None,
             ranges: Ranges::default(),
             output: String::new(),
@@ -531,7 +543,7 @@ pub fn demux(data: &[u8]) -> Step<String> {
         };
         let mut buffered_changed = false;
         if stream.enabled {
-            stream.enqueue(&mut packet, ctx.iformat, &mut host, &mut buffered_changed)?;
+            stream.enqueue(&mut packet, ctx.iformat, demuxer_start, &mut host, &mut buffered_changed)?;
         }
         if duration_known && stream.duration != NO_TIMESTAMP && stream.duration > duration {
             duration = stream.duration;

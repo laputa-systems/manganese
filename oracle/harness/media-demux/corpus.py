@@ -6,6 +6,7 @@ import subprocess
 
 import flacgen
 import mp3gen
+import ogggen
 
 root = pathlib.Path(__file__).resolve().parents[3]
 fixture_dir = root / '.work/tmp/media-demux/fixtures'
@@ -741,8 +742,62 @@ def mp3_generated(lane):
     return items
 
 
+def ogg_generated(lane):
+    seen = lane == 'seen'
+    rng = random.Random(6187 if seen else 9137)
+    items = []
+
+    def add(name, data):
+        items.append((f'ogg-{name}', data))
+
+    grid = [(1, 8, 2, 0, 1), (2, 0, 2, 312, 3), (5, 16, 1, 1024, 1), (9, 24, 2, 0, 20),
+            (21, 8, 1, 312, 20), (40, 0, 2, 128, 7), (100, 8, 2, 312, 20)] if seen else \
+           [(3, 8, 1, 0, 2), (6, 16, 2, 312, 1), (12, 24, 1, 1024, 20), (31, 0, 2, 0, 5), (75, 8, 2, 312, 20)]
+    for count, toc, channels, pre_skip, per_page in grid:
+        add(f'opus-{count}-{toc}-{channels}-{pre_skip}-{per_page}',
+            ogggen.opus(count, toc=toc, channels=channels, pre_skip=pre_skip, per_page=per_page))
+    for count in ([1, 2, 3, 4, 5] if seen else [2, 3, 5]):
+        add(f'opus-multi-{count}', ogggen.opus(count, toc=8, payload=bytes(count + 1 + (not seen)), per_page=1))
+    add('opus-vbr-toc', ogggen.opus(60, toc=11 if seen else 13, payload=b'\x01\x01' if seen else b'\0', per_page=3))
+    add('opus-comments', ogggen.opus(80, comments=[b'TITLE=Test', b'ARTIST=Author'], vendor=b'Manganese' if seen else b'Holdout'))
+    add('opus-empty-comment', ogggen.opus(60, comments=[b''], vendor=b'' if seen else b' '))
+    add('opus-head-18', ogggen.opus(60, head_size=18 if seen else 17))
+    add('opus-tags-short', ogggen.opus(60, tags_size=4 if seen else 9))
+    base = ogggen.opus(80, per_page=20, pre_skip=312 if seen else 313)
+    add('opus-crc-first', ogggen.corrupt_crc(base))
+    add('opus-version-one', ogggen.bad_version(base))
+    add('opus-no-tags', ogggen.opus(80, drop_tags=True, pre_skip=312 if seen else 313))
+    add('opus-no-eos', ogggen.opus(80, drop_eos=True, pre_skip=312 if seen else 313))
+    add('opus-granule-shift', ogggen.opus(80, granule_shift=960 if seen else -960, pre_skip=312 if seen else 313))
+    add('opus-granule-zero', ogggen.opus(80, end_granule=0, pre_skip=312 if seen else 313))
+    add('opus-chained', ogggen.chained(base, base, count=40 if seen else 30))
+    start, end = ogggen.page_at(base, 2)
+    add('opus-page2-only', base[start:end])
+    add('opus-truncated-page', base[:end - 7])
+    add('opus-truncated-header', base[:17 if seen else 23])
+    add('opus-trailing-junk', base + bytes(range(1, 80)))
+    add('opus-junk-prefix', bytes(range(1, 40)) + base)
+    add('opus-long', ogggen.opus(1500 if seen else 1200, per_page=20))
+
+    vorbis = [data for _, data in fixtures() if data.startswith(b'OggS') and b'\x01vorbis' in data[:80]]
+    for index, data in enumerate(vorbis):
+        label = f'vorbis-{index}'
+        data = ogggen.set_granule(data, 0, 1 if seen else 2)
+        add(label, data)
+        add(f'{label}-crc', ogggen.corrupt_crc(data))
+        add(f'{label}-version', ogggen.bad_version(data))
+        add(f'{label}-trailing', data + bytes(range(1, 64)))
+        _, end = ogggen.page_at(data, 2)
+        add(f'{label}-no-last-page', data[:end])
+        add(f'{label}-truncated', data[:end - 11])
+    for count in range(30 if seen else 18):
+        source = rng.choice([base, *vorbis])
+        add(f'mutated-{count}', mutate(source, rng))
+    return items
+
+
 def lane_items(lane):
-    items = generated(lane) + flac_generated(lane) + mp3_generated(lane)
+    items = generated(lane) + flac_generated(lane) + mp3_generated(lane) + ogg_generated(lane)
     for index, (path, data) in enumerate(fixtures()):
         if (index % 3 == 2) == (lane == 'holdout'):
             items.append(('fixture-' + pathlib.Path(path).name.lower().replace('.', '-'), data))

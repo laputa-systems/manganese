@@ -11,6 +11,7 @@ mod format;
 mod id3v2;
 mod mp3;
 mod mpegaudio;
+mod ogg;
 mod parser;
 mod probe;
 mod rational;

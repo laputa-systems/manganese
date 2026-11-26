@@ -12,6 +12,8 @@ use crate::id3v2;
 use crate::mp3;
 use crate::mp3::Mp3Decoded;
 use crate::mp3::Mp3State;
+use crate::ogg;
+use crate::ogg::OggState;
 use crate::probe;
 use crate::probe::Format;
 use crate::rational;
@@ -142,6 +144,8 @@ pub enum DecoderState {
     Pcm,
     Flac(Box<FlacDecoder>),
     Mp3,
+    Vorbis,
+    Opus,
 }
 
 pub struct CodecContext {
@@ -325,6 +329,7 @@ impl Stream {
 
 pub struct FormatContext<'a> {
     pub pb: Avio<'a>,
+    pub data: &'a [u8],
     pub iformat: Format,
     pub streams: Vec<Stream>,
     pub start_time: i64,
@@ -340,6 +345,7 @@ pub struct FormatContext<'a> {
     max_ts_probe: i32,
     pub wav: WavState,
     pub mp3: Mp3State,
+    pub ogg: OggState,
     pub metadata: Dict,
     pub id3v2_meta: Dict,
     pub channel_mask: Option<Vec<u8>>,
@@ -385,6 +391,12 @@ fn open_decoder(avctx: &mut CodecContext, decoder: &codec::Decoder) -> Step<i32>
     } else if decoder.name == "mp3" {
         params.format = sample_fmt::S16P;
         DecoderState::Mp3
+    } else if decoder.name == "vorbis" {
+        params.format = sample_fmt::FLTP;
+        DecoderState::Vorbis
+    } else if decoder.name == "opus" {
+        params.format = sample_fmt::S16;
+        DecoderState::Opus
     } else {
         return Err(Unemulated("decoder initialization"));
     };
@@ -436,6 +448,7 @@ impl<'a> FormatContext<'a> {
         let iformat = probed.format.expect("a successful probe names a format");
         let mut ctx = FormatContext {
             pb,
+            data,
             iformat,
             streams: Vec::new(),
             start_time: NOPTS,
@@ -451,18 +464,20 @@ impl<'a> FormatContext<'a> {
             max_ts_probe: 50,
             wav: WavState::default(),
             mp3: Mp3State::default(),
+            ogg: OggState::default(),
             metadata: Dict::default(),
             id3v2_meta: Dict::default(),
             channel_mask: None,
         };
         let mut pictures = Vec::new();
-        if matches!(iformat, Format::Aac | Format::Flac | Format::Mp3 | Format::Wav) {
+        if matches!(iformat, Format::Aac | Format::Flac | Format::Mp3 | Format::Ogg | Format::Wav) {
             id3v2::read_dict(&mut ctx.pb, &mut ctx.id3v2_meta, &mut pictures);
         }
         let ret = match iformat {
             Format::Wav => wav::read_header(&mut ctx)?,
             Format::Flac => flac_demux::read_header(&mut ctx)?,
             Format::Mp3 => mp3::read_header(&mut ctx)?,
+            Format::Ogg => ogg::read_header(&mut ctx)?,
             _ => return Err(Unemulated("demuxer outside the box scope")),
         };
         if ret < 0 {
@@ -513,6 +528,7 @@ impl<'a> FormatContext<'a> {
             Format::Wav => wav::read_packet(self),
             Format::Flac => flac_demux::read_packet(self),
             Format::Mp3 => mp3::read_packet(self),
+            Format::Ogg => ogg::read_packet(self),
             _ => Err(Unemulated("demuxer outside the box scope")),
         }
     }
@@ -1020,6 +1036,13 @@ impl<'a> FormatContext<'a> {
         let Some(decoder) = st.avctx.decoder.as_mut() else {
             return Err(Unemulated("decoding without an open decoder"));
         };
+        if matches!(decoder.state, DecoderState::Vorbis | DecoderState::Opus) {
+            if packet.is_some_and(|data| !data.is_empty()) {
+                st.nb_decoded_frames += 1;
+                return Ok(1);
+            }
+            return Ok(0);
+        }
         if let DecoderState::Mp3 = decoder.state {
             let Some(data) = packet.filter(|data| !data.is_empty()) else {
                 return Ok(0);
