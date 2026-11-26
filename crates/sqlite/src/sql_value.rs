@@ -26,7 +26,7 @@ impl SqlValue {
             ValueRef::Null => Self::Null,
             ValueRef::Numeric(Numeric::Integer(value)) => Self::Integer(value),
             ValueRef::Numeric(Numeric::Float(value)) => Self::Float(f64::from(value)),
-            ValueRef::Text(text) => Self::Text(text.as_str().as_bytes().to_vec()),
+            ValueRef::Text(text) => Self::Text(text.as_bytes().to_vec()),
             ValueRef::Blob(blob) => Self::Blob(blob.to_vec()),
         }
     }
@@ -36,7 +36,7 @@ impl SqlValue {
             Self::Null => Value::Null,
             Self::Integer(value) => Value::from_i64(*value),
             Self::Float(value) => Value::from_f64(*value),
-            Self::Text(bytes) => Value::build_text(String::from_utf8_lossy(bytes).into_owned()),
+            Self::Text(bytes) => Value::from_text_bytes(bytes.clone()),
             Self::Blob(bytes) => Value::from_slice(bytes).expect("blob allocation"),
         }
     }
