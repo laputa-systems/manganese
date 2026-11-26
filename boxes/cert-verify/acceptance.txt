@@ -1,0 +1,17 @@
+version 1
+box cert-verify
+revision bb5dbc667473bda12c62845dd1516948ff8b2a8c
+arch x86_64
+spec sha256:80cdb0fd13001931b443d02974445ed040df4b83148eb89bc25cc291d777626f
+corpus sha256:9125eda017df77a9bdef3c13ff96034bda46754d54eaf0487263bd12dad4e839 seen 1479 holdout 811
+oracle .work/tmp/cert-verify/oracle sha256:8b4be8839318dc46699c8e2ccdbad4dc40baea00d21902b12ea8b2ee2f03af64
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/cert-verify sha256:34409c9eb4763e3a1bac9ed1f9affdd16a821f537d117524cad8a60de931a69b
+dependencies cargo-lock sha256:c5e2039acbbed905b8bad92afd9838313060ff932e477c8180da82c64c90c81a tree sha256:17f0ad385f44f28979daf8204bd2bd32d76058097868043d528ebbfdf015bc3d
+run seen exit 0 items 1479 1479
+run holdout exit 0 items 811 811
+run fuzz exit 0 seed 1795702987901909214 requested 10000 completed 10000
+run anchor make cert-verify-anchor exit 0
+level source-harness met
+level frozen-browser met: make cert-verify-anchor
+level integration pending: arm64 evidence (public_api: navigation net errors and CDP security details of the frozen arm64 browser for the anchor's chains) and make closure have not run

@@ -192,3 +192,23 @@ media-demux-record:
 .PHONY: media-demux-anchor
 media-demux-anchor:
 	PYTHONPATH=oracle/harness/media-demux python3 -B oracle/harness/media-demux/anchor.py
+
+.PHONY: cert-verify-harness
+cert-verify-harness:
+	mkdir -p .work/tmp/cert-verify
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/cert-verify "$$tag" python3 -B /lane/oracle/harness/cert-verify/build.py
+
+.PHONY: cert-verify-record
+cert-verify-record:
+	mkdir -p .work/tmp/cert-verify
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --user "$$(id -u):$$(id -g)" --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/cert-verify -w /lane/oracle/harness/cert-verify "$$tag" python3 -B cases.py /work/src /lane/.work/tmp/cert-verify/cases.bin
+	python3 -B oracle/harness/cert-verify/record.py
+
+.PHONY: cert-verify-trust-data
+cert-verify-trust-data:
+	.work/tmp/cert-verify/oracle --dump-trust-data > crates/cert-verify/data/trust-data.txt.tmp
+	mv crates/cert-verify/data/trust-data.txt.tmp crates/cert-verify/data/trust-data.txt
+
+.PHONY: cert-verify-anchor
+cert-verify-anchor:
+	python3 -B oracle/harness/cert-verify/anchor.py
