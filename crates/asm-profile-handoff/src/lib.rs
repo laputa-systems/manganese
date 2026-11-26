@@ -95,16 +95,28 @@ pub fn storage_key(name: &str) -> Vec<u8> {
 }
 
 pub fn encode_text(value: &str) -> Vec<u8> {
-    let mut encoded = vec![1u8];
-    encoded.extend_from_slice(value.as_bytes());
-    encoded
+    if value.chars().all(|character| (character as u32) <= 0xff) {
+        let mut encoded = vec![1u8];
+        encoded.extend(value.chars().map(|character| character as u8));
+        encoded
+    } else {
+        let mut encoded = vec![0u8];
+        for unit in value.encode_utf16() {
+            encoded.extend_from_slice(&unit.to_le_bytes());
+        }
+        encoded
+    }
 }
 
 pub fn decode_text(encoded: &[u8]) -> Option<String> {
-    if encoded.first() != Some(&1) {
-        return None;
+    match encoded.split_first()? {
+        (1, bytes) => Some(bytes.iter().map(|byte| char::from(*byte)).collect()),
+        (0, bytes) if bytes.len() % 2 == 0 => {
+            let units: Vec<u16> = bytes.chunks_exact(2).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect();
+            String::from_utf16(&units).ok()
+        }
+        _ => None,
     }
-    std::str::from_utf8(&encoded[1..]).ok().map(str::to_string)
 }
 
 pub fn open(profile: &Path) -> DB {

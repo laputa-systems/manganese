@@ -51,8 +51,8 @@ fn step3_frozen_browser_reopens_the_manganese_written_profile() {
     let root = repo_root();
     let profile = hydrogen_profile(&root);
     changed(&profile);
-    let outcome = browser(&root, "read", &profile, Some(("gamma", GAMMA)));
-    assert_browser_saw(&outcome, &[INDEXED, "\"beta\": null", "\"local\": 2"]);
+    let outcome = browser(&root, "read", &profile, Some(("alpha", CHANGED_ALPHA)));
+    assert_browser_saw(&outcome, &[INDEXED, "\"beta\": null", "\"local\": 2", GAMMA]);
     println!("step 3: the frozen browser observed {}", outcome.stdout.trim());
 }
 

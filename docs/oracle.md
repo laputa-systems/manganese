@@ -173,9 +173,11 @@ The four steps and the control are:
    unavailable browser.
 
 The observable Local Storage encoding the consumer had to match is a key of
-`_<origin>\0\x01<name>` and a value of one type byte `0x01` followed by **UTF-8** text; `VERSION`
-holds `"1"`. Internal database byte layout is not compared: the evidence is cross-reader and
-cross-writer reopen, semantics and recovery, as the owner's storage rule requires.
+`_<origin>\0\x01<name>` and a value with either type byte `0x01` followed by one Latin-1 byte per
+character, or type byte `0x00` followed by UTF-16LE code units; `VERSION` holds `"1"`. Using UTF-8
+after `0x01` passes for ASCII but mangles non-ASCII text in the browser, so step 3 asserts the exact
+changed string including a lambda. Internal database byte layout is not compared: the evidence is
+cross-reader and cross-writer reopen, semantics and recovery, as the owner's storage rule requires.
 
 The witness needed no change to `crates/leveldb` and exposed no new API. It consumed the already
 public `leveldb::open_db`, `leveldb::ChromiumOptions`, `leveldb::engine::{DB, ReadOptions,
