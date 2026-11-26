@@ -1,16 +1,16 @@
 version 1
 box cert-verify
-revision 00d68e7bd6476529c73a18557a12354e46f573c0
+revision 9f9e31949c42b0fef08205d744c500b58b9e5c42
 arch x86_64
-spec sha256:80cdb0fd13001931b443d02974445ed040df4b83148eb89bc25cc291d777626f
-corpus sha256:9125eda017df77a9bdef3c13ff96034bda46754d54eaf0487263bd12dad4e839 seen 1479 holdout 811
-oracle .work/tmp/cert-verify/oracle sha256:8b4be8839318dc46699c8e2ccdbad4dc40baea00d21902b12ea8b2ee2f03af64
+spec sha256:3be2d8a229ce70d4f3ced28bdf77121c37c3292f18eb727475d27f765ab3db17
+corpus sha256:9a748b93acc84f76eff5232f769798f60e8189d69d537eab362f9fb73339d7a4 seen 1484 holdout 812
+oracle .work/tmp/cert-verify/oracle sha256:c19f677db6c9a271e8ee94bb0dfcefd3b82b0b9fb7c17bb0a77a0dbf5ef00eba
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/cert-verify sha256:8d78a7ea89adb229e089c8d7ca962f040e4da00e3b9002025dafed5d158efe30
-dependencies cargo-lock sha256:ee81937dd2e01da5f2c10761bd1b401d09826cd875d02bc96451a10019fc683c tree sha256:f1ca5b76351995d9b6d57c6cee6e9d8c636df7c1728a3e0e8813045a43be0422
-run seen exit 0 items 1479 1479
-run holdout exit 0 items 811 811
-run fuzz exit 0 seed 1795711365904482488 requested 10000 completed 10000
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/cert-verify sha256:143b06fb1cd1ea12cdc0b7a9f7d4ad067af824660a88edc1c5ce793888179445
+dependencies cargo-lock sha256:b826cdfff4e46ccefcc18da5c703c41e7af0ea9c1a9e9137ff782ebb4bc8ef08 tree sha256:00f8a8b14b2d9ea6e3ac5ddc2b22ac1131d2991282c9a42a4b91aba484cf16e4
+run seen exit 0 items 1484 1484
+run holdout exit 0 items 812 812
+run fuzz exit 0 seed 1795717433400086624 requested 10000 completed 10000
 run anchor make cert-verify-anchor exit 0
 level source-harness met
 level frozen-browser met: make cert-verify-anchor
