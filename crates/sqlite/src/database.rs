@@ -556,6 +556,7 @@ impl Database {
             return false;
         }
         let succeeded = self.run_sql("COMMIT");
+        self.schema_write_in_txn = false;
         if !self.is_open() {
             return false;
         }
