@@ -1,16 +1,16 @@
 version 1
 box structured-data
-revision bb001d53f42f52340b917746e34ab27230498392
+revision 492fd94581d185d49239593f4c4123865b012944
 arch x86_64
 spec sha256:ffc0f4a9743c2bddd1e29d1a7a4e22fed50f2779c716ab5bf382e1ce2cd03215
 corpus sha256:8b06307b7d34cbb1d1bdb77724f44ff788ed8ad80ae35ff8a206b7d61c3efb25 seen 684 holdout 658
 oracle .work/tmp/structured-data/oracle sha256:50b87efe93c38f8776a4bf34f08d58666dec0a3bed86b3512d27739cd26680fb
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/structured-data sha256:814b802b658742ab09e526f20ee4faeb8db99ac366f976cd1013643ae65665c3
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/structured-data sha256:d0f0ea8c86f4ddc3d35fbf596f294f751aebc1d78c957a8263e9e14d93e9d920
 dependencies cargo-lock sha256:ea376243cfc5ba95dc849b30f6e6d7d43dbd3bd24250c85c190a64b8c205f412 tree sha256:eac04b731b3e72944232c3fe6a394ac0193f8d79653ae64f081a893fc2e3a889
 run seen exit 0 items 684 684
 run holdout exit 0 items 658 658
-run fuzz exit 0 seed 1795745983616343785 requested 20000 completed 20000
+run fuzz exit 0 seed 1795746301218556219 requested 20000 completed 20000
 run anchor make structured-data-anchor exit 0
 level source-harness met
 level frozen-browser met: make structured-data-anchor
