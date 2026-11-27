@@ -180,6 +180,19 @@ http1-record:
 http1-anchor:
 	PYTHONPATH=oracle/harness/http1 python3 -B oracle/harness/http1/anchor.py
 
+.PHONY: http2-harness
+http2-harness:
+	mkdir -p .work/tmp/http2
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/http2 "$$tag" python3 -B /lane/oracle/harness/http2/build.py
+
+.PHONY: http2-record
+http2-record:
+	PYTHONPATH=oracle/harness/http2 python3 -B oracle/harness/http2/record.py
+
+.PHONY: http2-anchor
+http2-anchor:
+	PYTHONPATH=oracle/harness/http2 python3 -B oracle/harness/http2/anchor.py
+
 .PHONY: media-demux-harness
 media-demux-harness:
 	mkdir -p .work/tmp/media-demux

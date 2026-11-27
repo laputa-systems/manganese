@@ -145,7 +145,7 @@ def observed_view(observed):
 
 
 def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None, page=PAGE, files_dir=None,
-        policy_dir=POLICY_DIR, policy_file=POLICY_FILE, capture_clienthello=False):
+        policy_dir=POLICY_DIR, policy_file=POLICY_FILE, capture_clienthello=False, http2_cases=()):
     oracle = pathlib.Path(oracle)
     if not oracle.is_file():
         raise SystemExit(f'{oracle} is missing; run make cert-verify-harness')
@@ -157,6 +157,7 @@ def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None
         (files / f"{item['name']}.key.pem").write_bytes(item['key'].path.read_bytes())
     config = {
         'cases': [{'name': item['name'], 'host': item['host'], 'path': item.get('path', '/'),
+                   'http2': item['name'] in http2_cases,
                    'chain': f"{item['name']}.chain.pem", 'key': f"{item['name']}.key.pem"} for item in cases],
         'page': b64(page),
         'pinned_time': pinned_time,
@@ -212,6 +213,8 @@ def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None
                    for item in cases},
         'comparisons': comparisons,
         'clienthellos': result.get('clienthellos', {}),
+        'http2': result.get('http2', {}),
+        'http2_server': result.get('http2_server', {}),
         'failures': failures,
     }
     (run_dir / 'evidence.json').write_text(json.dumps(evidence, indent=2, sort_keys=True))

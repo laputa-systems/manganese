@@ -1,0 +1,110 @@
+import concurrent.futures
+import hashlib
+import os
+import pathlib
+import re
+import shlex
+import subprocess
+import tempfile
+
+out = pathlib.Path('/work/out/chromium-wayland-release')
+scratch = pathlib.Path('/lane/.work/tmp/http2')
+harness_source = pathlib.Path('/lane/oracle/harness/http2/harness.cc')
+scratch.mkdir(parents=True, exist_ok=True)
+env = dict(os.environ, TMPDIR=str(scratch))
+clang = '/opt/chromium-llvm/bin/clang'
+clangxx = '/opt/chromium-llvm/bin/clang++'
+
+
+def compile_edges(ninja):
+    values = {}
+    edges = {}
+    for line in (out / ninja).read_text(errors='replace').splitlines():
+        for key in ('defines', 'include_dirs', 'cflags', 'cflags_c', 'cflags_cc'):
+            if line.startswith(key + ' = '):
+                values[key] = shlex.split(line.split(' = ', 1)[1])
+        match = re.match(r'build (obj/\S+\.o): (cc|cxx) (\S+)', line)
+        if match:
+            obj, language, source = match.groups()
+            keys = ('defines', 'include_dirs', 'cflags', 'cflags_' + ('c' if language == 'cc' else 'cc'))
+            flags = [arg for key in keys for arg in values.get(key, []) if not arg.startswith('-fcrash-diagnostics-dir=')]
+            edges[obj] = (source, flags, language)
+    return edges
+
+
+def compile_object(key, source, flags, language):
+    content = pathlib.Path(source if source.startswith('/') else out / source).read_bytes()
+    digest = hashlib.sha256((key + '\0' + '\0'.join(flags)).encode() + b'\0' + content).hexdigest()
+    target = scratch / (digest + '.o')
+    if not target.exists():
+        print('compile', source, flush=True)
+        with tempfile.NamedTemporaryFile(prefix=digest + '-', suffix='.o', dir=scratch, delete=False) as temporary:
+            staged = pathlib.Path(temporary.name)
+        try:
+            subprocess.run([clangxx if language == 'cxx' else clang, *flags, '-c', source, '-o', str(staged)], cwd=out, env=env, check=True)
+            os.replace(staged, target)
+        finally:
+            staged.unlink(missing_ok=True)
+    return str(target)
+
+
+net = compile_edges('obj/net/net.ninja')
+_, harness_flags, _ = net['obj/net/net/spdy_session.o']
+harness_flags = [flag for flag in harness_flags if flag not in ('-DNET_IMPLEMENTATION',)]
+support = {**compile_edges('obj/base/test/test_support.ninja'), **compile_edges('obj/base/test/test_config.ninja')}
+support_suffixes = ('/base/test/task_environment.cc', '/base/test/test_timeouts.cc', '/base/test/test_switches.cc',
+                    '/base/test/scoped_run_loop_timeout.cc', '/base/test/test_mock_time_task_runner.cc',
+                    '/base/test/test_pending_task.cc', '/base/task/sequence_manager/test/mock_time_domain.cc', '/base/test/bind.cc')
+jobs = [(obj, *edge) for obj, edge in support.items() if edge[0].endswith(support_suffixes)]
+gtest = compile_edges('obj/third_party/googletest/gtest.ninja')
+jobs += [(obj, *edge) for obj, edge in gtest.items()]
+
+jobs.append(('harness', str(harness_source), harness_flags, 'cxx'))
+with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as pool:
+    objects = list(pool.map(lambda job: compile_object(*job), jobs))
+
+link = None
+link_vars = {}
+lines = (out / 'obj/chrome/chrome_initial.ninja').read_text(errors='replace').splitlines()
+for index, line in enumerate(lines):
+    if line.startswith('build ./chrome: link '):
+        link = line
+        for variable in lines[index + 1:]:
+            if not variable.startswith('  '):
+                break
+            name, value = variable.split('=', 1)
+            link_vars[name.strip()] = value.strip()
+        break
+if link is None:
+    raise SystemExit('no chrome link edge')
+explicit = link.split(' link ', 1)[1].split(' | ', 1)[0].split()
+chrome_objects = [path for path in explicit if path.endswith('.o')]
+archives = [path for path in explicit if path.endswith('.a')]
+dropped = ('-Wl,--version-script=', '-Wl,--thinlto-cache-dir=', '-Wl,--thinlto-cache-policy=', '-Wl,--icf=', '-rdynamic', '-Wl,-mllvm,-enable-ext-tsp-block-placement')
+ldflags = [flag for flag in shlex.split(link_vars['ldflags']) if not flag.startswith(dropped)]
+ldflags += ['-Wl,--thinlto-cache-dir=' + str(scratch / 'thinlto-cache')]
+host_absent = ('-lnspr4', '-lnss3', '-lnssutil3', '-lplc4', '-lplds4', '-lsmime3')
+libs = [flag for flag in shlex.split(link_vars.get('libs', '')) if flag not in host_absent]
+
+
+def link(extra):
+    command = [clangxx, *ldflags, '-Wl,--error-limit=0', '-o', str(scratch / 'oracle'), *objects, *extra,
+               '-Wl,--start-lib', *chrome_objects, '-Wl,--end-lib',
+               '-Wl,--start-group', *archives, '-Wl,--end-group',
+               '-Wl,--start-group', *shlex.split(link_vars.get('rlibs', '')), '-Wl,--end-group', *libs]
+    return subprocess.run(command, cwd=out, env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+
+print('link', len(objects), 'harness objects,', len(chrome_objects), 'lazy chrome objects,', len(archives), 'archives', flush=True)
+result = link([])
+missing = sorted(set(re.findall(r'undefined symbol: (\S+)', result.stderr)))
+if result.returncode and missing and all(re.match(r'(CERT|PK11|SECITEM|SECMOD|NSS|PR|PORT|SEC)_', symbol) for symbol in missing):
+    stubs = scratch / 'nss-stubs.c'
+    stubs.write_text('#include <stdlib.h>\n' + ''.join(f'void {symbol}(void) {{ abort(); }}\n' for symbol in missing))
+    subprocess.run([clang, '--target=x86_64-alpine-linux-musl', '-fPIC', '-O2', '-c', str(stubs), '-o', str(scratch / 'nss-stubs.o')], cwd=out, env=env, check=True)
+    print('stubbed', len(missing), 'NSS symbols that abort when called', flush=True)
+    result = link([str(scratch / 'nss-stubs.o')])
+if result.returncode:
+    print(result.stderr[-20000:], flush=True)
+    raise SystemExit(result.returncode)
+print('built', scratch / 'oracle', flush=True)
