@@ -213,6 +213,19 @@ cert-verify-trust-data:
 cert-verify-anchor:
 	python3 -B oracle/harness/cert-verify/anchor.py
 
+.PHONY: tls-handshake-harness
+tls-handshake-harness:
+	mkdir -p .work/tmp/tls-handshake
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/tls-handshake "$$tag" python3 -B /lane/oracle/harness/tls-handshake/build.py
+
+.PHONY: tls-handshake-record
+tls-handshake-record:
+	python3 -B oracle/harness/tls-handshake/record.py
+
+.PHONY: tls-handshake-anchor
+tls-handshake-anchor:
+	PYTHONPATH=oracle/harness/tls-handshake python3 -B oracle/harness/tls-handshake/anchor.py
+
 .PHONY: https-fixture
 https-fixture:
 	python3 -B oracle/harness/https/fixture.py build

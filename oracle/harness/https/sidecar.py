@@ -16,6 +16,7 @@ PAGE = base64.b64decode(CONFIG['page'])
 SOCKS = CONFIG['socks']
 HANDSHAKES = {case['name']: [] for case in CONFIG['cases']}
 CONNECTS = {case['name']: [] for case in CONFIG['cases']}
+CLIENTHELLOS = {}
 LOCK = threading.Lock()
 
 
@@ -31,6 +32,91 @@ def context(case):
     return tls
 
 
+class Channel:
+    def __init__(self, case, request, deadline):
+        self.incoming = ssl.MemoryBIO()
+        self.outgoing = ssl.MemoryBIO()
+        self.tls = context(case).wrap_bio(self.incoming, self.outgoing, server_side=True)
+        self.request = request
+        self.deadline = deadline
+        self.clienthello = None
+
+    def pump(self):
+        data = self.outgoing.read()
+        if data:
+            self.request.sendall(data)
+
+    def feed(self):
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('tls deadline')
+        self.request.settimeout(remaining)
+        chunk = self.request.recv(65536)
+        if not chunk:
+            raise ConnectionError('closed')
+        self.incoming.write(chunk)
+        return chunk
+
+    def handshake(self):
+        first = None
+        try:
+            self.tls.do_handshake()
+        except ssl.SSLWantReadError:
+            header = None
+            while header is None:
+                header = self.exact_record_header()
+            length = int.from_bytes(header[3:5], 'big')
+            first = header + self.exact_bytes(length)
+            self.clienthello = first
+            self.incoming.write(first)
+            while True:
+                try:
+                    self.tls.do_handshake()
+                    break
+                except ssl.SSLWantReadError:
+                    self.pump()
+                    self.feed()
+
+    def exact_record_header(self):
+        data = b''
+        while len(data) < 5:
+            chunk = self.request.recv(5 - len(data))
+            if not chunk:
+                raise ConnectionError('closed')
+            data += chunk
+        return data
+
+    def exact_bytes(self, count):
+        data = b''
+        while len(data) < count:
+            chunk = self.request.recv(count - len(data))
+            if not chunk:
+                raise ConnectionError('closed')
+            data += chunk
+        return data
+
+    def recv(self):
+        while True:
+            try:
+                return self.tls.read(65536)
+            except ssl.SSLWantReadError:
+                self.pump()
+                self.feed()
+
+    def send(self, data):
+        while data:
+            try:
+                written = self.tls.write(data)
+            except ssl.SSLWantWriteError:
+                self.pump()
+                continue
+            data = data[written:]
+            self.pump()
+
+    def close(self):
+        self.request.close()
+
+
 class Socks(socketserver.BaseRequestHandler):
     def exact(self, count):
         data = b''
@@ -43,6 +129,7 @@ class Socks(socketserver.BaseRequestHandler):
 
     def handle(self):
         self.request.settimeout(20)
+        deadline = time.monotonic() + 20
         try:
             version, count = self.exact(2)
             self.exact(count)
@@ -68,6 +155,21 @@ class Socks(socketserver.BaseRequestHandler):
             self.request.sendall(reply)
             with LOCK:
                 CONNECTS[case['name']].append({'host': host, 'port': port, 'reply': reply.hex()})
+            if CONFIG.get('capture_clienthello'):
+                channel = Channel(case, self.request, deadline)
+                channel.handshake()
+                with LOCK:
+                    HANDSHAKES[case['name']].append('handshake completed')
+                    CLIENTHELLOS[case['name']] = channel.clienthello.hex()
+                request = b''
+                while b'\r\n\r\n' not in request:
+                    chunk = channel.recv()
+                    if not chunk:
+                        return
+                    request += chunk
+                channel.send(PAGE)
+                channel.close()
+                return
             try:
                 tls = context(case).wrap_socket(self.request, server_side=True)
             except (ssl.SSLError, OSError) as error:
@@ -145,4 +247,4 @@ finally:
     client.close()
 with LOCK:
     print(json.dumps({'observed': observed, 'handshakes': HANDSHAKES, 'connects': CONNECTS,
-                      'socks_bind': f"{SOCKS['host']}:{SOCKS['port']}"}))
+                      'clienthellos': CLIENTHELLOS, 'socks_bind': f"{SOCKS['host']}:{SOCKS['port']}"}))
