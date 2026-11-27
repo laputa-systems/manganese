@@ -145,7 +145,7 @@ def observed_view(observed):
 
 
 def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None, page=PAGE, files_dir=None,
-        policy_dir=POLICY_DIR, policy_file=POLICY_FILE):
+        policy_dir=POLICY_DIR, policy_file=POLICY_FILE, capture_clienthello=False):
     oracle = pathlib.Path(oracle)
     if not oracle.is_file():
         raise SystemExit(f'{oracle} is missing; run make cert-verify-harness')
@@ -160,6 +160,7 @@ def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None
                    'chain': f"{item['name']}.chain.pem", 'key': f"{item['name']}.key.pem"} for item in cases],
         'page': b64(page),
         'pinned_time': pinned_time,
+        'capture_clienthello': capture_clienthello,
         'socks': {'host': SOCKS_HOST, 'port': SOCKS_PORT, 'https_port': HTTPS_PORT},
     }
     archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
@@ -210,6 +211,7 @@ def run(cases, policy, trust, *, oracle, label='https-fixture', pinned_time=None
                                   'sha256': [hashlib.sha256(cert.der).hexdigest() for cert in item['chain']]}
                    for item in cases},
         'comparisons': comparisons,
+        'clienthellos': result.get('clienthellos', {}),
         'failures': failures,
     }
     (run_dir / 'evidence.json').write_text(json.dumps(evidence, indent=2, sort_keys=True))
