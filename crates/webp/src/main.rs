@@ -43,7 +43,11 @@ fn main() -> io::Result<()> {
             Err(error) if error.kind() == io::ErrorKind::UnexpectedEof => return Ok(()),
             Err(error) => return Err(error),
         }
-        let mut input = vec![0u8; u32::from_be_bytes(header) as usize];
+        let length = u32::from_be_bytes(header) as usize;
+        if length == 0 || length > 1 << 20 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "bad record length"));
+        }
+        let mut input = vec![0u8; length];
         stdin.read_exact(&mut input)?;
         let output = decode(&input).ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "malformed request"))?;
         stdout.write_all(&(output.len() as u32).to_be_bytes())?;

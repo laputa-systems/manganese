@@ -58,22 +58,23 @@ def anchor_images():
 
 
 images = anchor_images()
-oracle = peer(str(root / '.work/tmp/webp/oracle'))
-expected = []
-for name, data in images:
-    wanted, note = expectation(ask(oracle, corpus.request(data)))
-    expected.append(wanted)
-    print(f'{name}: {note}', flush=True)
-oracle.stdin.close()
-if oracle.wait():
-    raise RuntimeError('oracle failed')
-
+oracle = None
 run_dir = launch.new_run_dir('webp-anchor', 'headless')
 (run_dir / 'inputs.json').write_text(json.dumps([b64(data) for _, data in images]))
 archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
 session = launch.open_session(run_dir, archive)
 browser = None
 try:
+    oracle = peer(str(root / '.work/tmp/webp/oracle'))
+    expected = []
+    for name, data in images:
+        wanted, note = expectation(ask(oracle, corpus.request(data)))
+        expected.append(wanted)
+        print(f'{name}: {note}', flush=True)
+    oracle.stdin.close()
+    if oracle.wait():
+        raise RuntimeError('oracle failed')
+
     _, browser = session.start_browser('headless')
     result = json.loads(session.sidecar(['python3', '-B', '/webp/anchor-sidecar.py', '/inputs/inputs.json'],
                                         {root / 'oracle/harness/webp': '/webp:ro', run_dir: '/inputs:ro'}, timeout=600))
@@ -95,6 +96,15 @@ try:
     if not shutdown.get('shutdown', {}).get('ok') or browser.wait(timeout=15) != 0:
         raise RuntimeError('browser shutdown failed')
 finally:
+    if oracle is not None:
+        try:
+            if oracle.stdin is not None and not oracle.stdin.closed:
+                oracle.stdin.close()
+            if oracle.poll() is None:
+                oracle.kill()
+            oracle.wait(timeout=15)
+        except OSError as error:
+            print(f'oracle cleanup: {error}', file=sys.stderr)
     if browser is not None and browser.poll() is None:
         browser.kill()
         browser.wait()
