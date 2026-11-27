@@ -1,0 +1,18 @@
+version 1
+box webp
+revision d8ff99ce1224a115d91982dc0cd9e39d4eed27bf
+arch x86_64
+spec sha256:9097eb3d059c85f4399dae113950d3f643dd6bb86e85a7068f4bd1fe22ea1f61
+corpus sha256:8218199bb5fb8d299437cdea4aa904decee53d73386caea2f9f481ed30c1adff seen 478 holdout 238
+oracle .work/tmp/webp/oracle sha256:6de8679973a71afaa8fb7d01b4a0807a574bd5e2a185b79ea3d06a944b70711d
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/webp sha256:e9fceb5917baf9e0f060f4ea1333f9f57bca288f0f9743bc13b817e2a3a055ff
+dependencies cargo-lock sha256:2c694b86a712c8ec2796aca291b931c63316908fb96fccbf7eb4fe01636e56be tree sha256:ce3edbb107691e344411d39204913df12549901ae91cc407a9691c3e8346224c
+snapshot vendor/img tree dcfc726bfa79072f7805e0a2923dcccb51afa056
+run seen exit 0 items 478 478
+run holdout exit 0 items 238 238
+run fuzz exit 0 seed 1795744269904162849 requested 20000 completed 20000
+run anchor make webp-anchor exit 0
+level source-harness met
+level frozen-browser met: make webp-anchor
+level integration pending: arm64 evidence (public_api: canvas getImageData in the frozen arm64 browser) and make closure have not run

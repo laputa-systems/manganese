@@ -1,0 +1,49 @@
+[package]
+name = "webpkit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT OR Apache-2.0"
+description = "Pure-Rust WebP VP8/VP8L codec, imported from P4suta/webpkit"
+repository = "https://github.com/P4suta/webpkit"
+readme = "README.md"
+
+# Deliberately isolate the imported codec from img's production Cargo.lock.
+# Do not join the root workspace or add a production path dependency until
+# the campaign's correctness and performance gates pass.
+[workspace]
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
+rayon = ["dep:rayon", "std"]
+image = ["dep:image", "std"]
+__internals = []
+oracle = ["dep:libwebp-sys", "__internals"]
+work-count = ["__internals"]
+bench = ["__internals"]
+
+[dependencies]
+image = { version = "0.25", optional = true, default-features = false }
+libwebp-sys = { version = "0.14", optional = true }
+rayon = { version = "1", optional = true }
+
+# Restore the original upstream test harness and pinned corpus before
+# running codec-internal tests. The source files remain otherwise unmodified.
+[dev-dependencies]
+proptest = "1"
+# Dev-only: deterministic synthetic corpus used by in-crate unit tests.
+webpkit-samples = { path = "../webpkit-samples" }
+
+[[example]]
+name = "workledger-scratch"
+required-features = ["work-count"]
+
+[[example]]
+name = "workledger-lossy-scratch"
+required-features = ["work-count"]
+
+[lints.clippy]
+unwrap_used = "deny"
+needless_pass_by_value = "deny"
