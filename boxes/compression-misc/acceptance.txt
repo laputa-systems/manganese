@@ -1,0 +1,17 @@
+version 1
+box compression-misc
+revision f5177e4cfab233c4f15bf7b5773545f1329779a2
+arch x86_64
+spec sha256:56f7514f3f8cb2052d6fd584d0193aff845c8a06f841d6e4cfa1498c2d1bce52
+corpus sha256:ddaa9dec80d7627fcfa34f24d6662699711d7c93e6a4b5d799b5bbccd494daf7 seen 533 holdout 516
+oracle .work/tmp/compression-misc/oracle sha256:50176aaeda476b08610ff3899ca3dbb0893849e2925631e99b4951d475ea8234
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/compression-misc sha256:6e0372ba7aa52495d74c4d20ed7f6304ff2048a89a7088523d418a2776195c4f
+dependencies cargo-lock sha256:31935b320b256715920f70f93b9f56c310707d06cfca0f2f9ee99d8a62e7611e tree sha256:d48d59a690a246c6deeeedd763d7c223008fdc6674bf7031406415a56a745b7f
+run seen exit 0 items 533 533
+run holdout exit 0 items 516 516
+run fuzz exit 0 seed 1795747910930538234 requested 20000 completed 20000
+run anchor make compression-misc-anchor exit 0
+level source-harness met
+level frozen-browser met: make compression-misc-anchor
+level integration pending: arm64 evidence (harness: decode Snappy LevelDB table blocks from the frozen arm64 browser's profile with an arm64 harness; not run on the x86_64 campaign host) and make closure have not run
