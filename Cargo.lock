@@ -1299,6 +1299,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "rawzip"
+version = "0.5.2"
+
+[[package]]
 name = "rfc6979"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1842,6 +1846,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.10",
+]
+
+[[package]]
+name = "zip"
+version = "0.1.0"
+dependencies = [
+ "rawzip",
+ "sha2 0.10.9",
+ "zlib-rs 0.6.8",
 ]
 
 [[package]]
