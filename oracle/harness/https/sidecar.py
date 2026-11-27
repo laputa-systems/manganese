@@ -17,6 +17,8 @@ SOCKS = CONFIG['socks']
 HANDSHAKES = {case['name']: [] for case in CONFIG['cases']}
 CONNECTS = {case['name']: [] for case in CONFIG['cases']}
 CLIENTHELLOS = {}
+H2FRAMES = {}
+H2SERVER = {}
 LOCK = threading.Lock()
 
 
@@ -28,6 +30,8 @@ class Server(socketserver.ThreadingTCPServer):
 def context(case):
     tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     tls.set_ciphers('DEFAULT:@SECLEVEL=0')
+    if case.get('http2'):
+        tls.set_alpn_protocols(['h2'])
     tls.load_cert_chain(f"/fixture/{case['chain']}", f"/fixture/{case['key']}")
     return tls
 
@@ -114,7 +118,74 @@ class Channel:
             self.pump()
 
     def close(self):
+        try:
+            self.tls.unwrap()
+        except (ssl.SSLError, OSError, ValueError):
+            pass
         self.request.close()
+
+
+def h2_frame(kind, flags, stream, payload):
+    return len(payload).to_bytes(3, 'big') + bytes([kind, flags]) + struct.pack('>I', stream) + payload
+
+
+def h2_exchange(channel, name):
+    data = bytearray()
+
+    def fill(length):
+        while len(data) < length:
+            try:
+                chunk = channel.recv()
+            except TimeoutError:
+                with LOCK:
+                    H2FRAMES[name] = bytes(data).hex()
+                raise
+            if not chunk:
+                with LOCK:
+                    H2FRAMES[name] = bytes(data).hex()
+                return False
+            data.extend(chunk)
+        return True
+
+    if not fill(24):
+        return
+    channel.send(h2_frame(4, 0, 0, b''))
+    offset = 24
+    while True:
+        if not fill(offset + 9):
+            return
+        length = int.from_bytes(data[offset:offset + 3], 'big')
+        if not fill(offset + 9 + length):
+            return
+        kind, flags = data[offset + 3], data[offset + 4]
+        stream = int.from_bytes(data[offset + 5:offset + 9], 'big')
+        if kind == 4 and not flags & 1:
+            channel.send(h2_frame(4, 1, 0, b''))
+        if kind == 1:
+            block = b'\x88\x00\x0econtent-length\x010\x00\x0ccontent-type\x09text/html'
+            channel.send(h2_frame(1, 4, stream, block))
+            channel.send(h2_frame(0, 1, stream, b''))
+            with LOCK:
+                H2SERVER[name] = {'stream': stream, 'frames': [h2_frame(1, 4, stream, block).hex(),
+                                                               h2_frame(0, 1, stream, b'').hex()]}
+            offset += 9 + length
+            channel.deadline = time.monotonic() + 2
+            for _ in range(4):
+                try:
+                    if not fill(offset + 9):
+                        break
+                    trailing_length = int.from_bytes(data[offset:offset + 3], 'big')
+                    if not fill(offset + 9 + trailing_length):
+                        break
+                    if data[offset + 3] == 4 and data[offset + 4] & 1:
+                        break
+                    offset += 9 + trailing_length
+                except TimeoutError:
+                    break
+            with LOCK:
+                H2FRAMES[name] = bytes(data).hex()
+            return
+        offset += 9 + length
 
 
 class Socks(socketserver.BaseRequestHandler):
@@ -168,6 +239,19 @@ class Socks(socketserver.BaseRequestHandler):
                         return
                     request += chunk
                 channel.send(PAGE)
+                channel.close()
+                return
+            if case.get('http2'):
+                channel = Channel(case, self.request, deadline)
+                channel.handshake()
+                with LOCK:
+                    HANDSHAKES[case['name']].append('handshake completed')
+                try:
+                    h2_exchange(channel, case['name'])
+                except Exception as error:
+                    with LOCK:
+                        if case['name'] not in H2FRAMES:
+                            H2FRAMES[case['name']] = f'error: {type(error).__name__}: {error}'
                 channel.close()
                 return
             try:
@@ -247,4 +331,5 @@ finally:
     client.close()
 with LOCK:
     print(json.dumps({'observed': observed, 'handshakes': HANDSHAKES, 'connects': CONNECTS,
-                      'clienthellos': CLIENTHELLOS, 'socks_bind': f"{SOCKS['host']}:{SOCKS['port']}"}))
+                      'clienthellos': CLIENTHELLOS, 'http2': H2FRAMES, 'http2_server': H2SERVER,
+                      'socks_bind': f"{SOCKS['host']}:{SOCKS['port']}"}))
