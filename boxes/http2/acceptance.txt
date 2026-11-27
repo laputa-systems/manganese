@@ -1,16 +1,16 @@
 version 1
 box http2
-revision fd90d22758e654793573999da49e3fce04aa285f
+revision c36f443de71d185db5641129a74dc5ed6d78aa9a
 arch x86_64
 spec sha256:01adf03356136209b7448485200aa1037a205e77bbe1bc8a1dd7678abdba7202
 corpus sha256:777e376ac124244ad8ec0b583403815d6204a9a714fb4be620d972d195c0a5a2 seen 300 holdout 160
 oracle .work/tmp/http2/oracle sha256:762f28da164b95ffb0881ced7a1e8d67319c9cdc432d8bd2a88ac1f0e6170fb4
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/http2 sha256:b645f070695dbcaea853cefdbc75e979f44bc3a5bf1ab2b85d2d5077408a35e1
-dependencies cargo-lock sha256:42abe6035e0438da4ecdb3210fa7b3217cecd2a5162e0b401523226a3533d410 tree sha256:2b1bca3a03387d66a02852e7492d4acd8fab7a9ade6675205e9087bb4b363f9b
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/http2 sha256:a0cdafec7f1135ce4710b119bf395ec02b4ea3be325f90162fe700db10ddbf97
+dependencies cargo-lock sha256:180da1bf8359c2c77cc5e4c8ff7ef05739396a9be5ed61821e6e2941a597052d tree sha256:d24c37f9d9f42aca4dff41fba97b7a64d7c2313511b914d3b87acd63dc3cb65c
 run seen exit 0 items 300 300
 run holdout exit 0 items 160 160
-run fuzz exit 0 seed 1795749997932873406 requested 20000 completed 20000
+run fuzz exit 0 seed 1795750263461604641 requested 20000 completed 20000
 run anchor make http2-anchor exit 0
 level source-harness met
 level frozen-browser met: make http2-anchor
