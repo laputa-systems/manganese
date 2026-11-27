@@ -1,18 +1,18 @@
 version 1
 box devtools-endpoint
-revision d593b2f009f79a2e8d1b698310d10ec9ed8365a3
+revision 35f8f1b9583650fddb136dd27f8d192b0599e75f
 arch x86_64
 spec sha256:8204c124872782c012f34db51c86f60cb8dc08c5c2f96d16187a1ffbd6f11e4d
 corpus sha256:776b9657cf66883ae67ddf37b8412949505721d3e715d869eb4774a2c32ddf35 seen 98 holdout 48
-oracle .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint-oracle sha256:fa14a842f25025783401607f03aa0bf3ae70042060e4aaa0b179b8c150854957
+oracle .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint-oracle sha256:84cc4e22faf98954274411b80a6a2bc66f3b58b45e6abf8e299db0aabfa86fc4
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint sha256:d3df530ab089fa59c0e08c1fc5070cba8fb0464fd182096e697f9195e498e6c9
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/devtools-endpoint sha256:3e927d3a166f5541d90064510351fafd93aeaa945407d15a749850fd22e415a5
 dependencies cargo-lock sha256:3cc50ce8eea0555bb45a914eb79044cbc8e1e0fb9731ac61c62ab0a56acd8e89 tree sha256:d96a22bea5f32f314f8f034b879a2cf543b6e615b42a52c530d0d36a203d788c
 snapshot vendor/smolith tree b39d9c755f401cc55043f001fcace6f71405a393
 snapshot vendor/zlib-rs tree 8d7f4e37f1731a5863d449f6f2a90acd4c6d890c
 run seen exit 0 items 98 98
 run holdout exit 0 items 48 48
-run fuzz exit 0 seed 1795724845766708595 requested 20000 completed 20000
+run fuzz exit 0 seed 1795741149827840888 requested 20000 completed 20000
 run improvement boxes/devtools-endpoint/improvement exit 0
 level source-harness met
 level frozen-browser not applicable: the oracle is the frozen browser itself, driven through oracle/harness/devtools-endpoint/daemon.py, so every golden is a frozen-browser observation
