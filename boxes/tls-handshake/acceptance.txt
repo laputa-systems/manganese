@@ -1,0 +1,17 @@
+version 1
+box tls-handshake
+revision 917440fd36334550c55fc84a7ff393440f8338fe
+arch x86_64
+spec sha256:ef4c8c0f7a2311b01e11804426bb91e964616ec6efc21c1c794dbdc37805f88c
+corpus sha256:de578cf1da144061bebabdc2ad42cc55450f78b119181a345c3581d024a58157 seen 122 holdout 54
+oracle .work/tmp/tls-handshake/oracle sha256:bfff559098b91994ca1ff05170b01068475db2589a51ea9865dda5b0ccd67a64
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/tls-handshake sha256:c37fe99f27a951bf3ff532fa5dd812be177e3c1043b550d3db9141b2a5c5f6a5
+dependencies cargo-lock sha256:db296829a0266d8b99b1898078e5fd62e4cda454ff153cb3a8af21cff097287c tree sha256:43a58285204e2921cc3cfea04082ce7103cb8fddedfa8c62244467e0a11fc956
+run seen exit 0 items 122 122
+run holdout exit 0 items 54 54
+run fuzz exit 0 seed 1795745610736614922 requested 20000 completed 20000
+run anchor make tls-handshake-anchor exit 0
+level source-harness met
+level frozen-browser met: make tls-handshake-anchor
+level integration pending: arm64 evidence (captures: none produced; an arm64 Linux host must capture the frozen browser's ClientHello through the shared HTTPS fixture's SOCKS5 TLS path and compare the modeled subset with the source harness) and make closure have not run
