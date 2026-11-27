@@ -250,3 +250,16 @@ jpeg-encode-anchor:
 .PHONY: jpeg-encode-record
 jpeg-encode-record:
 	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/record.py
+
+.PHONY: webp-harness
+webp-harness:
+	mkdir -p .work/tmp/webp
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/webp "$$tag" python3 -B /lane/oracle/harness/webp/build.py
+
+.PHONY: webp-record
+webp-record:
+	PYTHONPATH=oracle/harness/webp python3 -B oracle/harness/webp/record.py
+
+.PHONY: webp-anchor
+webp-anchor:
+	PYTHONPATH=oracle/harness/webp python3 -B oracle/harness/webp/anchor.py
