@@ -250,3 +250,16 @@ jpeg-encode-anchor:
 .PHONY: jpeg-encode-record
 jpeg-encode-record:
 	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/record.py
+
+.PHONY: structured-data-harness
+structured-data-harness:
+	mkdir -p .work/tmp/structured-data
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/structured-data "$$tag" python3 -B /lane/oracle/harness/structured-data/build.py
+
+.PHONY: structured-data-record
+structured-data-record:
+	PYTHONPATH=oracle/harness/structured-data python3 -B oracle/harness/structured-data/record.py
+
+.PHONY: structured-data-anchor
+structured-data-anchor:
+	PYTHONPATH=oracle/harness/structured-data python3 -B oracle/harness/structured-data/anchor.py
