@@ -1,0 +1,12 @@
+[package]
+name = "regex-box"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "regex"
+path = "src/main.rs"
+
+[dependencies]
+regex-ecma = { package = "regex", version = "1.13.2" }

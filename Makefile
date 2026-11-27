@@ -250,3 +250,16 @@ jpeg-encode-anchor:
 .PHONY: jpeg-encode-record
 jpeg-encode-record:
 	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/record.py
+
+.PHONY: regex-harness
+regex-harness:
+	mkdir -p .work/tmp/regex
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/regex "$$tag" python3 -B /lane/oracle/harness/regex/build.py
+
+.PHONY: regex-record
+regex-record:
+	PYTHONPATH=oracle/harness/regex python3 -B oracle/harness/regex/record.py
+
+.PHONY: regex-anchor
+regex-anchor:
+	PYTHONPATH=oracle/harness/regex python3 -B oracle/harness/regex/anchor.py
