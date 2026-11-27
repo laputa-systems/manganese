@@ -1,17 +1,17 @@
 version 1
 box gif
-revision 25a942fc4046e7f6e5d506e380f580ad3dd4341d
+revision 607ddfafbe58f732a5a9cedd3fe4a484324231ef
 arch x86_64
-spec sha256:e5f92a25b02025b73745a36e146e3131f8e794547a997287b264cc187ff944aa
+spec sha256:bcd26a8349d73b529c04f8831d90789d4fa2095fc14923297b4e8261b489ccc9
 corpus sha256:f8c48b06e7a7d995c67f16954526e34bd219f99f2a0ea9f53da6479ebad3bfde seen 226 holdout 220
 oracle .work/tmp/gif/oracle sha256:f50443d4c062ce231b1654b19fde2994ed1255ea4ad742ad31f657ac90464119
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/gif sha256:ee47ee0f66b89869ec653b4beec03bb68e5363393a03acee4eb9434e996f5fb0
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/gif sha256:3067984e2cd209c69576066f60b96eb1164ac416cde13db6de0337640528f24d
 dependencies cargo-lock sha256:10bdd96b45f670186065a2e710a360ca211dae32bc85ee83b77aa01d0b2fe705 tree sha256:946f4a3da198180f61fc5e29106ea6fd0bcd72551c323afc2124be49cce59cac
-snapshot vendor/img tree 2866cc41c0f7a8675d70ac7c4735df991b23cb18
+snapshot vendor/img tree 97d662a393abed2fca4020fff3aa898841088404
 run seen exit 0 items 226 226
 run holdout exit 0 items 220 220
-run fuzz exit 0 seed 1795746906354636604 requested 20000 completed 20000
+run fuzz exit 0 seed 1795747663804048545 requested 20000 completed 20000
 run anchor make gif-anchor exit 0
 level source-harness met
 level frozen-browser met: make gif-anchor
