@@ -462,7 +462,7 @@ impl Database {
             if clear_bindings {
                 engine.clear_bindings(prepared);
             }
-            if statement.ran {
+            if statement.ran && (statement.rc == 0 || self.errcode != 0) {
                 self.errcode = statement.rc;
             }
             statement.ran = false;
