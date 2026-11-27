@@ -94,43 +94,50 @@ def blocks(table):
 
 oracle = compare.peer(compare.oracle)
 candidate = compare.peer(compare.candidate)
+peers = (oracle, candidate)
 decoded_blocks = 0
 compressed_blocks = 0
 marker_seen = False
-databases = [path.parent for path in session.profile.rglob('CURRENT')
-             if 'Local Storage' in path.parts or 'IndexedDB' in path.parts]
-if not any('Local Storage' in path.parts for path in databases):
-    raise RuntimeError('Local Storage database missing')
-if not any('IndexedDB' in path.parts for path in databases):
-    raise RuntimeError('IndexedDB database missing')
-for database in databases:
-    for table in sorted(database.glob('*.ldb')):
-        for kind, payload in blocks(table.read_bytes()):
-            if kind != 1:
-                continue
-            request = corpus.decode_request(payload, 1 << 20)
-            expected = compare.ask(oracle, request)
-            actual = compare.ask(candidate, request)
-            if expected != actual:
-                raise RuntimeError(f'Snappy block mismatch in {table.name}')
-            if expected[0] != 0:
-                continue
-            plaintext = expected[5:]
-            markers = (b'local-storage-', b'l\x00o\x00c\x00a\x00l\x00', b'profile-',
-                       b'indexed-value-', b'i\x00n\x00d\x00e\x00x\x00e\x00d\x00', b'bulk-')
-            if any(marker in plaintext for marker in markers):
-                marker_seen = True
-            recompress = corpus.compress_request(plaintext)
-            if compare.ask(oracle, recompress) != compare.ask(candidate, recompress):
-                raise RuntimeError(f'Snappy recompression mismatch in {table.name}')
-            decoded_blocks += 1
-            compressed_blocks += len(payload)
-for peer in (oracle, candidate):
-    peer.stdin.close()
-    if peer.wait():
-        raise RuntimeError('peer exited nonzero')
-if decoded_blocks == 0 or not marker_seen:
-    raise RuntimeError('no browser-written Snappy table block with profile text was decoded')
-print(f'frozen browser workload {workload}')
-print(f'compression-misc anchor: {decoded_blocks} Snappy table blocks, '
-      f'{compressed_blocks} compressed bytes, browser text recovered, oracle and candidate agree')
+try:
+    databases = [path.parent for path in session.profile.rglob('CURRENT')
+                 if 'Local Storage' in path.parts or 'IndexedDB' in path.parts]
+    if not any('Local Storage' in path.parts for path in databases):
+        raise RuntimeError('Local Storage database missing')
+    if not any('IndexedDB' in path.parts for path in databases):
+        raise RuntimeError('IndexedDB database missing')
+    for database in databases:
+        for table in sorted(database.glob('*.ldb')):
+            for kind, payload in blocks(table.read_bytes()):
+                if kind != 1:
+                    continue
+                request = corpus.decode_request(payload, 1 << 20)
+                expected = compare.ask(oracle, request)
+                actual = compare.ask(candidate, request)
+                if expected != actual:
+                    raise RuntimeError(f'Snappy block mismatch in {table.name}')
+                if expected[0] != 0:
+                    continue
+                plaintext = expected[5:]
+                markers = (b'local-storage-', b'l\x00o\x00c\x00a\x00l\x00', b'profile-',
+                           b'indexed-value-', b'i\x00n\x00d\x00e\x00x\x00e\x00d\x00', b'bulk-')
+                if any(marker in plaintext for marker in markers):
+                    marker_seen = True
+                recompress = corpus.compress_request(plaintext)
+                if compare.ask(oracle, recompress) != compare.ask(candidate, recompress):
+                    raise RuntimeError(f'Snappy recompression mismatch in {table.name}')
+                decoded_blocks += 1
+                compressed_blocks += len(payload)
+    for peer in peers:
+        peer.stdin.close()
+        if peer.wait():
+            raise RuntimeError('peer exited nonzero')
+    if decoded_blocks == 0 or not marker_seen:
+        raise RuntimeError('no browser-written Snappy table block with profile text was decoded')
+    print(f'frozen browser workload {workload}')
+    print(f'compression-misc anchor: {decoded_blocks} Snappy table blocks, '
+          f'{compressed_blocks} compressed bytes, browser text recovered, oracle and candidate agree')
+finally:
+    for peer in peers:
+        if peer.poll() is None:
+            peer.kill()
+            peer.wait()

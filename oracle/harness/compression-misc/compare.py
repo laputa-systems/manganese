@@ -7,9 +7,14 @@ candidate = '.work/tmp/target/x86_64-unknown-linux-musl/debug/compression-misc'
 
 def peer(path):
     process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    process.stdin.write(b'MGB1')
-    process.stdin.flush()
-    assert process.stdout.read(4) == b'MGB1'
+    try:
+        process.stdin.write(b'MGB1')
+        process.stdin.flush()
+        assert process.stdout.read(4) == b'MGB1'
+    except BaseException:
+        process.kill()
+        process.wait()
+        raise
     return process
 
 
