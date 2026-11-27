@@ -1,0 +1,22 @@
+seam = "Chromium 156 Snappy block codec: third_party/snappy snappy::Compress and snappy::Uncompress for reporting records, and the same RawCompress/RawUncompress block path LevelDB uses for Local Storage and IndexedDB table blocks; the Manganese adapter carries no Chromium policy beyond the box's output-size limit, and uses snap 1.1.2 for the block codec"
+streaming = "MGB1 op 0 is u32 input length and input bytes, answered by one status byte, u32 length and compressed bytes; op 1 is u32 output limit, u32 compressed length and bytes, answered by one status byte, u32 length and uncompressed bytes; a status of 1 means the stream was invalid, oversized or failed the declared limit; Snappy is a single block codec at every linked caller, so one request is one complete block"
+reentrancy = "none: each request owns its buffer and finishes synchronously"
+callbacks = "none: the codec has no callbacks"
+threading = "one thread per process and request"
+wire_version = 1
+corpus_sources = "Deterministic empty, tiny, repeated, binary, 64 KiB fragment boundary, multi-fragment, incompressible and seeded random blocks in both lanes, oracle-compressed round trips with exact and constrained output limits, and malformed or truncated streams with length-varint bombs and invalid copy tags; the shared driver mutates seen blocks and streams for 20000 cases. Included callers: //third_party/snappy:snappy as reached from components/reporting/compression:compression_module and the LevelDB table blocks the frozen browser writes. Excluded with reasons: LZ4 and lz4_flex have no Chromium 156 GN target, source directory, or codec callsite in the linked chrome target (only an ONC config-string value and an unused Debian sysroot liblz4), so no LZ4 surface exists to compare; bzip2, XZ/LZMA and LZW have no linked codec callsite, and GIF LZW belongs to the gif item; Snappy framing and stream identifiers are not used by the linked callers; leveldb table structure, key ordering and log format belong to the leveldb box and profile-format item"
+environment = "x86_64 Linux musl; the source harness compiles the frozen tree's third_party/snappy sources with the exact defines, include dirs and cflags of obj/third_party/snappy/snappy.ninja and the linux config.h with SNAPPY_HAVE_SSSE3=0, so it runs the portable encoder and decoder; default base::Feature states"
+comparison = "exact"
+observable_surface = "Bytes a Snappy-compressed reporting record carries to its server and the plaintext a LevelDB reader recovers from a compressed browser-written table block. The frozen-browser anchor compares blocks from Local Storage tables the frozen x86_64 browser wrote: no page API exposes Snappy itself, so no JS-level claim is made."
+varying_relationships = "none: results are deterministic for a given block, output limit and declared environment"
+ordering = "Bytes follow block order; a decode response is emitted only after the whole input is consumed"
+oracle_defects = "none: no known oracle defect in the compared block codec"
+improvements = "none: no required oracle improvements"
+anchor = "make compression-misc-anchor decodes Snappy-compressed Local Storage table blocks the frozen x86_64 browser wrote, through the source oracle and the candidate, and checks the recovered browser text"
+arm64_evidence = "harness: decode Snappy LevelDB table blocks from the frozen arm64 browser's profile with an arm64 harness; not run on the x86_64 campaign host"
+holdout_percent = 40
+oracle = ".work/tmp/compression-misc/oracle"
+candidate = ".work/tmp/target/x86_64-unknown-linux-musl/debug/compression-misc"
+fuzz = "driver"
+fuzz_driver = "oracle/harness/compression-misc/fuzz.py"
+acceptance_cases = 20000

@@ -162,6 +162,19 @@ encoding-harness:
 zstd-anchor:
 	PYTHONPATH=oracle/harness/zstd python3 -B oracle/harness/zstd/anchor.py
 
+.PHONY: compression-misc-harness
+compression-misc-harness:
+	mkdir -p .work/tmp/compression-misc
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/compression-misc "$$tag" python3 -B /lane/oracle/harness/compression-misc/build.py
+
+.PHONY: compression-misc-record
+compression-misc-record:
+	PYTHONPATH=oracle/harness/compression-misc python3 -B oracle/harness/compression-misc/record.py
+
+.PHONY: compression-misc-anchor
+compression-misc-anchor:
+	PYTHONPATH=oracle/harness/compression-misc python3 -B oracle/harness/compression-misc/anchor.py
+
 .PHONY: protobuf-harness
 protobuf-harness:
 	mkdir -p .work/tmp/protobuf
