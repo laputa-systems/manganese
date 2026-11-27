@@ -468,6 +468,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "gif"
+version = "0.1.0"
+dependencies = [
+ "img-gif",
+]
+
+[[package]]
 name = "goldens"
 version = "0.1.0"
 
@@ -667,6 +674,10 @@ dependencies = [
  "icu_normalizer",
  "icu_properties",
 ]
+
+[[package]]
+name = "img-gif"
+version = "0.1.0"
 
 [[package]]
 name = "img-jpeg"

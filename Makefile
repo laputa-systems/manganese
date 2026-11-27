@@ -250,3 +250,16 @@ jpeg-encode-anchor:
 .PHONY: jpeg-encode-record
 jpeg-encode-record:
 	PYTHONPATH=oracle/harness/jpeg-encode python3 -B oracle/harness/jpeg-encode/record.py
+
+.PHONY: gif-harness
+gif-harness:
+	mkdir -p .work/tmp/gif
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/gif "$$tag" python3 -B /lane/oracle/harness/gif/build.py
+
+.PHONY: gif-record
+gif-record:
+	PYTHONPATH=oracle/harness/gif python3 -B oracle/harness/gif/record.py
+
+.PHONY: gif-anchor
+gif-anchor:
+	PYTHONPATH=oracle/harness/gif python3 -B oracle/harness/gif/anchor.py
