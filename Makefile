@@ -275,3 +275,15 @@ webp-record:
 .PHONY: webp-anchor
 webp-anchor:
 	PYTHONPATH=oracle/harness/webp python3 -B oracle/harness/webp/anchor.py
+.PHONY: zip-harness
+zip-harness:
+	mkdir -p .work/tmp/zip
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/zip "$$tag" python3 -B /lane/oracle/harness/zip/build.py
+
+.PHONY: zip-record
+zip-record:
+	PYTHONPATH=oracle/harness/zip python3 -B oracle/harness/zip/record.py
+
+.PHONY: zip-anchor
+zip-anchor:
+	PYTHONPATH=oracle/harness/zip python3 -B oracle/harness/zip/anchor.py

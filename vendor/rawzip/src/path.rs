@@ -1,0 +1,642 @@
+//! Path handling for ZIP archive paths.
+//!
+//! This module provides raw access to file paths from ZIP archives.
+#![cfg_attr(
+    feature = "alloc",
+    doc = "With the `alloc` feature, it also provides normalized path types with strong safety guarantees against path traversal attacks (zip slip vulnerabilities)."
+)]
+//!
+//! ## Path Types
+//!
+//! The main type is [`ZipFilePath`], which is generic over three possible path
+//! types with different safety levels:
+//!
+//! - [`RawPath`]: Direct bytes from ZIP archive (⚠️ may contain malicious
+//!   paths)
+#![cfg_attr(
+    feature = "alloc",
+    doc = "- [`NormalizedPath`]: Validated and sanitized path"
+)]
+#![cfg_attr(
+    feature = "alloc",
+    doc = "- [`NormalizedPathBuf`]: Owned version of normalized path"
+)]
+//!
+//! ## Raw Paths
+//!
+//! Raw paths provide direct access to the original bytes from the ZIP file
+//! without any validation.
+//!
+//! May contain the following:
+//!
+//! - Directory traversal: `../`, `..\\`, `..` sequences
+//! - Absolute paths: `/etc/passwd`, `C:\\Windows\\system32`
+//! - Invalid UTF-8: Arbitrary byte sequences that aren't valid text
+//!
+#![cfg_attr(
+    feature = "alloc",
+    doc = r#"
+## Normalized Paths
+
+Normalized paths have been validated and sanitized according to these rules:
+
+- Assumed to be UTF-8 ([zip file names aren't always
+  UTF-8](https://fasterthanli.me/articles/the-case-for-sans-io#character-encoding-differences))
+- Path separators: All backslashes (`\`) converted to forward slashes (`/`)
+- Redundant slashes: Multiple consecutive slashes (`//`) reduced to single
+  slash
+- Relative components: Current directory (`.`) and parent directory (`..`)
+  resolved
+- Leading separators: Absolute paths made relative (`/foo` -> `foo`)
+- Drive letters: one leading `<letter>:` prefix is removed (`C:\\foo` becomes `foo`); any other colon is kept (`notes:draft.txt` stays unchanged)
+- Escape prevention: Paths cannot escape the archive root directory
+
+## Usage Examples
+
+```rust
+use rawzip::path::ZipFilePath;
+
+// From raw bytes
+let raw_path = ZipFilePath::from_bytes(b"../../../etc/passwd");
+let safe_path = raw_path.try_normalize()?; // Returns error if invalid UTF-8
+assert_eq!(safe_path.as_str(), "etc/passwd");
+
+// From string
+let normalized_path = ZipFilePath::from_str("dir\\file.txt");
+assert_eq!(normalized_path.as_str(), "dir/file.txt");
+assert_eq!(String::from(normalized_path), "dir/file.txt");
+
+// Backslashes to forward slashes
+let path = ZipFilePath::from_str("dir\\subdir\\file.txt");
+assert_eq!(path.as_str(), "dir/subdir/file.txt");
+
+// Remove redundant slashes
+let path = ZipFilePath::from_str("dir//subdir///file.txt");
+assert_eq!(path.as_str(), "dir/subdir/file.txt");
+
+// Resolve relative components
+let path = ZipFilePath::from_str("dir/../file.txt");
+assert_eq!(path.as_str(), "file.txt");
+
+// Remove leading slashes (absolute -> relative)
+let path = ZipFilePath::from_str("/etc/passwd");
+assert_eq!(path.as_str(), "etc/passwd");
+
+// Prevent directory traversal
+let path = ZipFilePath::from_str("../../../etc/passwd");
+assert_eq!(path.as_str(), "etc/passwd");
+
+// Get string from normalized path
+let path = ZipFilePath::from_str("dir/file.txt");
+let my_str = String::from(path.into_owned());
+assert_eq!(my_str, String::from("dir/file.txt"));
+
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+## UTF-8 Encoding Detection
+
+The library automatically detects when paths contain characters that require
+UTF-8 encoding in ZIP files (beyond the default CP-437 encoding). This
+information is used internally when creating ZIP archives.
+"#
+)]
+
+#[cfg(feature = "alloc")]
+use crate::Error;
+use crate::ZipStr;
+#[cfg(feature = "alloc")]
+use alloc::borrow::Cow;
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+
+/// Raw path data directly from a ZIP archive.
+///
+/// **Warning**: Contains unvalidated bytes that may include malicious path components.
+#[cfg_attr(
+    feature = "alloc",
+    doc = "Use [`ZipFilePath::try_normalize()`] to create a safe path."
+)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RawPath<'a>(ZipStr<'a>);
+
+impl AsRef<[u8]> for RawPath<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+/// A normalized and sanitized path from a ZIP archive.
+///
+/// This path has been validated and sanitized according to the normalization
+/// rules described in the module documentation.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct NormalizedPath<'a>(Cow<'a, str>);
+
+#[cfg(feature = "alloc")]
+impl AsRef<[u8]> for NormalizedPath<'_> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl AsRef<str> for NormalizedPath<'_> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+/// An owned, normalized path from a ZIP archive.
+///
+/// Owned version of [`NormalizedPath`] with the same safety guarantees.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct NormalizedPathBuf(String);
+
+#[cfg(feature = "alloc")]
+impl AsRef<[u8]> for NormalizedPathBuf {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl AsRef<str> for NormalizedPathBuf {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+/// Type-safe wrapper for ZIP archive file paths.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ZipFilePath<R> {
+    data: R,
+}
+
+impl ZipFilePath<()> {
+    /// Creates a raw path from bytes.
+    ///
+    /// **Warning**: The resulting path is unvalidated.
+    #[cfg_attr(
+        feature = "alloc",
+        doc = "Use [`ZipFilePath::try_normalize()`] to create a safe path."
+    )]
+    #[inline]
+    pub fn from_bytes(data: &[u8]) -> ZipFilePath<RawPath<'_>> {
+        ZipFilePath {
+            data: RawPath(ZipStr::new(data)),
+        }
+    }
+
+    /// Creates a normalized path from a UTF-8 string.
+    ///
+    /// The path is automatically normalized according to the rules described in the module
+    /// documentation. When possible, the original string reference is preserved to avoid allocation.
+    #[cfg(feature = "alloc")]
+    #[inline]
+    #[allow(clippy::should_implement_trait)] // Can't implement FromStr due to lifetime issues
+    pub fn from_str(mut name: &str) -> ZipFilePath<NormalizedPath<'_>> {
+        let mut last = 0;
+        for &c in name.as_bytes() {
+            if matches!(
+                (c, last),
+                (b'\\', _) | (b'/', b'/') | (b'.', b'.') | (b'.', b'/') | (b':', _)
+            ) {
+                // slow path: intrusive string manipulations required
+                return ZipFilePath {
+                    data: NormalizedPath(Cow::Owned(Self::normalize_alloc(name))),
+                };
+            }
+            last = c;
+        }
+
+        loop {
+            // Fast path: before we trim, do a quick check if they are even necessary.
+            name = match name.as_bytes() {
+                [b'.', b'.', b'/', ..] => name.trim_start_matches("../"),
+                [b'.', b'/', ..] => name.trim_start_matches("./"),
+                [b'/', ..] => name.trim_start_matches('/'),
+                _ => {
+                    return ZipFilePath {
+                        data: NormalizedPath(Cow::Borrowed(name)),
+                    };
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "alloc")]
+    fn normalize_alloc(s: &str) -> String {
+        // 4.4.17.1 All slashes MUST be forward slashes '/'
+        let s = s.replace('\\', "/");
+
+        // 4.4.17.1 MUST NOT contain a drive or device letter
+        let s = match s.as_bytes() {
+            [drive, b':', b'/', ..] if drive.is_ascii_alphabetic() => &s[3..],
+            [drive, b':', ..] if drive.is_ascii_alphabetic() => &s[2..],
+            _ => &s,
+        };
+
+        // resolve path components
+        let splits = s.split('/');
+        let mut result = String::new();
+        for split in splits {
+            if split.is_empty() || split == "." {
+                continue;
+            }
+
+            if split == ".." {
+                let last = result.rfind('/');
+                result.truncate(last.unwrap_or(0));
+                continue;
+            }
+
+            if !result.is_empty() {
+                result.push('/');
+            }
+
+            result.push_str(split);
+        }
+
+        // Preserve a trailing slash so directory entries remain directories.
+        if s.as_bytes().last() == Some(&b'/') && !result.is_empty() {
+            result.push('/');
+        }
+
+        result
+    }
+}
+
+impl<R> ZipFilePath<R>
+where
+    R: AsRef<[u8]>,
+{
+    /// Returns true if the file path represents a directory.
+    ///
+    /// Determined by the path ending with a forward slash (`/`).
+    #[inline]
+    pub fn is_dir(&self) -> bool {
+        self.data.as_ref().last() == Some(&b'/')
+    }
+
+    /// Returns the length of the path in bytes.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.data.as_ref().len()
+    }
+
+    /// Returns true if the path is empty.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.data.as_ref().is_empty()
+    }
+}
+
+#[cfg(any(feature = "std", test))]
+pub(crate) fn str_needs_utf8(s: &str) -> bool {
+    for ch in s.chars() {
+        let code_point = ch as u32;
+
+        // Forbid 0x7e (~) and 0x5c (\) since EUC-KR and Shift-JIS replace those
+        // characters with localized currency and overline characters.
+        // Also forbid control characters (< 0x20) and characters above 0x7d.
+        if !(0x20..=0x7d).contains(&code_point) || code_point == 0x5c {
+            return true;
+        }
+    }
+
+    false
+}
+
+impl<'a> ZipFilePath<RawPath<'a>> {
+    /// Returns the raw bytes of the zip file path.
+    #[inline]
+    pub fn as_bytes(&self) -> &'a [u8] {
+        self.data.0.as_bytes()
+    }
+
+    /// Attempts to normalize this raw path into a safe, validated path.
+    ///
+    /// Validates the raw bytes as UTF-8 and applies normalization rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file path contains invalid UTF-8 sequences.
+    #[cfg(feature = "alloc")]
+    #[inline]
+    pub fn try_normalize(self) -> Result<ZipFilePath<NormalizedPath<'a>>, Error> {
+        let raw_data = self.data.0;
+        let name = core::str::from_utf8(raw_data.as_bytes()).map_err(Error::utf8)?;
+        Ok(ZipFilePath::from_str(name))
+    }
+}
+
+impl AsRef<[u8]> for ZipFilePath<RawPath<'_>> {
+    #[inline]
+    fn as_ref(&self) -> &[u8] {
+        self.data.0.as_bytes()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl AsRef<str> for ZipFilePath<NormalizedPath<'_>> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.data.0.as_ref()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl AsRef<str> for ZipFilePath<NormalizedPathBuf> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.data.0.as_ref()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<ZipFilePath<NormalizedPathBuf>> for String {
+    #[inline]
+    fn from(path: ZipFilePath<NormalizedPathBuf>) -> Self {
+        path.data.0
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl From<ZipFilePath<NormalizedPath<'_>>> for String {
+    #[inline]
+    fn from(path: ZipFilePath<NormalizedPath<'_>>) -> Self {
+        path.data.0.into_owned()
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> ZipFilePath<NormalizedPath<'a>> {
+    /// Returns the normalized string slice.
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.data.0.as_ref()
+    }
+
+    /// Converts this borrowed path into an owned path.
+    ///
+    /// Similar to [`Cow::into_owned`]
+    #[inline]
+    pub fn into_owned(self) -> ZipFilePath<NormalizedPathBuf> {
+        ZipFilePath {
+            data: NormalizedPathBuf(self.data.0.into_owned()),
+        }
+    }
+
+    /// Strips a single trailing slash, if present, so the path is treated as a
+    /// file rather than a directory.
+    ///
+    /// Normalization collapses any run of trailing separators into a single
+    /// `/`, so removing one slash is sufficient. The original borrow is
+    /// preserved when possible.
+    #[cfg(any(feature = "std", test))]
+    #[inline]
+    pub(crate) fn trim_trailing_slash(self) -> ZipFilePath<NormalizedPath<'a>> {
+        let data = match self.data.0 {
+            Cow::Borrowed(s) => Cow::Borrowed(s.strip_suffix('/').unwrap_or(s)),
+            Cow::Owned(mut s) => {
+                if s.ends_with('/') {
+                    s.pop();
+                }
+                Cow::Owned(s)
+            }
+        };
+        ZipFilePath {
+            data: NormalizedPath(data),
+        }
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl ZipFilePath<NormalizedPathBuf> {
+    /// Returns the normalized string slice.
+    #[inline]
+    pub fn as_str(&self) -> &str {
+        self.data.0.as_ref()
+    }
+}
+
+/// Controls how an entry path is written to the ZIP file name field.
+///
+/// ZIP calls this header field the "file name", but the value may include a
+/// relative path such as `dir/file.txt`.
+///
+/// - [`EntryPath::conformant`] normalizes UTF-8 text and sets the
+///   [`EntryFlags::is_utf8`](crate::EntryFlags::is_utf8) flag when needed.
+/// - [`EntryPath::verbatim`] writes uninterpreted bytes without that flag.
+///
+/// # Examples
+///
+/// ```rust
+/// use rawzip::path::EntryPath;
+///
+/// // A UTF-8 path, normalized on write.
+/// let path = EntryPath::conformant("docs/readme.txt");
+///
+/// // Exact bytes, no normalization, no UTF-8 flag.
+/// let path = EntryPath::verbatim(b"odd\x05name");
+/// ```
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EntryPath<'a>(pub(crate) EntryPathInner<'a>);
+
+/// The private path-writing policy.
+#[cfg(feature = "alloc")]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EntryPathInner<'a> {
+    /// Normalize UTF-8 text and set utf-8 flag when needed.
+    Conformant(Cow<'a, str>),
+    /// UTF-8 text already normalized by the reader.
+    Normalized(Cow<'a, str>),
+    /// Uninterpreted bytes without utf-8 flag.
+    Verbatim(Cow<'a, [u8]>),
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> EntryPath<'a> {
+    /// Creates a normalized UTF-8 path, setting utf-8 flag when needed.
+    #[inline]
+    pub fn conformant<S: Into<Cow<'a, str>>>(path: S) -> Self {
+        EntryPath(EntryPathInner::Conformant(path.into()))
+    }
+
+    /// Creates an exact, uninterpreted path without utf-8 flag.
+    #[inline]
+    pub fn verbatim<B: Into<Cow<'a, [u8]>>>(path: B) -> Self {
+        EntryPath(EntryPathInner::Verbatim(path.into()))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a, T> From<&'a T> for EntryPath<'a>
+where
+    T: AsRef<str> + ?Sized,
+{
+    #[inline]
+    fn from(value: &'a T) -> Self {
+        EntryPath::conformant(value.as_ref())
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<String> for EntryPath<'a> {
+    #[inline]
+    fn from(value: String) -> Self {
+        EntryPath::conformant(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<Cow<'a, str>> for EntryPath<'a> {
+    #[inline]
+    fn from(value: Cow<'a, str>) -> Self {
+        EntryPath::conformant(value)
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<ZipFilePath<NormalizedPath<'a>>> for EntryPath<'a> {
+    #[inline]
+    fn from(value: ZipFilePath<NormalizedPath<'a>>) -> Self {
+        EntryPath(EntryPathInner::Normalized(value.data.0))
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> From<ZipFilePath<NormalizedPathBuf>> for EntryPath<'a> {
+    #[inline]
+    fn from(value: ZipFilePath<NormalizedPathBuf>) -> Self {
+        EntryPath(EntryPathInner::Normalized(Cow::Owned(value.data.0)))
+    }
+}
+
+#[cfg(all(test, feature = "alloc"))]
+mod tests {
+    use super::*;
+    use rstest::rstest;
+
+    #[rstest]
+    #[case(b"test.txt", "test.txt")]
+    #[case(b"dir/test.txt", "dir/test.txt")]
+    #[case(b"dir\\test.txt", "dir/test.txt")]
+    #[case(b"dir//test.txt", "dir/test.txt")]
+    #[case(b"/test.txt", "test.txt")]
+    #[case(b"../test.txt", "test.txt")]
+    #[case(b"dir/../test.txt", "test.txt")]
+    #[case(b"./test.txt", "test.txt")]
+    #[case(b"dir/./test.txt", "dir/test.txt")]
+    #[case(b"dir/./../test.txt", "test.txt")]
+    #[case(b"dir/sub/../test.txt", "dir/test.txt")]
+    #[case(b"dir/../../test.txt", "test.txt")]
+    #[case(b"../../../test.txt", "test.txt")]
+    #[case(b"a/b/../../test.txt", "test.txt")]
+    #[case(b"a/b/c/../../../test.txt", "test.txt")]
+    #[case(b"a/b/c/d/../../test.txt", "a/b/test.txt")]
+    #[case(b"C:\\hello\\test.txt", "hello/test.txt")]
+    #[case(b"C:/hello\\test.txt", "hello/test.txt")]
+    #[case(b"C:/hello/test.txt", "hello/test.txt")]
+    #[case(b"C:hello/test.txt", "hello/test.txt")]
+    #[case(b"notes:draft.txt", "notes:draft.txt")]
+    #[case(b"foo:bar:baz", "foo:bar:baz")]
+    #[case(b"foo/bar/", "foo/bar/")]
+    #[case(b"foo\\bar\\", "foo/bar/")]
+    #[case(b"dir//sub/", "dir/sub/")]
+    #[case(b"dir/./", "dir/")]
+    #[case(b"x..y/", "x..y/")]
+    #[case(b"a/b/../", "a/")]
+    #[case(b"dir\\", "dir/")]
+    #[case(b"../", "")]
+    #[case(b"./", "")]
+    fn test_zip_path_normalized(#[case] input: &[u8], #[case] expected: &str) {
+        assert_eq!(
+            ZipFilePath::from_bytes(input)
+                .try_normalize()
+                .unwrap()
+                .as_ref(),
+            expected
+        );
+    }
+
+    #[rstest]
+    #[case(&[0xFF])]
+    #[case(&[b't', b'e', b's', b't', 0xFF])]
+    fn test_zip_path_normalized_invalid_utf8(#[case] input: &[u8]) {
+        assert!(ZipFilePath::from_bytes(input).try_normalize().is_err());
+    }
+
+    #[rstest]
+    #[case("test.txt", false)]
+    #[case("hello_world", false)]
+    #[case("file.name.ext", false)]
+    #[case("hello!", false)]
+    #[case("hello{world}", false)]
+    #[case("hello|world", false)]
+    #[case("hello`world", false)]
+    #[case("hello\"world", false)]
+    #[case("hello<world>", false)]
+    #[case("hello;world", false)]
+    #[case("hello:world", false)]
+    #[case("hello^world", false)]
+    #[case("hello\u{00A0}world", true)]
+    #[case("hello\u{0080}world", true)]
+    #[case("hello\u{00FF}world", true)]
+    #[case("hello\u{0100}world", true)]
+    #[case("hello\u{03B1}world", true)]
+    #[case("hello\u{4E00}world", true)]
+    #[case("hello\u{1F600}world", true)]
+    #[case(r"hello\world", false)] // Backslash gets normalized to forward slash
+    #[case("hello~world", true)]
+    #[case("hello\u{007F}world", true)]
+    #[case("hello\u{001F}world", true)]
+    #[case("hello\u{0000}world", true)]
+    #[case("hello\u{0001}world", true)]
+    #[case("hello\u{000A}world", true)]
+    #[case("hello\u{000D}world", true)]
+    #[case("hello\u{0009}world", true)]
+    #[case("", false)]
+    #[case(" ", false)]
+    #[case("hello\u{007E}world", true)]
+    #[case("hello\u{007D}world", false)]
+    fn test_needs_utf8_encoding(#[case] input: &str, #[case] expected: bool) {
+        let path = ZipFilePath::from_str(input);
+        assert_eq!(
+            str_needs_utf8(path.as_str()),
+            expected,
+            "Failed for input: {input}"
+        );
+    }
+
+    #[test]
+    fn test_path_lifetime_test() {
+        let normalized_path = ZipFilePath::from_bytes(b"test.txt")
+            .try_normalize()
+            .unwrap();
+        assert_eq!(normalized_path.as_ref(), "test.txt");
+        assert_eq!(normalized_path.len(), 8);
+    }
+
+    #[test]
+    fn test_raw_path_lifetime_preservation() {
+        use std::str::Utf8Error;
+
+        fn file_path_utf8<'a>(path: ZipFilePath<RawPath<'a>>) -> Result<&'a str, Utf8Error> {
+            std::str::from_utf8(path.as_bytes())
+        }
+
+        let raw_path = ZipFilePath::from_bytes(b"test/file.txt");
+        let result = file_path_utf8(raw_path).unwrap();
+        assert_eq!(result, "test/file.txt");
+    }
+}
