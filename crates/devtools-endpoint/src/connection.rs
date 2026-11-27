@@ -151,8 +151,8 @@ impl Connection {
             consumed += length;
         }
         self.buffer.consume(consumed);
-        let deferred = request.path().starts_with(b"/devtools/");
-        if deferred && matches!(Request::parse(self.buffer.readable()).0, Parsed::Invalid) {
+        let devtools_path = request.path().starts_with(b"/devtools/");
+        if devtools_path && matches!(Request::parse(self.buffer.readable()).0, Parsed::Invalid) {
             self.close();
             return false;
         }
