@@ -151,15 +151,12 @@ impl Connection {
             consumed += length;
         }
         self.buffer.consume(consumed);
-        let route = handler.route_http(&request);
-        if let Route::Now(response) = &route {
-            let remainder = self.buffer.readable();
-            if response.status() == 404 && matches!(remainder.first(), Some(b'\r' | b'\n')) {
-                self.close();
-                return false;
-            }
+        let deferred = request.path().starts_with(b"/devtools/");
+        if deferred && matches!(Request::parse(self.buffer.readable()).0, Parsed::Invalid) {
+            self.close();
+            return false;
         }
-        match route {
+        match handler.route_http(&request) {
             Route::Now(response) => self.send(&response),
             Route::Later => self.tasks.push(Task::Http(request)),
         }

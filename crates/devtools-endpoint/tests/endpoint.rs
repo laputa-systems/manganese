@@ -100,11 +100,12 @@ fn http_one_point_zero_requests_are_closed_without_a_response() {
 }
 
 #[test]
-fn a_not_found_with_a_malformed_following_request_is_closed_without_a_reply() {
-    for trailing in [b"\r".as_slice(), b"\n", b"\r\n"] {
+fn a_deferred_devtools_not_found_with_a_malformed_following_request_is_dropped() {
+    let head = format!("GET /devtools/browser/{} HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\n", launch::BROWSER_ID);
+    for trailing in [b"\r".as_slice(), b"\n", b"\r\n", b"\0", b"e: websocket\r\n", b"GET /x HTTP/1.0\r\n\r\n"] {
         let endpoint = endpoint();
         let mut stream = connect(&endpoint);
-        let mut request = b"GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\n".to_vec();
+        let mut request = head.as_bytes().to_vec();
         request.extend_from_slice(trailing);
         stream.write_all(&request).expect("the request is sent");
         assert!(read_all(&mut stream).is_empty(), "trailing {trailing:?}");
@@ -112,10 +113,20 @@ fn a_not_found_with_a_malformed_following_request_is_closed_without_a_reply() {
 }
 
 #[test]
-fn a_not_found_with_a_partial_following_request_still_answers() {
+fn an_io_thread_not_found_is_written_before_a_malformed_following_request() {
     let endpoint = endpoint();
     let mut stream = connect(&endpoint);
-    stream.write_all(b"GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\nGET /json/list HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r").expect("the request is sent");
+    stream.write_all(b"GET /nothing HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\n\n").expect("the request is sent");
+    let reply = read_all(&mut stream);
+    assert!(reply.starts_with(b"HTTP/1.1 404 Not Found\r\n"), "the 404 is written");
+}
+
+#[test]
+fn a_deferred_not_found_with_an_incomplete_following_request_still_answers() {
+    let endpoint = endpoint();
+    let mut stream = connect(&endpoint);
+    let head = format!("GET /devtools/browser/{} HTTP/1.1\r\nHost: 127.0.0.1:9221\r\n\r\n", launch::BROWSER_ID);
+    stream.write_all(format!("{head}GET").as_bytes()).expect("the request is sent");
     let reply = read_all(&mut stream);
     assert!(reply.starts_with(b"HTTP/1.1 404 Not Found\r\n"), "the first response is written");
 }
