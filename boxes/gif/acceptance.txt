@@ -1,0 +1,18 @@
+version 1
+box gif
+revision 60d4a2a48f86c67a3a45e01bd507e0bd7e8dd159
+arch x86_64
+spec sha256:e5f92a25b02025b73745a36e146e3131f8e794547a997287b264cc187ff944aa
+corpus sha256:f8c48b06e7a7d995c67f16954526e34bd219f99f2a0ea9f53da6479ebad3bfde seen 226 holdout 220
+oracle .work/tmp/gif/oracle sha256:f50443d4c062ce231b1654b19fde2994ed1255ea4ad742ad31f657ac90464119
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/gif sha256:a7c1801944cfeb8965dd6de7575df24029206700ef31c5325c653a38dee57358
+dependencies cargo-lock sha256:b8540d6c4025a5e967b5c8a0038e1e293b133a4d96f600b8ea1bc0d8984f12e1 tree sha256:c227169a0bf2029aa031a23728f206c67042c2c7d5782d74e27b8427762fbec4
+snapshot vendor/img tree f83baf12cf760e450f7f231b366540fd1c2f6482
+run seen exit 0 items 226 226
+run holdout exit 0 items 220 220
+run fuzz exit 0 seed 1795746766358680250 requested 20000 completed 20000
+run anchor make gif-anchor exit 0
+level source-harness met
+level frozen-browser met: make gif-anchor
+level integration pending: arm64 evidence (public_api: canvas getImageData in the frozen arm64 browser) and make closure have not run

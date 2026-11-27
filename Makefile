@@ -313,3 +313,16 @@ structured-data-record:
 .PHONY: structured-data-anchor
 structured-data-anchor:
 	PYTHONPATH=oracle/harness/structured-data python3 -B oracle/harness/structured-data/anchor.py
+
+.PHONY: gif-harness
+gif-harness:
+	mkdir -p .work/tmp/gif
+	tag=$$(sh oracle/source-oracle image-tag) && docker run --rm --network none --mount type=volume,src=manganese-oracle-work-amd64,dst=/work,readonly --mount type=bind,src=$(CURDIR),dst=/lane -e TMPDIR=/lane/.work/tmp/gif "$$tag" python3 -B /lane/oracle/harness/gif/build.py
+
+.PHONY: gif-record
+gif-record:
+	PYTHONPATH=oracle/harness/gif python3 -B oracle/harness/gif/record.py
+
+.PHONY: gif-anchor
+gif-anchor:
+	PYTHONPATH=oracle/harness/gif python3 -B oracle/harness/gif/anchor.py
