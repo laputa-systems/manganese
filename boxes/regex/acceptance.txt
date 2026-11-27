@@ -1,0 +1,17 @@
+version 1
+box regex
+revision 45f6cee786acefcfeff97b503501f17041717a7a
+arch x86_64
+spec sha256:f9be99de7a8b0aad5d8a98cd60a3c63a3244734115904ebb425c54ebb2189354
+corpus sha256:e04bb2ed8287a5c70c6b087eb11e9ec8c7d24372d0216738b4a7e5a49575c386 seen 1200 holdout 631
+oracle .work/tmp/regex/oracle sha256:2833905f63e2b47d737272680f2c309c8f816570049c7c48e07e2da3c20357b9
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/regex sha256:23edcfd491db3e77921ccbd1324690abe916107c721e921be58a7a9d26bb9ebf
+dependencies cargo-lock sha256:9d77b669055ea40cb40c90e38c290fdb1063e45228755afaaee505647d99ce86 tree sha256:77d0accfdf1db4841db9b8f756ec5d5fdf17ccaf7c15e62bdbb83563252ca8a0
+run seen exit 0 items 1200 1200
+run holdout exit 0 items 631 631
+run fuzz exit 0 seed 1795744275375037073 requested 20000 completed 20000
+run anchor make regex-anchor exit 0
+level source-harness met
+level frozen-browser met: make regex-anchor
+level integration pending: arm64 evidence (public_api: RegExp exec and hasIndices in the frozen arm64 browser) and make closure have not run
