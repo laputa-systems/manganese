@@ -1,0 +1,17 @@
+version 1
+box structured-data
+revision d02be50ba6a97d1f68891ab04f5e57afb3ee2c72
+arch x86_64
+spec sha256:ffc0f4a9743c2bddd1e29d1a7a4e22fed50f2779c716ab5bf382e1ce2cd03215
+corpus sha256:8b06307b7d34cbb1d1bdb77724f44ff788ed8ad80ae35ff8a206b7d61c3efb25 seen 684 holdout 658
+oracle .work/tmp/structured-data/oracle sha256:50b87efe93c38f8776a4bf34f08d58666dec0a3bed86b3512d27739cd26680fb
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/structured-data sha256:1fc598fd8513854b41f0c247c24317fe18955d0a64afc87c478693c9766da5d5
+dependencies cargo-lock sha256:61fb71493d566a72625f16617d9d40fbc316966c491e0cac8b262e3f598a9f6e tree sha256:932d6c66711a76ea259ae26eb4abab6abf8019ba129326341f17b22c88a4fa5f
+run seen exit 0 items 684 684
+run holdout exit 0 items 658 658
+run fuzz exit 0 seed 1795745709636522333 requested 20000 completed 20000
+run anchor make structured-data-anchor exit 0
+level source-harness met
+level frozen-browser met: make structured-data-anchor
+level integration pending: arm64 evidence (public_api: JSON.parse/JSON.stringify and DOMParser/XMLSerializer in the frozen arm64 browser) and make closure have not run
