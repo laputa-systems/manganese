@@ -8,6 +8,14 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::io::{self, Read, Write};
 
+const UNKNOWN_POSITION: i32 = -1;
+const MAX_RECORD: usize = 16 * 1024 * 1024;
+
+fn fail(message: &str) -> ! {
+    let _ = writeln!(io::stderr(), "structured-data: {message}");
+    std::process::exit(1);
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Value {
     Null,
@@ -266,8 +274,8 @@ fn json_parse(data: &[u8]) -> Option<Vec<u8>> {
         }
         Err(error) => {
             out.push(0);
-            out.extend(i32::try_from(error.line()).unwrap_or(-1).to_be_bytes());
-            out.extend(i32::try_from(error.column()).unwrap_or(-1).to_be_bytes());
+            out.extend(i32::try_from(error.line()).unwrap_or(UNKNOWN_POSITION).to_be_bytes());
+            out.extend(i32::try_from(error.column()).unwrap_or(UNKNOWN_POSITION).to_be_bytes());
             blob(&mut out, error.to_string().as_bytes());
         }
     }
@@ -751,7 +759,7 @@ fn serialize_node(node: &Node, out: &mut String) {
 
 fn record(data: &[u8]) -> Vec<u8> {
     if data.is_empty() {
-        std::process::exit(1);
+        return vec![0];
     }
     let result = match data[0] {
         1 => json_parse(&data[1..]),
@@ -776,31 +784,35 @@ fn main() {
     let mut input = stdin.lock();
     let header = match exact_read(&mut input, 4) {
         Some(value) => value,
-        None => std::process::exit(1),
+        None => fail("protocol header truncated"),
     };
     if header != b"MGB1" {
-        std::process::exit(1);
+        fail("not a box protocol stream");
     }
     let stdout = io::stdout();
     let mut out = stdout.lock();
     if out.write_all(b"MGB1").is_err() || out.flush().is_err() {
-        std::process::exit(1);
+        fail("cannot write the protocol header");
     }
     loop {
-        let length = match exact_read(&mut input, 4) {
-            Some(value) => u32::from_be_bytes(value.try_into().unwrap()) as usize,
+        let prefix = match exact_read(&mut input, 4) {
+            Some(value) => value,
             None => return,
         };
+        let length = u32::from_be_bytes(prefix.try_into().expect("a four-byte record prefix")) as usize;
+        if length > MAX_RECORD {
+            fail("record exceeds the input cap");
+        }
         let data = match exact_read(&mut input, length) {
             Some(value) => value,
-            None => std::process::exit(1),
+            None => fail("record truncated"),
         };
         let response = record(&data);
         if out.write_all(&(response.len() as u32).to_be_bytes()).is_err()
             || out.write_all(&response).is_err()
             || out.flush().is_err()
         {
-            std::process::exit(1);
+            fail("cannot write the response");
         }
     }
 }

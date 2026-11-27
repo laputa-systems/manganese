@@ -123,8 +123,8 @@ def main():
                 if process.poll() is None:
                     process.kill()
                 process.wait(timeout=15)
-            except OSError as error:
-                print(f'peer cleanup: {error}', file=sys.stderr)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f'peer cleanup: {type(error).__name__}: {error}', file=sys.stderr)
         if browser is not None and browser.poll() is None:
             browser.kill()
             browser.wait()
