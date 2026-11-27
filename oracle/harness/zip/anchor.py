@@ -15,11 +15,26 @@ import launch
 
 def peer(path):
     process = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
-    process.stdin.write(b'MGB1')
-    process.stdin.flush()
-    if process.stdout.read(4) != b'MGB1':
-        raise RuntimeError('oracle protocol header')
+    try:
+        process.stdin.write(b'MGB1')
+        process.stdin.flush()
+        if process.stdout.read(4) != b'MGB1':
+            raise RuntimeError('oracle protocol header')
+    except BaseException:
+        stop_peer(process)
+        raise
     return process
+
+
+def stop_peer(process):
+    try:
+        if process.stdin is not None and not process.stdin.closed:
+            process.stdin.close()
+        if process.poll() is None:
+            process.kill()
+        process.wait(timeout=15)
+    except OSError as error:
+        print(f'oracle cleanup: {error}', file=sys.stderr)
 
 
 def ask(process, data):
@@ -57,6 +72,7 @@ run_dir = launch.new_run_dir('zip-anchor', 'headless')
 archive = launch.resolve_archive(run_dir, 'x86_64', None, None)
 session = launch.open_session(run_dir, archive)
 browser = None
+oracle = None
 try:
     _, browser = session.start_browser('headless')
     result = json.loads(session.sidecar(
@@ -74,7 +90,7 @@ try:
         raise RuntimeError('oracle failed')
     if len(result) != len(items):
         raise RuntimeError(f'anchor count {len(result)} != {len(items)}')
-    for index, (item, observed, wanted) in enumerate(zip(items, result, expected)):
+    for index, (item, observed, wanted) in enumerate(zip(items, result, expected, strict=True)):
         data = base64.b64decode(observed)
         actual = ('ok' if hashlib.sha256(data).hexdigest() == wanted[2] and len(data) == wanted[1] else 'fail',
                   len(data), hashlib.sha256(data).hexdigest())
@@ -86,6 +102,8 @@ try:
     if not shutdown.get('shutdown', {}).get('ok') or browser.wait(timeout=15) != 0:
         raise RuntimeError('browser shutdown failed')
 finally:
+    if oracle is not None:
+        stop_peer(oracle)
     if browser is not None and browser.poll() is None:
         browser.kill()
         browser.wait()
