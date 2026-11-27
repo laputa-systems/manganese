@@ -1,16 +1,16 @@
 version 1
 box compression-misc
-revision 579d8c6112353a370231d33b50d18f2a21a8e70b
+revision c83460e7b616d023720532c6c338841e523f124a
 arch x86_64
 spec sha256:56f7514f3f8cb2052d6fd584d0193aff845c8a06f841d6e4cfa1498c2d1bce52
 corpus sha256:ddaa9dec80d7627fcfa34f24d6662699711d7c93e6a4b5d799b5bbccd494daf7 seen 533 holdout 516
 oracle .work/tmp/compression-misc/oracle sha256:50176aaeda476b08610ff3899ca3dbb0893849e2925631e99b4951d475ea8234
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/compression-misc sha256:6e0372ba7aa52495d74c4d20ed7f6304ff2048a89a7088523d418a2776195c4f
-dependencies cargo-lock sha256:31935b320b256715920f70f93b9f56c310707d06cfca0f2f9ee99d8a62e7611e tree sha256:d48d59a690a246c6deeeedd763d7c223008fdc6674bf7031406415a56a745b7f
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/compression-misc sha256:5515050b36a3321605e48f70966792b1ad5d6ee8fb77f99e19cde607b6261dbe
+dependencies cargo-lock sha256:3729fa2248b7e6c1c19e5a781d2547fbb2089e99d21cdb23bfa4a6c706a91ed8 tree sha256:7bb8a088b29021d3f982201d61bf37f02a1ec36f6042883c3cebc8d277228376
 run seen exit 0 items 533 533
 run holdout exit 0 items 516 516
-run fuzz exit 0 seed 1795748059610769155 requested 20000 completed 20000
+run fuzz exit 0 seed 1795748130098841430 requested 20000 completed 20000
 run anchor make compression-misc-anchor exit 0
 level source-harness met
 level frozen-browser met: make compression-misc-anchor
