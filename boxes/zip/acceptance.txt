@@ -1,18 +1,18 @@
 version 1
 box zip
-revision 2538255f64f4b89e8133bdda5cf1917c6786236a
+revision 52baa0ea473d2497f93ea642e8084a550912dadf
 arch x86_64
 spec sha256:caa6900519a355de77e08ef5c58e96570f455a16b53a562dd3e04bf40fc64d0d
 corpus sha256:ac7dc904f249b2ff30874d210566f38459eeaa09e6fa158e26d84032b68d94ca seen 581 holdout 400
 oracle .work/tmp/zip/oracle sha256:a95f2e1e41ebe43a1be9961d6ceb09384cef8fd32fca07b81aaeb3d3e612e0e0
 oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
-candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/zip sha256:f45860fc041c641c1e9e9541c4e567990f63c8d6ceed2991c4b2b987d8c19747
-dependencies cargo-lock sha256:0f86efadbb67389795a2bc38c8a205f81f9d91ae234e10551edbb277e4d55e10 tree sha256:8174e981504cf80b36b87637c1eaa4f33965a1ac3d76accdd65ec3eb90939f29
-snapshot vendor/rawzip tree 042ec8e8e4fcd454c7b5ef04544038296089bc48
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/zip sha256:df2257619b19849c3a1205ff622393bd46bfabbccb100db30b82b61c4ed6a879
+dependencies cargo-lock sha256:acda5c92edee39ed215cf7842cd59f341f539c17a8c32b9dcecf5d6716a5cae7 tree sha256:a389e103c7a27bf4c888bdc19dca0d8776944ddb96f1d642b1cfc76b97ec27f6
+snapshot vendor/rawzip tree 773dcde09b259881bec631995af02b2b6fc4d133
 snapshot vendor/zlib-rs tree 8d7f4e37f1731a5863d449f6f2a90acd4c6d890c
 run seen exit 0 items 581 581
 run holdout exit 0 items 400 400
-run fuzz exit 0 seed 1795745313884157815 requested 20000 completed 20000
+run fuzz exit 0 seed 1795745460683452308 requested 20000 completed 20000
 run anchor make zip-anchor exit 0
 level source-harness met
 level frozen-browser met: make zip-anchor
