@@ -125,8 +125,11 @@ def mutate(data: bytes, rng: random.Random) -> bytes:
         return data
     count = 1 << ((data[10] & 7) + 1)
     result = bytearray(data)
+    limit = min(len(result), 13 + 3 * count)
+    if limit <= 13:
+        return bytes(result)
     for _ in range(rng.randrange(1, 4)):
-        position = 13 + rng.randrange(3 * count)
+        position = 13 + rng.randrange(limit - 13)
         result[position] ^= 1 << rng.randrange(8)
     return bytes(result)
 

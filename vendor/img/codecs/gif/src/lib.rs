@@ -146,6 +146,11 @@ struct GraphicControl {
 
 impl Decoder {
     /// Parse the image header and every frame configuration the input reveals.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Status::ShortRead` when the stream ends before the header or a frame is complete,
+    /// and `Status::Error` when the header or frame syntax is invalid.
     pub fn new(data: &[u8]) -> Result<Self, Status> {
         if data.len() < 6 {
             return Err(Status::ShortRead);
@@ -318,6 +323,11 @@ impl Decoder {
     }
 
     /// Decode one frame's LZW stream and paint it into a BGRA image buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Status::Error` for an unknown frame index or an invalid LZW stream, and
+    /// `Status::ShortRead` when the stream ends before the frame is complete.
     pub fn decode_frame(
         &self,
         data: &[u8],

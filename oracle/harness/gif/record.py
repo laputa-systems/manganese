@@ -4,6 +4,7 @@ import pathlib
 import random
 import struct
 import subprocess
+import tempfile
 
 from corpus import decode_request, make_gif, mutate, random_gif
 
@@ -11,7 +12,9 @@ root = pathlib.Path(__file__).resolve().parents[3]
 os.chdir(root)
 store = pathlib.Path(os.environ.get('MANGANESE_STORE', pathlib.Path.home() / '.local/share/manganese/store')) / 'sha256'
 store.mkdir(parents=True, exist_ok=True)
-oracle = subprocess.Popen(['.work/tmp/gif/oracle'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+scratch = pathlib.Path('.work/tmp/gif')
+scratch.mkdir(parents=True, exist_ok=True)
+oracle = subprocess.Popen(['.work/tmp/gif/oracle'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
 
 def stop_oracle():
@@ -41,13 +44,35 @@ def ask(data: bytes) -> bytes:
     return result
 
 
+def stage(data: bytes, directory: pathlib.Path, prefix: str) -> pathlib.Path:
+    with tempfile.NamedTemporaryFile(dir=directory, prefix=prefix, delete=False) as temporary:
+        path = pathlib.Path(temporary.name)
+        try:
+            temporary.write(data)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        except BaseException:
+            path.unlink()
+            raise
+    return path
+
+
 def blob(data: bytes) -> tuple[str, int]:
     digest = hashlib.sha256(data).hexdigest()
     path = store / digest
-    if path.exists() and path.read_bytes() != data:
-        raise RuntimeError('artifact digest collision')
-    if not path.exists():
-        path.write_bytes(data)
+    if path.exists():
+        if path.read_bytes() != data:
+            raise RuntimeError('artifact digest collision')
+        return digest, len(data)
+    temporary = stage(data, store, 'blob-')
+    try:
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            if path.read_bytes() != data:
+                raise RuntimeError('artifact digest collision')
+    finally:
+        temporary.unlink()
     return digest, len(data)
 
 
@@ -99,5 +124,9 @@ if oracle.wait():
     raise RuntimeError('oracle failed')
 lock = pathlib.Path('goldens.lock')
 existing = [line for line in lock.read_text().splitlines() if not line.startswith('gif ')]
-lock.write_text('\n'.join(existing + rows) + '\n')
+temporary = stage(('\n'.join(existing + rows) + '\n').encode(), scratch, 'lock-')
+try:
+    os.replace(temporary, lock)
+finally:
+    temporary.unlink(missing_ok=True)
 print('recorded', len(rows), 'seen', sum(' seen ' in row for row in rows), 'holdout', sum(' holdout ' in row for row in rows))

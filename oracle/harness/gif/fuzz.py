@@ -2,6 +2,7 @@
 import os
 import pathlib
 import random
+import struct
 import sys
 
 from corpus import decode_request, mutate, random_gif
@@ -23,14 +24,26 @@ seed, cases = fuzzdriver.budget()
 rng = random.Random(seed)
 
 
+def seed_data(request: bytes) -> bytes:
+    count = struct.unpack_from('>I', request, 1)[0]
+    offset = 5
+    pieces = []
+    for _ in range(count):
+        length = struct.unpack_from('>I', request, offset)[0]
+        offset += 4
+        pieces.append(request[offset:offset + length])
+        offset += length
+    return b''.join(pieces)
+
+
 def generate(_oracle):
     if rng.randrange(4) == 0:
-        value = mutate(rng.choice(seeds), rng)
+        value = decode_request(mutate(seed_data(rng.choice(seeds)), rng))
     else:
         data = random_gif(rng)
         if rng.randrange(4) == 0:
             data = mutate(data, rng)
-        value = decode_request(data, [])
+        value = decode_request(data)
     return value
 
 

@@ -6,6 +6,7 @@ const EMPTY: u32 = 0;
 const INITIALIZED: u32 = 1;
 const PARTIAL: u32 = 2;
 const COMPLETE: u32 = 3;
+const MAX_RECORD: usize = 64 * 1024 * 1024;
 
 fn put32(output: &mut Vec<u8>, value: u32) {
     output.extend_from_slice(&value.to_be_bytes());
@@ -397,7 +398,11 @@ fn main() -> io::Result<()> {
             break;
         }
         input.read_exact(&mut header[1..])?;
-        let mut bytes = vec![0; u32::from_be_bytes(header) as usize];
+        let length = u32::from_be_bytes(header) as usize;
+        if length == 0 || length > MAX_RECORD {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "bad record length"));
+        }
+        let mut bytes = vec![0; length];
         input.read_exact(&mut bytes)?;
         if bytes.first() != Some(&0) {
             return Err(io::Error::other("invalid operation"));
