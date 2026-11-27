@@ -4,7 +4,7 @@ Base: 9e928387c549fb3c303c902b741918039a4e4dc4 (2026-11-25, 0.9.0-pre.6).
 
 Branch: manganese/chromium-sqlite.
 
-Pushed commit: 02c26e911 (core: make LIKE and GLOB false for BLOB operands under a feature).
+Pushed commit: 974eabbb27 (core: reject column rename when a view cannot resolve a table; commit 02c26e911 preceded it).
 
 The snapshot holds the crates Manganese builds: core (turso_core), ast (turso_ast), macros (turso_macros), sqlite/parser (turso_parser), sqlite/frontend (turso_sqlite) and extensions/core (turso_ext), with the upstream license files and sqlite/version. Its root manifest lists only those members; every other file in those crates matches the pushed commit.
 
@@ -19,5 +19,6 @@ Fork commits on the branch, oldest first:
 - secure_delete also zeroes freed pages, emptied pages and defragmented gaps; PRAGMA case_sensitive_like; upper(X,'el') as ICU 78; REGEXP with ICU syntax through fancy-regex (MIT); VACUUM leaves the last insert rowid where SQLite does.
 - A like_doesnt_match_blobs feature makes the built-in LIKE and GLOB answer false for a BLOB operand before they check NULL, as Chromium's SQLITE_LIKE_DOESNT_MATCH_BLOBS build does; it is off by default.
 - Values: SQLite 3.53.4's REAL to TEXT and TEXT to REAL conversions everywhere, concat_ws keeping empty arguments, SQLITE_ENABLE_ICU's upper, lower, LIKE and REGEXP as a dialect option (icu_casemap 2.2), and SQLite version 3.53.4.
+- ALTER TABLE RENAME COLUMN revalidates every view in the main and temp schemas, as SQLite does, so a view that references a missing table fails the rename with SQLITE_ERROR; a conformance regression test covers both the failure and the unaffected rename.
 
 The lane branches manganese/rollback-journal, manganese/sqlite-text, manganese/lane-wor, manganese/lane-rename and manganese/lane-text in the local clone hold the original commits that were cherry-picked onto the branch.
