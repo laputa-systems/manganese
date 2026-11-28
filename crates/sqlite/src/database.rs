@@ -64,6 +64,7 @@ pub struct Database {
     schema_write_slot: Option<u8>,
     transaction_slot: Option<u8>,
     errcode: i32,
+    last_step_error: i32,
     epoch: u64,
     next_statement: u64,
     statements: HashMap<StatementId, PreparedStatement>,
@@ -142,6 +143,7 @@ impl Database {
             schema_write_slot: None,
             transaction_slot: None,
             errcode: 0,
+            last_step_error: 0,
             epoch: 0,
             next_statement: 0,
             statements: HashMap::new(),
@@ -478,6 +480,7 @@ impl Database {
                 engine.reset(prepared);
                 statement.halted = true;
                 statement.rc = code;
+                self.last_step_error = code;
                 code
             }
         };
@@ -689,7 +692,6 @@ impl Database {
     }
 
     pub fn query_rows(&mut self, sql: &[u8]) -> Option<Vec<Vec<SqlValue>>> {
-        let saved = self.errcode;
         let id = self.unique_statement(sql);
         let mut rows = Vec::new();
         while self.step(id) {
@@ -697,23 +699,28 @@ impl Database {
         }
         let ok = self.succeeded(id);
         self.finalize(id);
-        self.errcode = saved;
+        if self.last_step_error > 25 {
+            self.errcode = self.last_step_error;
+        }
         ok.then_some(rows)
     }
 
     fn does_schema_item_exist(&mut self, name: &[u8], kind: &[u8]) -> bool {
-        let saved = self.errcode;
         let id = self.unique_statement(b"SELECT 1 FROM sqlite_schema WHERE type=? AND name=?");
         if !self.is_valid(id) {
             self.finalize(id);
-            self.errcode = saved;
+            if self.last_step_error > 25 {
+                self.errcode = self.last_step_error;
+            }
             return false;
         }
         self.bind(id, 0, &SqlValue::Text(kind.to_vec()));
         self.bind(id, 1, &SqlValue::Text(name.to_vec()));
         let exists = self.step(id);
         self.finalize(id);
-        self.errcode = saved;
+        if self.last_step_error > 25 {
+            self.errcode = self.last_step_error;
+        }
         exists
     }
 
