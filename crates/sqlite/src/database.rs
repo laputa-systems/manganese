@@ -573,6 +573,9 @@ impl Database {
             statement.ran = false;
             statement.halted = false;
             statement.rc = 0;
+            if clear_bindings {
+                statement.final_error = 0;
+            }
         }
         statement.last_result = None;
     }

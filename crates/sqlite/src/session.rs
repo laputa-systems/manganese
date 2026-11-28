@@ -348,11 +348,6 @@ impl Session {
                 }
                 if ok {
                     self.transaction_stack.push(slot);
-                } else if self.db().error_code() == 0 {
-                    let code = self.db().last_step_error();
-                    if code > 25 {
-                        self.db().set_error(code);
-                    }
                 }
                 self.result(out, ok);
             }
