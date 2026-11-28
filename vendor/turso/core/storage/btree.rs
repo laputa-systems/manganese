@@ -967,6 +967,9 @@ pub struct BTreeCursor {
     /// to decide whether a peer's write hit *this* handle's row (expire, like SQLite's
     /// invalidateIncrblobCursors) or a different row (survivable via re-seek).
     blob_pinned_rowid: Option<i64>,
+    /// Most recent table rowid visited by this cursor, retained so an EOF cursor
+    /// can save a "seek past this row" position when a peer inserts a row.
+    last_visited_rowid: Option<i64>,
     /// Latched when an external write hits the pinned row or the position becomes
     /// unrecoverable. Every subsequent blob operation fails with
     /// [`LimboError::BlobHandleExpired`]; nothing ever clears it — SQLite's expired
@@ -1340,6 +1343,7 @@ impl BTreeCursor {
             reusable_cell_payload: crate::alloc::vec![],
             blob_cache: BlobCellCache::default(),
             blob_pinned_rowid: None,
+            last_visited_rowid: None,
             blob_expired: false,
             iteration_pending_descent: None,
             pending_peer_save: None,
@@ -1918,6 +1922,11 @@ impl BTreeCursor {
                 );
 
                 if is_leaf {
+                    if contents.page_type().is_ok_and(|kind| kind.is_table()) {
+                        if let Ok(rowid) = contents.cell_table_leaf_read_rowid(cell_idx) {
+                            self.last_visited_rowid = Some(rowid);
+                        }
+                    }
                     return Ok(IOResult::Done(true));
                 }
                 if is_index && self.going_upwards {
@@ -7817,6 +7826,18 @@ impl CursorTrait for BTreeCursor {
         // Idempotent, so safe across IO re-entry into this function.
         self.move_to_right_state.1 = None;
         self.invalidate_count_cache();
+        if !self.has_record() && !self.skip_advance {
+            if let Some(rowid) = self.last_visited_rowid {
+                // The cursor has scanned past the last row. Save a seek past that
+                // row so a same-connection insert beyond it becomes visible on the
+                // next step, as SQLite's saveAllCursors does for an EOF cursor.
+                self.save_context(CursorContext {
+                    key: CursorContextKey::TableRowId(rowid),
+                    seek_op: SeekOp::GT,
+                });
+                return Ok(IOResult::Done(SavePositionResult::Saved));
+            }
+        }
         if self.valid_state != CursorValidState::Valid || !(self.has_record() || self.skip_advance)
         {
             // Nothing to save: cursor has no live position. No invalidation
