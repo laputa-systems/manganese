@@ -324,7 +324,15 @@ impl Session {
             0x08 => {
                 let id = self.slot(input.u8());
                 let clear = input.u8() != 0;
+                let code = if !clear && self.db().last_step_error() > 25 {
+                    self.db().final_error(id)
+                } else {
+                    0
+                };
                 self.db().reset(id, clear);
+                if code > 25 && self.db().error_code() == 0 {
+                    self.db().set_error(code);
+                }
                 out.bool(true);
             }
             0x09 => {
