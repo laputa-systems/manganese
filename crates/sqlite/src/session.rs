@@ -121,6 +121,15 @@ impl Session {
         let code = if ok { 0 } else { self.db().error_code() };
         if !ok {
             self.db().clear_step_error();
+        }
+        out.i32(code);
+    }
+
+    fn result_consuming(&mut self, out: &mut Writer, ok: bool) {
+        out.bool(ok);
+        let code = if ok { 0 } else { self.db().error_code() };
+        if !ok {
+            self.db().clear_step_error();
             if code > 25 {
                 self.db().consume_statement_errors(code);
             }
@@ -257,7 +266,7 @@ impl Session {
             0x04 => {
                 let sql = input.bytes();
                 let ok = self.db().execute(&String::from_utf8_lossy(&sql));
-                self.result(out, ok);
+                self.result_consuming(out, ok);
             }
             0x05 => {
                 let slot = input.u8();
@@ -485,7 +494,7 @@ impl Session {
             }
             0x1a => {
                 let ok = self.db().vacuum();
-                self.result(out, ok);
+                self.result_consuming(out, ok);
             }
             0x1b => {
                 let truncate = input.u8() != 0;
