@@ -120,6 +120,24 @@ impl Engine {
         self.connection.update_last_rowid(rowid);
     }
 
+    pub fn statement_succeeds(&self, sql: &str) -> bool {
+        let Ok(mut statement) = self.connection.prepare(sql) else {
+            return false;
+        };
+        loop {
+            match statement.step_with_structured_errors() {
+                Ok(StepResult::Row) => {}
+                Ok(StepResult::Done) => return true,
+                Ok(StepResult::IO | StepResult::Yield | StepResult::Sleep { .. }) => {
+                    if self.io.step().is_err() {
+                        return false;
+                    }
+                }
+                _ => return false,
+            }
+        }
+    }
+
     pub fn autocommit(&self) -> bool {
         self.connection.get_auto_commit()
     }

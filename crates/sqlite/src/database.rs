@@ -385,11 +385,13 @@ impl Database {
         let saved_errcode = self.errcode;
         let saved_rowid = self.last_insert_row_id();
         let mut valid = true;
-        if let Some(rows) = self.query_rows(b"SELECT name FROM sqlite_schema WHERE type='view'") {
+        let names = self.query_rows(b"SELECT name FROM sqlite_schema WHERE type='view'");
+        if let Some(rows) = names {
             for row in rows {
                 if let SqlValue::Text(name) = &row[0] {
                     let quoted = String::from_utf8_lossy(name).replace('"', "\"\"");
-                    if self.query_rows(format!("SELECT * FROM \"{quoted}\"").as_bytes()).is_none() {
+                    let readable = self.engine().is_ok_and(|engine| engine.statement_succeeds(&format!("SELECT * FROM \"{quoted}\"")));
+                    if !readable {
                         valid = false;
                         break;
                     }
