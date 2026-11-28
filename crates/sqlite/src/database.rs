@@ -689,6 +689,7 @@ impl Database {
     }
 
     pub fn query_rows(&mut self, sql: &[u8]) -> Option<Vec<Vec<SqlValue>>> {
+        let saved = self.errcode;
         let id = self.unique_statement(sql);
         let mut rows = Vec::new();
         while self.step(id) {
@@ -696,19 +697,23 @@ impl Database {
         }
         let ok = self.succeeded(id);
         self.finalize(id);
+        self.errcode = saved;
         ok.then_some(rows)
     }
 
     fn does_schema_item_exist(&mut self, name: &[u8], kind: &[u8]) -> bool {
+        let saved = self.errcode;
         let id = self.unique_statement(b"SELECT 1 FROM sqlite_schema WHERE type=? AND name=?");
         if !self.is_valid(id) {
             self.finalize(id);
+            self.errcode = saved;
             return false;
         }
         self.bind(id, 0, &SqlValue::Text(kind.to_vec()));
         self.bind(id, 1, &SqlValue::Text(name.to_vec()));
         let exists = self.step(id);
         self.finalize(id);
+        self.errcode = saved;
         exists
     }
 
