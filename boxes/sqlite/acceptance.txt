@@ -1,0 +1,18 @@
+version 1
+box sqlite
+revision 7889c68b30940ea435badc955e3292986580da1f
+arch x86_64
+spec sha256:862769c2c4cfda4ed9726292bf6c906ad6ed6985b0a97588fa42a3f2e1a7b485
+corpus sha256:7f2a4983e9254f690402d2aa0ef26ce9d3ba34211e8291e6b35750bc8dc333d9 seen 395 holdout 260
+oracle .work/tmp/sqlite/oracle sha256:1c2a592f6f28edb947f0315a92d8f5044f1731625bfab40606f8ec8a73a51ac7
+oracle-builder manganese-oracle-builder:156.0.8078.79-amd64-8b03e6847e16
+candidate .work/tmp/target/x86_64-unknown-linux-musl/debug/sqlite sha256:cb39dd90dd6b04aea0bcd0fcf498bf32bd6b6566f2106a56c81ed57799355802
+dependencies cargo-lock sha256:1df14250e2f9a442d912357f41536746a68a7e5a43ff079d06149d00b13d614d tree sha256:156114513514ea0ceef9ce3aa58bd5eefb20433d6ba69ef2779c5ea163fbde94
+snapshot vendor/turso tree f57be745c1b83df38624b94fc0da72451b5d2f56
+run seen exit 0 items 395 395
+run holdout exit 0 items 260 260
+run fuzz exit 0 seed 1 requested 20000 completed 20000
+run anchor make sqlite-anchor exit 0
+level source-harness met
+level frozen-browser met: make sqlite-anchor
+level integration pending: arm64 evidence (public_api: the SQLite databases of a frozen arm64 browser profile through the same anchor) and make closure have not run
