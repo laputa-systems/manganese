@@ -48,6 +48,7 @@ use super::btree::offset::{
 };
 use super::btree::{
     btree_init_page, payload_overflow_threshold_max, payload_overflow_threshold_min, PayloadLimits,
+    SavePositionResult,
 };
 use super::page_cache::{CacheError, CacheResizeResult, PageCache, PageCacheKey, SpillResult};
 use super::sqlite3_ondisk::{
@@ -2203,6 +2204,27 @@ impl Pager {
         }
     }
 
+    /// Preserve every cursor's iteration position across a savepoint rollback,
+    /// as SQLite's saveAllCursors does. A statement reset can roll back a
+    /// statement savepoint while other statements on the connection are still
+    /// mid-scan; clearing their page stacks would end those scans early.
+    pub(crate) fn save_all_cursors_before_rollback(&self) {
+        let snapshot: smallvec::SmallVec<[RegisteredCursor; 8]> = {
+            let registry = self.cursor_registry.lock();
+            registry.values().flat_map(|b| b.iter().copied()).collect()
+        };
+        for peer in snapshot {
+            // SAFETY: see RegisteredCursor's invariant.
+            let outcome = self
+                .io
+                .block(|| unsafe { peer.as_mut().try_save_position_for_external_balance() });
+            if !matches!(outcome, Ok(SavePositionResult::Saved)) {
+                // SAFETY: see RegisteredCursor's invariant.
+                unsafe { peer.as_mut().invalidate_btree_cache() };
+            }
+        }
+    }
+
     /// Invalidate the page stacks of every peer on `except`'s btree. Used
     /// by clear_btree / btree_destroy where every page is freed; saving
     /// positions would just stash keys that no longer exist.
@@ -2704,7 +2726,7 @@ impl Pager {
         );
 
         // saveAllCursors at sqlite3BtreeSavepoint (btree.c:4580).
-        self.invalidate_all_cursors();
+        self.save_all_cursors_before_rollback();
 
         // Discard all dirty pages allocated after the savepoint. These pages
         // are never subjournaled (see subjournal_page_if_required), so the loop
@@ -6518,7 +6540,7 @@ impl Pager {
             self.wal.as_ref().is_none_or(|wal| wal.holds_write_lock()),
             "rollback must discard pages while holding the WAL write lock"
         );
-        self.invalidate_all_cursors();
+        self.save_all_cursors_before_rollback();
         let committed_max_frame = self.wal.as_ref().map_or(0, |wal| wal.get_max_frame());
         let mut dirty_pages = self.dirty_pages.write();
         self.page_cache
