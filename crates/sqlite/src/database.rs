@@ -104,6 +104,9 @@ fn skip_blank(sql: &[u8]) -> usize {
 
 fn reads_table(sql: &[u8]) -> bool {
     let upper: Vec<u8> = sql.iter().map(|byte| byte.to_ascii_uppercase()).collect();
+    if upper.windows(6).any(|window| window == b"COUNT(") {
+        return false;
+    }
     [b"INSERT".as_slice(), b"UPDATE", b"DELETE"].iter().any(|verb| upper.starts_with(verb))
         || upper.windows(5).any(|window| window == b" FROM")
         || upper.windows(5).any(|window| window == b"JOIN ")
