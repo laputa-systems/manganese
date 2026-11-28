@@ -121,6 +121,9 @@ impl Session {
         let code = if ok { 0 } else { self.db().error_code() };
         if !ok {
             self.db().clear_step_error();
+            if code > 25 {
+                self.db().consume_statement_errors(code);
+            }
         }
         out.i32(code);
     }

@@ -181,6 +181,14 @@ impl Database {
         self.last_step_error = 0;
     }
 
+    pub fn consume_statement_errors(&mut self, code: i32) {
+        for statement in self.statements.values_mut() {
+            if statement.final_error == code {
+                statement.final_error = 0;
+            }
+        }
+    }
+
     pub fn final_error(&self, id: StatementId) -> i32 {
         self.statements.get(&id).map_or(0, |statement| statement.final_error)
     }
