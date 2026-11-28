@@ -334,6 +334,7 @@ impl Database {
 
     fn ensure_trigger_sequence_rows(&mut self, sql: &str) {
         let changes = self.last_change_count();
+        let rowid = self.last_insert_row_id();
         let upper: Vec<u8> = sql.as_bytes().iter().map(|byte| byte.to_ascii_uppercase()).collect();
         if !self.options.enable_triggers
             || !upper.starts_with(b"INSERT")
@@ -371,6 +372,7 @@ impl Database {
         }
         if let Ok(engine) = self.engine() {
             engine.set_changes(changes);
+            engine.set_last_insert_rowid(rowid);
         }
     }
 

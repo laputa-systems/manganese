@@ -116,6 +116,10 @@ impl Engine {
         self.connection.last_insert_rowid()
     }
 
+    pub fn set_last_insert_rowid(&self, rowid: i64) {
+        self.connection.update_last_rowid(rowid);
+    }
+
     pub fn autocommit(&self) -> bool {
         self.connection.get_auto_commit()
     }

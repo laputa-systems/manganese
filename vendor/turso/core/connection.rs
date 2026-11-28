@@ -2538,7 +2538,7 @@ impl Connection {
         self.last_insert_rowid.load(Ordering::SeqCst)
     }
 
-    pub(crate) fn update_last_rowid(&self, rowid: i64) {
+    pub fn update_last_rowid(&self, rowid: i64) {
         self.last_insert_rowid.store(rowid, Ordering::SeqCst);
     }
 
