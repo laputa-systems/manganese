@@ -7609,7 +7609,7 @@ fn init_agg_payload(func: &AggFunc, payload: &mut crate::alloc::Vec<Value>) -> R
         }
         AggFunc::Avg => {
             payload.try_reserve_exact(5)?;
-            payload.push(Value::from_f64(0.0));
+            payload.push(Value::Null);
             payload.push(Value::from_f64(0.0));
             payload.push(Value::from_i64(0));
             payload.push(Value::from_i64(0));
@@ -7762,18 +7762,40 @@ fn update_agg_payload(
             if counts_infinite_inputs && add_to_infinity_count(&parsed, pos_inf, neg_inf, 1)? {
                 return Ok(());
             }
-            if matches!(*sum_val, Value::Null) {
-                return Ok(());
-            }
-            let r_err = r_err_val.to_float_or_zero();
             let mut sum_state = SumAggState {
-                r_err,
+                r_err: r_err_val.to_float_or_zero(),
                 ..Default::default()
             };
             match parsed {
-                NumericArg::Integer(i) => apply_kbn_step_int(sum_val, i, &mut sum_state),
-                NumericArg::Float(f) => apply_kbn_step(sum_val, f, &mut sum_state),
-                NumericArg::Null => unreachable!("NULL early-returned above"),
+                NumericArg::Null => {}
+                NumericArg::Integer(i) => match sum_val {
+                    Value::Null => *sum_val = Value::from_i64(i),
+                    Value::Numeric(Numeric::Integer(acc)) => match acc.checked_add(i) {
+                        Some(total) => *acc = total,
+                        None => {
+                            let prev = *acc;
+                            sum_state.approx = true;
+                            kbn_init_from_int(sum_val, prev, &mut sum_state);
+                            apply_kbn_step_int(sum_val, i, &mut sum_state);
+                        }
+                    },
+                    Value::Numeric(Numeric::Float(_)) => apply_kbn_step_int(sum_val, i, &mut sum_state),
+                    _ => unreachable!("Avg accumulator is Null/Integer/Float"),
+                },
+                NumericArg::Float(f) => match sum_val {
+                    Value::Null => {
+                        *sum_val = Value::from_f64(f);
+                        sum_state.approx = true;
+                    }
+                    Value::Numeric(Numeric::Integer(i)) => {
+                        let prev = *i;
+                        sum_state.approx = true;
+                        kbn_init_from_int(sum_val, prev, &mut sum_state);
+                        apply_kbn_step(sum_val, f, &mut sum_state);
+                    }
+                    Value::Numeric(Numeric::Float(_)) => apply_kbn_step(sum_val, f, &mut sum_state),
+                    _ => unreachable!("Avg accumulator is Null/Integer/Float"),
+                },
             }
             *r_err_val = Value::from_f64(sum_state.r_err);
         }
@@ -8415,10 +8437,14 @@ fn finalize_agg_payload(func: &AggFunc, payload: &mut [Value], take_first: bool)
             } else if let Some(infinite_sum) = sum_of_infinite_inputs(&payload[3], &payload[4]) {
                 infinite_sum
             } else {
-                let sum = payload[0].to_float_or_zero();
                 let r_err = payload[1].to_float_or_zero();
-                // Apply KBN compensation before dividing
-                Value::from_f64((sum + r_err) / count as f64)
+                let total = match &payload[0] {
+                    Value::Numeric(Numeric::Integer(i)) => *i as f64,
+                    Value::Numeric(Numeric::Float(f)) => f64::from(*f) + r_err,
+                    Value::Null => 0.0,
+                    _ => payload[0].to_float_or_zero(),
+                };
+                Value::from_f64(total / count as f64)
             }
         }
         AggFunc::Sum => {
