@@ -169,6 +169,14 @@ impl Database {
         self.errcode
     }
 
+    pub fn last_step_error(&self) -> i32 {
+        self.last_step_error
+    }
+
+    pub fn clear_step_error(&mut self) {
+        self.last_step_error = 0;
+    }
+
     pub fn set_error(&mut self, code: i32) {
         self.errcode = code;
     }

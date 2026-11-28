@@ -267,6 +267,9 @@ impl Session {
                 }
                 let id = self.slot(slot);
                 let valid = self.db().is_valid(id);
+                if valid {
+                    self.db().clear_step_error();
+                }
                 self.result(out, valid);
             }
             0x06 => {
@@ -320,6 +323,10 @@ impl Session {
                 let slot = input.u8();
                 if let Some(id) = self.statements.remove(&slot) {
                     self.drop_statement(id);
+                }
+                let code = self.db().last_step_error();
+                if code > 25 {
+                    self.db().set_error(code);
                 }
                 out.bool(true);
             }
