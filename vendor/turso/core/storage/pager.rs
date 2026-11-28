@@ -2215,10 +2215,8 @@ impl Pager {
         };
         for peer in snapshot {
             // SAFETY: see RegisteredCursor's invariant.
-            let outcome = self
-                .io
-                .block(|| unsafe { peer.as_mut().try_save_position_for_external_balance() });
-            if !matches!(outcome, Ok(SavePositionResult::Saved)) {
+            let outcome = unsafe { peer.as_mut().save_position_for_rollback() };
+            if outcome == SavePositionResult::MustInvalidate {
                 // SAFETY: see RegisteredCursor's invariant.
                 unsafe { peer.as_mut().invalidate_btree_cache() };
             }

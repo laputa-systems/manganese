@@ -874,6 +874,11 @@ pub trait CursorTrait: Any + Send + Sync {
     fn try_save_position_for_external_balance(&mut self) -> IOResultOr<SavePositionResult> {
         Ok(IOResult::Done(SavePositionResult::MustInvalidate))
     }
+    /// Synchronous saveAllCursors for WAL rollback, which cannot yield. Table
+    /// cursors save without IO; index cursors keep the prior invalidation.
+    fn save_position_for_rollback(&mut self) -> SavePositionResult {
+        SavePositionResult::MustInvalidate
+    }
     // --- end: BTreeCursor specific functions ----
 }
 
@@ -7924,6 +7929,16 @@ impl CursorTrait for BTreeCursor {
             seek_op,
         });
         Ok(IOResult::Done(SavePositionResult::Saved))
+    }
+
+    fn save_position_for_rollback(&mut self) -> SavePositionResult {
+        if self.index_info().is_some() {
+            return SavePositionResult::MustInvalidate;
+        }
+        match self.try_save_position_for_external_balance() {
+            Ok(IOResult::Done(result)) => result,
+            _ => SavePositionResult::MustInvalidate,
+        }
     }
 
     #[inline]
