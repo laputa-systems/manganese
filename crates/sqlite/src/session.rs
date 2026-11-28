@@ -322,11 +322,11 @@ impl Session {
             0x09 => {
                 let slot = input.u8();
                 if let Some(id) = self.statements.remove(&slot) {
+                    let code = self.db().final_error(id);
                     self.drop_statement(id);
-                }
-                let code = self.db().last_step_error();
-                if code > 25 {
-                    self.db().set_error(code);
+                    if code > 25 {
+                        self.db().set_error(code);
+                    }
                 }
                 out.bool(true);
             }

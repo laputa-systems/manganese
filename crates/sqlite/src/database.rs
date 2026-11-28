@@ -47,6 +47,7 @@ struct PreparedStatement {
     rollback_aborted: bool,
     reads_table: bool,
     last_result: Option<i32>,
+    final_error: i32,
 }
 
 enum Connection {
@@ -178,6 +179,10 @@ impl Database {
 
     pub fn clear_step_error(&mut self) {
         self.last_step_error = 0;
+    }
+
+    pub fn final_error(&self, id: StatementId) -> i32 {
+        self.statements.get(&id).map_or(0, |statement| statement.final_error)
     }
 
     pub fn set_error(&mut self, code: i32) {
@@ -376,8 +381,35 @@ impl Database {
         }
     }
 
+    fn views_can_be_read(&mut self) -> bool {
+        let saved_errcode = self.errcode;
+        let saved_rowid = self.last_insert_row_id();
+        let mut valid = true;
+        if let Some(rows) = self.query_rows(b"SELECT name FROM sqlite_schema WHERE type='view'") {
+            for row in rows {
+                if let SqlValue::Text(name) = &row[0] {
+                    let quoted = String::from_utf8_lossy(name).replace('"', "\"\"");
+                    if self.query_rows(format!("SELECT * FROM \"{quoted}\"").as_bytes()).is_none() {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+        }
+        self.errcode = saved_errcode;
+        if let Ok(engine) = self.engine() {
+            engine.set_last_insert_rowid(saved_rowid);
+        }
+        valid
+    }
+
     pub fn execute(&mut self, sql: &str) -> bool {
         if self.connection.is_none() {
+            return false;
+        }
+        let upper: Vec<u8> = sql.as_bytes().iter().map(|byte| byte.to_ascii_uppercase()).collect();
+        if upper.starts_with(b"ALTER TABLE") && !self.views_can_be_read() {
+            self.errcode = engine::SQLITE_ERROR;
             return false;
         }
         let mut rest = sql;
@@ -432,7 +464,7 @@ impl Database {
                 Ok(None) | Err(_) => None,
             }
         };
-        self.statements.insert(id, PreparedStatement { engine, ran: false, halted: false, rc: 0, rollback_aborted: false, reads_table: reads_table(sql), last_result: None });
+        self.statements.insert(id, PreparedStatement { engine, ran: false, halted: false, rc: 0, rollback_aborted: false, reads_table: reads_table(sql), last_result: None, final_error: 0 });
         id
     }
 
@@ -484,15 +516,20 @@ impl Database {
         }
         statement.ran = true;
         let code = match engine.step(prepared) {
-            Ok(true) => engine::SQLITE_ROW,
+            Ok(true) => {
+                statement.final_error = 0;
+                engine::SQLITE_ROW
+            }
             Ok(false) => {
                 statement.halted = true;
+                statement.final_error = 0;
                 engine::SQLITE_DONE
             }
             Err(code) => {
                 engine.reset(prepared);
                 statement.halted = true;
                 statement.rc = code;
+                statement.final_error = code;
                 self.last_step_error = code;
                 code
             }
@@ -712,9 +749,6 @@ impl Database {
         }
         let ok = self.succeeded(id);
         self.finalize(id);
-        if self.last_step_error > 25 {
-            self.errcode = self.last_step_error;
-        }
         ok.then_some(rows)
     }
 
@@ -722,18 +756,12 @@ impl Database {
         let id = self.unique_statement(b"SELECT 1 FROM sqlite_schema WHERE type=? AND name=?");
         if !self.is_valid(id) {
             self.finalize(id);
-            if self.last_step_error > 25 {
-                self.errcode = self.last_step_error;
-            }
             return false;
         }
         self.bind(id, 0, &SqlValue::Text(kind.to_vec()));
         self.bind(id, 1, &SqlValue::Text(name.to_vec()));
         let exists = self.step(id);
         self.finalize(id);
-        if self.last_step_error > 25 {
-            self.errcode = self.last_step_error;
-        }
         exists
     }
 
