@@ -61,6 +61,8 @@ pub struct Database {
     transaction_nesting: i32,
     needs_rollback: bool,
     schema_write_in_txn: bool,
+    schema_write_slot: Option<u8>,
+    transaction_slot: Option<u8>,
     errcode: i32,
     epoch: u64,
     next_statement: u64,
@@ -137,6 +139,8 @@ impl Database {
             transaction_nesting: 0,
             needs_rollback: false,
             schema_write_in_txn: false,
+            schema_write_slot: None,
+            transaction_slot: None,
             errcode: 0,
             epoch: 0,
             next_statement: 0,
@@ -161,6 +165,45 @@ impl Database {
             return engine::SQLITE_ERROR;
         }
         self.errcode
+    }
+
+    pub fn set_error(&mut self, code: i32) {
+        self.errcode = code;
+    }
+
+    pub fn last_result(&self, id: StatementId) -> Option<i32> {
+        self.statements
+            .get(&id)
+            .filter(|statement| statement.engine.is_some())
+            .and_then(|statement| statement.last_result)
+    }
+
+    pub fn set_transaction_slot(&mut self, slot: Option<u8>) {
+        self.transaction_slot = slot;
+    }
+
+    pub fn schema_write_slot(&self) -> Option<u8> {
+        self.schema_write_slot
+    }
+
+    pub fn clear_schema_write_slot(&mut self, slot: u8) {
+        if self.schema_write_slot == Some(slot) {
+            self.schema_write_in_txn = false;
+            self.schema_write_slot = None;
+        }
+    }
+
+    pub fn rollback_slot(&mut self, slot: u8) {
+        self.rollback_transaction();
+    }
+
+    pub fn rollback_explicit(&mut self, slot: u8) {
+        if self.schema_write_slot == Some(slot) {
+            self.abort_schema_write_readers();
+            self.schema_write_in_txn = false;
+            self.schema_write_slot = None;
+        }
+        self.rollback_transaction();
     }
 
     pub fn open(&mut self, path: &Path) -> bool {
@@ -335,8 +378,12 @@ impl Database {
                 Err(_) => return false,
             };
             let (mut statement, tail) = prepared;
-            if self.transaction_nesting > 0 && is_schema_write(&rest[..tail]) {
+            if self.transaction_nesting > 0
+                && self.transaction_slot.is_some()
+                && is_schema_write(&rest[..tail])
+            {
                 self.schema_write_in_txn = true;
+                self.schema_write_slot = self.transaction_slot;
             }
             let engine = self.engine().expect("prepared on an open connection");
             let result = loop {
@@ -511,15 +558,20 @@ impl Database {
         true
     }
 
-    fn do_rollback(&mut self) {
-        if self.schema_write_in_txn {
-            for statement in self.statements.values_mut() {
-                if statement.ran && !statement.halted && statement.reads_table {
-                    statement.rollback_aborted = true;
-                }
+    fn abort_schema_write_readers(&mut self) {
+        for statement in self.statements.values_mut() {
+            if statement.ran && !statement.halted && statement.reads_table {
+                statement.rollback_aborted = true;
             }
         }
+    }
+
+    fn do_rollback(&mut self) {
+        if self.schema_write_in_txn {
+            self.abort_schema_write_readers();
+        }
         self.schema_write_in_txn = false;
+        self.schema_write_slot = None;
         if self.autocommit() {
             self.needs_rollback = false;
             return;
@@ -557,6 +609,7 @@ impl Database {
         }
         let succeeded = self.run_sql("COMMIT");
         self.schema_write_in_txn = false;
+        self.schema_write_slot = None;
         if !self.is_open() {
             return false;
         }

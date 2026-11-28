@@ -6,6 +6,7 @@ use sha2::Digest;
 use sha2::Sha256;
 
 use crate::database::Database;
+use crate::engine;
 use crate::database::DatabaseOptions;
 use crate::database::StatementId;
 use crate::meta_table::MetaTable;
@@ -20,6 +21,7 @@ const SUFFIXES: [&str; 3] = ["", "-journal", "-wal"];
 
 #[derive(Clone, Copy)]
 struct TransactionSlot {
+    slot: u8,
     epoch: u64,
     active: bool,
 }
@@ -31,6 +33,7 @@ pub struct Session {
     abandoned: Vec<Database>,
     statements: BTreeMap<u8, StatementId>,
     transactions: BTreeMap<u8, TransactionSlot>,
+    transaction_stack: Vec<u8>,
     meta: bool,
 }
 
@@ -47,6 +50,7 @@ impl Session {
             abandoned: Vec::new(),
             statements: BTreeMap::new(),
             transactions: BTreeMap::new(),
+            transaction_stack: Vec::new(),
             meta: false,
         }
     }
@@ -128,9 +132,10 @@ impl Session {
         if !slot.active {
             return;
         }
+        self.transaction_stack.retain(|value| *value != slot.slot);
         if let Some(database) = self.database.as_mut() {
             if database.epoch() == slot.epoch && database.is_open() {
-                database.rollback_transaction();
+                database.rollback_slot(slot.slot);
             }
         }
     }
@@ -140,6 +145,7 @@ impl Session {
         for slot in slots {
             self.drop_transaction(slot);
         }
+        self.transaction_stack.clear();
     }
 
     fn clear_statements(&mut self) {
@@ -195,6 +201,14 @@ impl Session {
     fn step(&mut self, input: &mut Reader<'_>, out: &mut Writer) {
         let op = input.u8();
         out.u8(op);
+        if self.database.is_some() {
+            let slot = if self.transaction_stack.len() == 1 {
+                self.transaction_stack.first().copied()
+            } else {
+                None
+            };
+            self.db().set_transaction_slot(slot);
+        }
         match op {
             0x01 => {
                 let kind = usize::from(input.u8());
@@ -238,9 +252,15 @@ impl Session {
                 let slot = input.u8();
                 let sql = input.bytes();
                 if let Some(previous) = self.statements.remove(&slot) {
+                    let old_error = self.db().last_result(previous);
                     let id = self.db().unique_statement(&sql);
                     self.drop_statement(previous);
                     self.statements.insert(slot, id);
+                    if let Some(code) = old_error {
+                        if code != engine::SQLITE_ROW && code != engine::SQLITE_DONE {
+                            self.db().set_error(code);
+                        }
+                    }
                 } else {
                     let id = self.db().unique_statement(&sql);
                     self.statements.insert(slot, id);
@@ -307,8 +327,15 @@ impl Session {
                 let slot = input.u8();
                 let epoch = self.db().epoch();
                 let ok = self.db().is_open() && self.db().begin_transaction();
-                if let Some(previous) = self.transactions.insert(slot, TransactionSlot { epoch, active: ok }) {
+                let sole_slot = self.transactions.len() == 1;
+                if let Some(previous) = self.transactions.insert(slot, TransactionSlot { slot, epoch, active: ok }) {
+                    if sole_slot && self.db().schema_write_slot() == Some(previous.slot) {
+                        self.db().clear_schema_write_slot(previous.slot);
+                    }
                     self.drop_transaction(previous);
+                }
+                if ok {
+                    self.transaction_stack.push(slot);
                 }
                 self.result(out, ok);
             }
@@ -319,6 +346,7 @@ impl Session {
                 };
                 transaction.active = false;
                 let epoch = transaction.epoch;
+                self.transaction_stack.retain(|value| *value != slot);
                 let database = self.db();
                 let ok = database.epoch() == epoch && database.has_connection() && database.commit_transaction();
                 self.result(out, ok);
@@ -330,9 +358,10 @@ impl Session {
                 };
                 transaction.active = false;
                 let epoch = transaction.epoch;
+                self.transaction_stack.retain(|value| *value != slot);
                 let database = self.db();
                 if database.epoch() == epoch && database.has_connection() {
-                    database.rollback_transaction();
+                    database.rollback_explicit(slot);
                 }
                 out.bool(true);
             }
