@@ -410,7 +410,10 @@ impl Database {
             return false;
         }
         let upper: Vec<u8> = sql.as_bytes().iter().map(|byte| byte.to_ascii_uppercase()).collect();
-        if upper.starts_with(b"ALTER TABLE") && !self.views_can_be_read() {
+        if upper.starts_with(b"ALTER TABLE")
+            && upper.windows(15).any(|window| window == b" RENAME COLUMN ")
+            && !self.views_can_be_read()
+        {
             self.errcode = engine::SQLITE_ERROR;
             return false;
         }
