@@ -2214,11 +2214,13 @@ impl Pager {
             registry.values().flat_map(|b| b.iter().copied()).collect()
         };
         for peer in snapshot {
-            // SAFETY: see RegisteredCursor's invariant.
-            let outcome = unsafe { peer.as_mut().save_position_for_rollback() };
+            // SAFETY: the handle was copied from the registry under its lock; the
+            // one-statement-per-connection model keeps every other cursor reference
+            // dead, and the cursor stays registered until its statement is recycled.
+            let peer = unsafe { peer.as_mut() };
+            let outcome = peer.save_position_for_rollback();
             if outcome == SavePositionResult::MustInvalidate {
-                // SAFETY: see RegisteredCursor's invariant.
-                unsafe { peer.as_mut().invalidate_btree_cache() };
+                peer.invalidate_btree_cache();
             }
         }
     }

@@ -680,7 +680,8 @@ pub enum CursorSeekState {
     },
 }
 
-/// Outcome of [`CursorTrait::try_save_position_for_external_balance`]. Mirrors
+/// Outcome of [`CursorTrait::try_save_position_for_external_balance`] and
+/// [`CursorTrait::save_position_for_rollback`]. Mirrors
 /// the two paths SQLite's saveCursorPosition takes (btree.c:756) — succeed and
 /// have the caller skip invalidation, or fall through to clearing the cached
 /// page stack.
