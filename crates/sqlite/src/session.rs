@@ -119,7 +119,15 @@ impl Session {
     fn result(&mut self, out: &mut Writer, ok: bool) {
         out.bool(ok);
         let code = if ok { 0 } else { self.db().error_code() };
+        if !ok {
+            self.db().clear_step_error();
+        }
         out.i32(code);
+    }
+
+    fn result_step(&mut self, out: &mut Writer, ok: bool) {
+        out.bool(ok);
+        out.i32(if ok { 0 } else { self.db().error_code() });
     }
 
     fn drop_statement(&mut self, id: StatementId) {
@@ -267,9 +275,6 @@ impl Session {
                 }
                 let id = self.slot(slot);
                 let valid = self.db().is_valid(id);
-                if valid {
-                    self.db().clear_step_error();
-                }
                 self.result(out, valid);
             }
             0x06 => {
@@ -311,7 +316,7 @@ impl Session {
                 out.bytes(&rows.into_inner());
                 out.bool(more);
                 let succeeded = self.db().succeeded(id);
-                self.result(out, succeeded || more);
+                self.result_step(out, succeeded || more);
             }
             0x08 => {
                 let id = self.slot(input.u8());
@@ -343,6 +348,11 @@ impl Session {
                 }
                 if ok {
                     self.transaction_stack.push(slot);
+                } else if self.db().error_code() == 0 {
+                    let code = self.db().last_step_error();
+                    if code > 25 {
+                        self.db().set_error(code);
+                    }
                 }
                 self.result(out, ok);
             }
