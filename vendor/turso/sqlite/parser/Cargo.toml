@@ -1,0 +1,33 @@
+[package]
+name = "turso_parser"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The Turso parser library"
+
+[lints]
+workspace = true
+
+[lib]
+name = "turso_parser"
+
+[features]
+default = []
+codspeed = []
+
+[dependencies]
+turso_ast = { workspace = true }
+turso_macros = { workspace = true }
+memchr = "2.7.6"
+
+[dev-dependencies]
+fallible-iterator = { workspace = true }
+criterion = { workspace = true, features = ["html_reports" ] }
+codspeed-criterion-compat = { workspace = true }
+
+
+[[bench]]
+name = "parser_benchmark"
+harness = false

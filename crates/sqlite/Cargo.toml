@@ -1,0 +1,11 @@
+[package]
+name = "sqlite"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+sha2 = "0.10"
+turso_core = { path = "../../vendor/turso/core", default-features = false, features = ["fs", "time", "secure_delete", "like_doesnt_match_blobs"] }
+turso_sqlite = { path = "../../vendor/turso/sqlite/frontend" }
+turso_parser = { path = "../../vendor/turso/sqlite/parser" }

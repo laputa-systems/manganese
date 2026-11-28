@@ -1,0 +1,128 @@
+use turso_parser::lexer::Lexer;
+use turso_parser::token::TokenType;
+
+pub struct Word<'a> {
+    pub kind: TokenType,
+    pub text: &'a [u8],
+}
+
+pub struct Statement<'a> {
+    pub words: Vec<Word<'a>>,
+    pub end: usize,
+}
+
+pub fn first_statement(sql: &str) -> Statement<'_> {
+    let base = sql.as_ptr() as usize;
+    let mut words = Vec::new();
+    let mut end = sql.len();
+    for token in Lexer::new(sql.as_bytes()) {
+        let Ok(token) = token else { break };
+        match token.token_type {
+            TokenType::TK_NONE => {}
+            TokenType::TK_SEMI => {
+                end = (token.value.as_ptr() as usize).saturating_sub(base) + token.value.len();
+                break;
+            }
+            kind => words.push(Word { kind, text: token.value }),
+        }
+    }
+    Statement { words, end: end.min(sql.len()) }
+}
+
+pub fn is_omitted_pragma(words: &[Word<'_>]) -> bool {
+    let name = match words {
+        [pragma, name, ..] if pragma.kind == TokenType::TK_PRAGMA && words.get(2).is_none_or(|word| word.kind != TokenType::TK_DOT) => name,
+        [pragma, _, dot, name, ..] if pragma.kind == TokenType::TK_PRAGMA && dot.kind == TokenType::TK_DOT => name,
+        _ => return false,
+    };
+    ["function_list", "module_list", "pragma_list", "compile_options"]
+        .iter()
+        .any(|omitted| name.text.eq_ignore_ascii_case(omitted.as_bytes()))
+}
+
+fn is_identifier(kind: TokenType) -> bool {
+    !matches!(
+        kind,
+        TokenType::TK_LP | TokenType::TK_RP | TokenType::TK_SEMI | TokenType::TK_COMMA | TokenType::TK_DOT | TokenType::TK_EOF
+    )
+}
+
+pub fn omits(words: &[Word<'_>]) -> bool {
+    if words.first().is_some_and(|word| matches!(word.kind, TokenType::TK_EXPLAIN | TokenType::TK_ANALYZE | TokenType::TK_REINDEX)) {
+        return true;
+    }
+    for (index, word) in words.iter().enumerate() {
+        let next = words.get(index + 1).map(|word| word.kind);
+        let omitted = match word.kind {
+            TokenType::TK_DO => true,
+            TokenType::TK_OVER => next.is_some_and(|kind| kind == TokenType::TK_LP || is_identifier(kind)),
+            TokenType::TK_FILTER => next == Some(TokenType::TK_LP),
+            TokenType::TK_WINDOW => words.get(index + 2).is_some_and(|word| word.kind == TokenType::TK_AS),
+            TokenType::TK_ID => {
+                next == Some(TokenType::TK_LP)
+                    && ((word.text.len() > 7 && word.text[..7].eq_ignore_ascii_case(b"pragma_"))
+                        || word.text.eq_ignore_ascii_case(b"load_extension"))
+            }
+            _ => false,
+        };
+        if omitted {
+            return true;
+        }
+    }
+    false
+}
+
+pub fn names_view(words: &[Word<'_>], views: &[Vec<u8>]) -> bool {
+    let reads_rows = words.first().is_some_and(|word| {
+        matches!(
+            word.kind,
+            TokenType::TK_SELECT
+                | TokenType::TK_INSERT
+                | TokenType::TK_UPDATE
+                | TokenType::TK_DELETE
+                | TokenType::TK_REPLACE
+                | TokenType::TK_WITH
+                | TokenType::TK_VALUES
+        )
+    });
+    if views.is_empty() || !reads_rows {
+        return false;
+    }
+    words.iter().any(|word| {
+        let text = word.text.strip_prefix(b"\"").and_then(|inner| inner.strip_suffix(b"\"")).unwrap_or(word.text);
+        is_identifier(word.kind) && views.iter().any(|view| view.eq_ignore_ascii_case(text))
+    })
+}
+
+pub enum ConfigPragma {
+    Constant(i64),
+    MmapSize(Option<i64>),
+}
+
+const MAX_MMAP_SIZE: i64 = 268435456;
+
+pub fn config_pragma(words: &[Word<'_>]) -> Option<ConfigPragma> {
+    let rest = match words {
+        [pragma, schema, dot, rest @ ..] if pragma.kind == TokenType::TK_PRAGMA && dot.kind == TokenType::TK_DOT && schema.text.eq_ignore_ascii_case(b"main") => rest,
+        [pragma, rest @ ..] if pragma.kind == TokenType::TK_PRAGMA => rest,
+        _ => return None,
+    };
+    let (name, argument) = match rest {
+        [name] => (name, None),
+        [name, equals, value] if equals.kind == TokenType::TK_EQ => (name, Some(value)),
+        [name, open, value, close] if open.kind == TokenType::TK_LP && close.kind == TokenType::TK_RP => (name, Some(value)),
+        _ => return None,
+    };
+    let lower = name.text.to_ascii_lowercase();
+    match (lower.as_slice(), argument) {
+        (b"secure_delete", None) => Some(ConfigPragma::Constant(1)),
+        (b"recursive_triggers", None) => Some(ConfigPragma::Constant(0)),
+        (b"mmap_size", None) => Some(ConfigPragma::MmapSize(None)),
+        (b"mmap_size", Some(value)) => {
+            let text = std::str::from_utf8(value.text).ok()?;
+            let size: i64 = text.parse().ok()?;
+            Some(ConfigPragma::MmapSize(Some(size.clamp(0, MAX_MMAP_SIZE))))
+        }
+        _ => None,
+    }
+}

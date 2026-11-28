@@ -1,7 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-exclude = ["vendor/zlib-rs", "vendor/rust-brotli", "vendor/ruzstd", "vendor/img", "vendor/smolith", "vendor/rusty-leveldb", "vendor/symphonia"]
+exclude = ["vendor/zlib-rs", "vendor/rust-brotli", "vendor/ruzstd", "vendor/img", "vendor/smolith", "vendor/rusty-leveldb", "vendor/symphonia", "vendor/turso"]
 
 [workspace.package]
 edition = "2024"
